@@ -50,6 +50,26 @@
 				"Win64",
 				"Linux"
 			]
+		},
+		{
+			"Name": "GeometryScripting",
+			"Enabled": true
+		},
+		{
+			"Name": "PCGPythonInterop",
+			"Enabled": true
+		},
+		{
+			"Name": "Aura",
+			"Enabled": true
+		},
+		{
+			"Name": "RemoteControlActorModifierBridge",
+			"Enabled": true
+		},
+		{
+			"Name": "RemoteControlWebInterface",
+			"Enabled": true
 		}
 	]
 }
