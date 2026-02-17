@@ -15,15 +15,13 @@ UCLASS(abstract)
 class URammsUI : public UUserWidget
 {
 	GENERATED_BODY()
-	
-protected:
 
+protected:
 	/** Controls the display of speed in Km/h or MPH */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Vehicle")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Vehicle")
 	bool bIsMPH = false;
 
 public:
-
 	/** Called to update the speed display */
 	void UpdateSpeed(float NewSpeed);
 
@@ -31,12 +29,11 @@ public:
 	void UpdateGear(int32 NewGear);
 
 protected:
-
 	/** Implemented in Blueprint to display the new speed */
-	UFUNCTION(BlueprintImplementableEvent, Category="Vehicle")
+	UFUNCTION(BlueprintImplementableEvent, Category = "Vehicle")
 	void OnSpeedUpdate(float NewSpeed);
 
 	/** Implemented in Blueprint to display the new gear */
-	UFUNCTION(BlueprintImplementableEvent, Category="Vehicle")
+	UFUNCTION(BlueprintImplementableEvent, Category = "Vehicle")
 	void OnGearUpdate(int32 NewGear);
 };

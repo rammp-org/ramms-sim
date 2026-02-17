@@ -14,6 +14,3 @@ class ARammsGameMode : public AGameModeBase
 public:
 	ARammsGameMode();
 };
-
-
-

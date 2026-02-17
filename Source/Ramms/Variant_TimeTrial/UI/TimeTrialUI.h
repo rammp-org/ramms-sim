@@ -19,11 +19,10 @@ UCLASS(abstract)
 class UTimeTrialUI : public UUserWidget
 {
 	GENERATED_BODY()
-	
-protected:
 
+protected:
 	/** Type of start countdown UI widget to spawn */
-	UPROPERTY(EditAnywhere, Category="Start Countdown")
+	UPROPERTY(EditAnywhere, Category = "Start Countdown")
 	TSubclassOf<UTimeTrialStartUI> StartUIClass;
 
 	/** Time when the previous lap started, in seconds */
@@ -39,39 +38,35 @@ protected:
 	int32 CurrentLap = 0;
 
 public:
-
 	/** Delegate to broadcast when the race starts */
 	FStartRaceDelegate OnRaceStart;
 
 protected:
-
 	/** Widget initialization */
 	virtual void NativeConstruct() override;
 
 public:
-
 	/** Increments the lap and updates the lap counter */
 	void UpdateLapCount(int32 Lap, float NewLapStartTime);
 
 	/** Allows Blueprint control to update the lap tracker widgets */
-	UFUNCTION(BlueprintImplementableEvent, Category="Time Trial", meta = (DisplayName = "Update Laps"))
+	UFUNCTION(BlueprintImplementableEvent, Category = "Time Trial", meta = (DisplayName = "Update Laps"))
 	void BP_UpdateLaps();
 
 protected:
-
 	/** Called from the countdown delegate to start the race */
 	UFUNCTION()
 	void StartRace();
 
 	/** Gets the current lap number */
-	UFUNCTION(BlueprintPure, Category="Time Trial")
+	UFUNCTION(BlueprintPure, Category = "Time Trial")
 	int32 GetCurrentLap() const { return CurrentLap; };
 
 	/** Gets the best lap time saved */
-	UFUNCTION(BlueprintPure, Category="Time Trial")
+	UFUNCTION(BlueprintPure, Category = "Time Trial")
 	float GetBestLapTime() const { return BestLapTime; };
 
 	/** Gets the best lap time saved */
-	UFUNCTION(BlueprintPure, Category="Time Trial")
+	UFUNCTION(BlueprintPure, Category = "Time Trial")
 	float GetLapStartTime() const { return LapStartTime; };
 };
