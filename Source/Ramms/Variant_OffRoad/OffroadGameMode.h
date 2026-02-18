@@ -13,9 +13,8 @@ UCLASS(abstract)
 class AOffroadGameMode : public AGameModeBase
 {
 	GENERATED_BODY()
-	
-public:
 
+public:
 	/** Constructor */
 	AOffroadGameMode();
 };

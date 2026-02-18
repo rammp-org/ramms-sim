@@ -13,7 +13,7 @@ UCLASS()
 class URammsOffroadWheelFront : public URammsWheelFront
 {
 	GENERATED_BODY()
-	
+
 public:
 	URammsOffroadWheelFront();
 };

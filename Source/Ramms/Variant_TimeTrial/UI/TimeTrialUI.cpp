@@ -1,6 +1,5 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-
 #include "TimeTrialUI.h"
 #include "TimeTrialStartUI.h"
 
@@ -35,8 +34,9 @@ void UTimeTrialUI::UpdateLapCount(int32 Lap, float NewLapStartTime)
 		{
 			// save the current lap time
 			BestLapTime = LapTime;
-
-		} else {
+		}
+		else
+		{
 
 			// not the first lap: do we have a lower lap time?
 			if (LapTime < BestLapTime)
@@ -44,14 +44,13 @@ void UTimeTrialUI::UpdateLapCount(int32 Lap, float NewLapStartTime)
 				// save the best lap time
 				BestLapTime = LapTime;
 			}
-
 		}
-		
-	} else {
+	}
+	else
+	{
 
 		// first lap: save an invalid lap time
 		BestLapTime = -1.0f;
-
 	}
 
 	// save the current lap

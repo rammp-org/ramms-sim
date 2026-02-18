@@ -1,6 +1,5 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-
 #include "TimeTrialTrackGate.h"
 #include "Components/SceneComponent.h"
 #include "Components/BoxComponent.h"
@@ -8,7 +7,7 @@
 
 ATimeTrialTrackGate::ATimeTrialTrackGate()
 {
- 	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bCanEverTick = true;
 
 	// create the root component
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
@@ -21,7 +20,6 @@ ATimeTrialTrackGate::ATimeTrialTrackGate()
 	CollisionBox->SetLineThickness(32.0f);
 	CollisionBox->bHiddenInGame = false;
 	CollisionBox->SetCollisionProfileName(FName("OverlapAllDynamic"));
-
 }
 
 void ATimeTrialTrackGate::NotifyActorBeginOverlap(AActor* OtherActor)
