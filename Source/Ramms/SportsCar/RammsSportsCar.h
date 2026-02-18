@@ -13,8 +13,7 @@ UCLASS(abstract)
 class ARammsSportsCar : public ARammsPawn
 {
 	GENERATED_BODY()
-	
-public:
 
+public:
 	ARammsSportsCar();
 };

@@ -1,6 +1,5 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-
 #include "TimeTrialGameMode.h"
 #include "Kismet/GameplayStatics.h"
 #include "TimeTrialTrackGate.h"
@@ -20,7 +19,6 @@ void ATimeTrialGameMode::BeginPlay()
 		// get the first returned track marker that matches the tag
 		FinishLineMarker = Cast<ATimeTrialTrackGate>(ActorList[0]);
 	}
-
 }
 
 ATimeTrialTrackGate* ATimeTrialGameMode::GetFinishLine() const

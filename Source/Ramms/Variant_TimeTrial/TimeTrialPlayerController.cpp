@@ -1,6 +1,5 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-
 #include "TimeTrialPlayerController.h"
 #include "TimeTrialUI.h"
 #include "Engine/World.h"
@@ -34,11 +33,11 @@ void ATimeTrialPlayerController::BeginPlay()
 			{
 				// add the controls to the player screen
 				MobileControlsWidget->AddToPlayerScreen(0);
-
-			} else {
+			}
+			else
+			{
 
 				UE_LOG(LogRamms, Error, TEXT("Could not spawn mobile controls widget."));
-
 			}
 		}
 
@@ -51,13 +50,12 @@ void ATimeTrialPlayerController::BeginPlay()
 
 			// subscribe to the race start delegate
 			UIWidget->OnRaceStart.AddDynamic(this, &ATimeTrialPlayerController::StartRace);
-
-		} else {
+		}
+		else
+		{
 
 			UE_LOG(LogRamms, Error, TEXT("Could not spawn Time Trial UI widget."));
-
 		}
-		
 
 		// spawn the UI widget and add it to the viewport
 		VehicleUI = CreateWidget<URammsUI>(this, VehicleUIClass);
@@ -65,14 +63,13 @@ void ATimeTrialPlayerController::BeginPlay()
 		if (VehicleUI)
 		{
 			VehicleUI->AddToViewport(0);
-
-		} else {
+		}
+		else
+		{
 
 			UE_LOG(LogRamms, Error, TEXT("Could not spawn vehicle UI widget."));
-
 		}
 	}
-
 }
 
 void ATimeTrialPlayerController::SetupInputComponent()
@@ -116,7 +113,7 @@ void ATimeTrialPlayerController::OnPossess(APawn* InPawn)
 	if (!bRaceStarted)
 	{
 		VehiclePawn->DisableInput(this);
-	}	
+	}
 }
 
 void ATimeTrialPlayerController::Tick(float Delta)
@@ -138,7 +135,7 @@ void ATimeTrialPlayerController::StartRace()
 		SetTargetGate(GM->GetFinishLine()->GetNextMarker());
 	}
 
-	// raise the race started flag so any respawned vehicles start with controls unlocked 
+	// raise the race started flag so any respawned vehicles start with controls unlocked
 	bRaceStarted = true;
 
 	// start the first lap

@@ -16,7 +16,7 @@ struct FInputActionValue;
  *  Vehicle Pawn class
  *  Handles common functionality for all vehicle types,
  *  including input handling and camera management.
- *  
+ *
  *  Specific vehicle configurations are handled in subclasses.
  */
 UCLASS(abstract)
@@ -25,52 +25,51 @@ class ARammsPawn : public AWheeledVehiclePawn
 	GENERATED_BODY()
 
 	/** Spring Arm for the front camera */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category ="Components", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
 	USpringArmComponent* FrontSpringArm;
 
 	/** Front Camera component */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category ="Components", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
 	UCameraComponent* FrontCamera;
 
 	/** Spring Arm for the back camera */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category ="Components", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
 	USpringArmComponent* BackSpringArm;
 
 	/** Back Camera component */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category ="Components", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
 	UCameraComponent* BackCamera;
 
 	/** Cast pointer to the Chaos Vehicle movement component */
 	TObjectPtr<UChaosWheeledVehicleMovementComponent> ChaosVehicleMovement;
 
 protected:
-
 	/** Steering Action */
-	UPROPERTY(EditAnywhere, Category="Input")
+	UPROPERTY(EditAnywhere, Category = "Input")
 	UInputAction* SteeringAction;
 
 	/** Throttle Action */
-	UPROPERTY(EditAnywhere, Category="Input")
+	UPROPERTY(EditAnywhere, Category = "Input")
 	UInputAction* ThrottleAction;
 
 	/** Brake Action */
-	UPROPERTY(EditAnywhere, Category="Input")
+	UPROPERTY(EditAnywhere, Category = "Input")
 	UInputAction* BrakeAction;
 
 	/** Handbrake Action */
-	UPROPERTY(EditAnywhere, Category="Input")
+	UPROPERTY(EditAnywhere, Category = "Input")
 	UInputAction* HandbrakeAction;
 
 	/** Look Around Action */
-	UPROPERTY(EditAnywhere, Category="Input")
+	UPROPERTY(EditAnywhere, Category = "Input")
 	UInputAction* LookAroundAction;
 
 	/** Toggle Camera Action */
-	UPROPERTY(EditAnywhere, Category="Input")
+	UPROPERTY(EditAnywhere, Category = "Input")
 	UInputAction* ToggleCameraAction;
 
 	/** Reset Vehicle Action */
-	UPROPERTY(EditAnywhere, Category="Input")
+	UPROPERTY(EditAnywhere, Category = "Input")
 	UInputAction* ResetVehicleAction;
 
 	/** Keeps track of which camera is active */
@@ -80,11 +79,11 @@ protected:
 	bool bPreviousFlipCheck = false;
 
 	/** Time between automatic flip checks */
-	UPROPERTY(EditAnywhere, Category="Flip Check", meta = (Units = "s"))
+	UPROPERTY(EditAnywhere, Category = "Flip Check", meta = (Units = "s"))
 	float FlipCheckTime = 3.0f;
 
 	/** Minimum dot product value for the vehicle's up direction that we still consider upright */
-	UPROPERTY(EditAnywhere, Category="Flip Check")
+	UPROPERTY(EditAnywhere, Category = "Flip Check")
 	float FlipCheckMinDot = -0.2f;
 
 	/** Flip check timer */
@@ -113,7 +112,6 @@ public:
 	// End Actor interface
 
 protected:
-
 	/** Handles steering input */
 	void Steering(const FInputActionValue& Value);
 
@@ -141,51 +139,49 @@ protected:
 	void ResetVehicle(const FInputActionValue& Value);
 
 public:
-
 	/** Handle steering input by input actions or mobile interface */
-	UFUNCTION(BlueprintCallable, Category="Input")
+	UFUNCTION(BlueprintCallable, Category = "Input")
 	void DoSteering(float SteeringValue);
 
 	/** Handle throttle input by input actions or mobile interface */
-	UFUNCTION(BlueprintCallable, Category="Input")
+	UFUNCTION(BlueprintCallable, Category = "Input")
 	void DoThrottle(float ThrottleValue);
 
 	/** Handle brake input by input actions or mobile interface */
-	UFUNCTION(BlueprintCallable, Category="Input")
+	UFUNCTION(BlueprintCallable, Category = "Input")
 	void DoBrake(float BrakeValue);
 
 	/** Handle brake start input by input actions or mobile interface */
-	UFUNCTION(BlueprintCallable, Category="Input")
+	UFUNCTION(BlueprintCallable, Category = "Input")
 	void DoBrakeStart();
 
 	/** Handle brake stop input by input actions or mobile interface */
-	UFUNCTION(BlueprintCallable, Category="Input")
+	UFUNCTION(BlueprintCallable, Category = "Input")
 	void DoBrakeStop();
 
 	/** Handle handbrake start input by input actions or mobile interface */
-	UFUNCTION(BlueprintCallable, Category="Input")
+	UFUNCTION(BlueprintCallable, Category = "Input")
 	void DoHandbrakeStart();
 
 	/** Handle handbrake stop input by input actions or mobile interface */
-	UFUNCTION(BlueprintCallable, Category="Input")
+	UFUNCTION(BlueprintCallable, Category = "Input")
 	void DoHandbrakeStop();
 
 	/** Handle look input by input actions or mobile interface */
-	UFUNCTION(BlueprintCallable, Category="Input")
+	UFUNCTION(BlueprintCallable, Category = "Input")
 	void DoLookAround(float YawDelta);
 
 	/** Handle toggle camera input by input actions or mobile interface */
-	UFUNCTION(BlueprintCallable, Category="Input")
+	UFUNCTION(BlueprintCallable, Category = "Input")
 	void DoToggleCamera();
 
 	/** Handle reset vehicle input by input actions or mobile interface */
-	UFUNCTION(BlueprintCallable, Category="Input")
+	UFUNCTION(BlueprintCallable, Category = "Input")
 	void DoResetVehicle();
 
 protected:
-
 	/** Called when the brake lights are turned on or off */
-	UFUNCTION(BlueprintImplementableEvent, Category="Vehicle")
+	UFUNCTION(BlueprintImplementableEvent, Category = "Vehicle")
 	void BrakeLights(bool bBraking);
 
 	/** Checks if the car is flipped upside down and automatically resets it */

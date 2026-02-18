@@ -14,23 +14,22 @@ class URammsUI;
  *  Vehicle Player Controller class
  *  Handles input mapping and user interface
  */
-UCLASS(abstract, Config="Game")
+UCLASS(abstract, Config = "Game")
 class ARammsPlayerController : public APlayerController
 {
 	GENERATED_BODY()
 
 protected:
-
 	/** Input Mapping Contexts */
-	UPROPERTY(EditAnywhere, Category ="Input|Input Mappings")
+	UPROPERTY(EditAnywhere, Category = "Input|Input Mappings")
 	TArray<UInputMappingContext*> DefaultMappingContexts;
 
 	/** Input Mapping Contexts */
-	UPROPERTY(EditAnywhere, Category="Input|Input Mappings")
+	UPROPERTY(EditAnywhere, Category = "Input|Input Mappings")
 	TArray<UInputMappingContext*> MobileExcludedMappingContexts;
 
 	/** Mobile controls widget to spawn */
-	UPROPERTY(EditAnywhere, Category="Input|Touch Controls")
+	UPROPERTY(EditAnywhere, Category = "Input|Touch Controls")
 	TSubclassOf<UUserWidget> MobileControlsWidgetClass;
 
 	/** Pointer to the mobile controls widget */
@@ -52,22 +51,21 @@ protected:
 	UInputMappingContext* SteeringWheelInputMappingContext;
 
 	/** Type of vehicle to automatically respawn when it's destroyed */
-	UPROPERTY(EditAnywhere, Category="Vehicle|Respawn")
+	UPROPERTY(EditAnywhere, Category = "Vehicle|Respawn")
 	TSubclassOf<ARammsPawn> VehiclePawnClass;
 
 	/** Pointer to the controlled vehicle pawn */
 	TObjectPtr<ARammsPawn> VehiclePawn;
 
 	/** Type of the UI to spawn */
-	UPROPERTY(EditAnywhere, Category="Vehicle|UI")
+	UPROPERTY(EditAnywhere, Category = "Vehicle|UI")
 	TSubclassOf<URammsUI> VehicleUIClass;
 
 	/** Pointer to the UI widget */
 	UPROPERTY()
 	TObjectPtr<URammsUI> VehicleUI;
-		
-protected:
 
+protected:
 	/** Gameplay initialization */
 	virtual void BeginPlay() override;
 
@@ -75,12 +73,10 @@ protected:
 	virtual void SetupInputComponent() override;
 
 public:
-
 	/** Update vehicle UI on tick */
 	virtual void Tick(float Delta) override;
 
 protected:
-
 	/** Pawn setup */
 	virtual void OnPossess(APawn* InPawn) override;
 

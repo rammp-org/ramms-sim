@@ -17,24 +17,20 @@ UCLASS(abstract)
 class UTimeTrialStartUI : public UUserWidget
 {
 	GENERATED_BODY()
-	
-public:
 
+public:
 	/** Starts the race countdown */
 	void StartCountdown();
 
 protected:
-
 	/** Passes control to Blueprint to animate the race countdown. FinishCountdown should be called to start the race when it's done. */
-	UFUNCTION(BlueprintImplementableEvent, Category="Countdown", meta = (DisplayName = "Start Countdown"))
+	UFUNCTION(BlueprintImplementableEvent, Category = "Countdown", meta = (DisplayName = "Start Countdown"))
 	void BP_StartCountdown();
 
 	/** Finishes the countdown and starts the race. */
-	UFUNCTION(BlueprintCallable, Category="Countdown")
+	UFUNCTION(BlueprintCallable, Category = "Countdown")
 	void FinishCountdown();
 
 public:
-
 	FCountdownFinishedDelegate OnCountdownFinished;
-
 };

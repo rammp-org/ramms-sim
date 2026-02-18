@@ -1,6 +1,5 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-
 #include "RammsPlayerController.h"
 #include "RammsPawn.h"
 #include "RammsUI.h"
@@ -15,7 +14,7 @@
 void ARammsPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
-	
+
 	// ensure we're attached to the vehicle pawn so that World Partition streaming works correctly
 	bAttachToPawn = true;
 
@@ -31,14 +30,13 @@ void ARammsPlayerController::BeginPlay()
 			{
 				// add the controls to the player screen
 				MobileControlsWidget->AddToPlayerScreen(0);
-
-			} else {
+			}
+			else
+			{
 
 				UE_LOG(LogRamms, Error, TEXT("Could not spawn mobile controls widget."));
-
 			}
 		}
-		
 
 		// spawn the UI widget and add it to the viewport
 		VehicleUI = CreateWidget<URammsUI>(this, VehicleUIClass);
@@ -46,11 +44,11 @@ void ARammsPlayerController::BeginPlay()
 		if (VehicleUI)
 		{
 			VehicleUI->AddToViewport();
-
-		} else {
+		}
+		else
+		{
 
 			UE_LOG(LogRamms, Error, TEXT("Could not spawn vehicle UI widget."));
-
 		}
 	}
 }
@@ -58,7 +56,7 @@ void ARammsPlayerController::BeginPlay()
 void ARammsPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
-	
+
 	// only add IMCs for local player controllers
 	if (IsLocalPlayerController())
 	{

@@ -1,6 +1,5 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-
 #include "RammsUI.h"
 
 void URammsUI::UpdateSpeed(float NewSpeed)

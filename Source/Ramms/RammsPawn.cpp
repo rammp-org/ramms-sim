@@ -51,7 +51,6 @@ ARammsPawn::ARammsPawn()
 
 	// get the Chaos Wheeled movement component
 	ChaosVehicleMovement = CastChecked<UChaosWheeledVehicleMovementComponent>(GetVehicleMovement());
-
 }
 
 void ARammsPawn::SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent)
@@ -60,30 +59,30 @@ void ARammsPawn::SetupPlayerInputComponent(class UInputComponent* PlayerInputCom
 
 	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent))
 	{
-		// steering 
+		// steering
 		EnhancedInputComponent->BindAction(SteeringAction, ETriggerEvent::Triggered, this, &ARammsPawn::Steering);
 		EnhancedInputComponent->BindAction(SteeringAction, ETriggerEvent::Completed, this, &ARammsPawn::Steering);
 
-		// throttle 
+		// throttle
 		EnhancedInputComponent->BindAction(ThrottleAction, ETriggerEvent::Triggered, this, &ARammsPawn::Throttle);
 		EnhancedInputComponent->BindAction(ThrottleAction, ETriggerEvent::Completed, this, &ARammsPawn::Throttle);
 
-		// break 
+		// break
 		EnhancedInputComponent->BindAction(BrakeAction, ETriggerEvent::Triggered, this, &ARammsPawn::Brake);
 		EnhancedInputComponent->BindAction(BrakeAction, ETriggerEvent::Started, this, &ARammsPawn::StartBrake);
 		EnhancedInputComponent->BindAction(BrakeAction, ETriggerEvent::Completed, this, &ARammsPawn::StopBrake);
 
-		// handbrake 
+		// handbrake
 		EnhancedInputComponent->BindAction(HandbrakeAction, ETriggerEvent::Started, this, &ARammsPawn::StartHandbrake);
 		EnhancedInputComponent->BindAction(HandbrakeAction, ETriggerEvent::Completed, this, &ARammsPawn::StopHandbrake);
 
-		// look around 
+		// look around
 		EnhancedInputComponent->BindAction(LookAroundAction, ETriggerEvent::Triggered, this, &ARammsPawn::LookAround);
 
-		// toggle camera 
+		// toggle camera
 		EnhancedInputComponent->BindAction(ToggleCameraAction, ETriggerEvent::Triggered, this, &ARammsPawn::ToggleCamera);
 
-		// reset the vehicle 
+		// reset the vehicle
 		EnhancedInputComponent->BindAction(ResetVehicleAction, ETriggerEvent::Triggered, this, &ARammsPawn::ResetVehicle);
 	}
 	else
@@ -285,11 +284,12 @@ void ARammsPawn::FlippedCheck()
 			// reset the vehicle to upright
 			DoResetVehicle();
 		}
-		
+
 		// set the flipped check flag so the next check resets the car
 		bPreviousFlipCheck = true;
-
-	} else {
+	}
+	else
+	{
 
 		// we're upright. reset the flipped check flag
 		bPreviousFlipCheck = false;
