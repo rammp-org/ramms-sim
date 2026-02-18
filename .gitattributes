@@ -1,2 +1,1 @@
 Content/mebot/SkeletalMeshes/chassis.uasset filter=lfs diff=lfs merge=lfs -text
-Content/Vehicles/IDBuzz/SkeletalMeshes/idbuzz.uasset filter=lfs diff=lfs merge=lfs -text
