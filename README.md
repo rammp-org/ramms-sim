@@ -2,6 +2,26 @@
 
 Robotic Assistive Mobility and Manipulation Simulation (RAMMS) - An Unreal Engine 5 based simulation environment for robotic assistive technologies.
 
+<!-- markdown-toc start - Don't edit this section. Run M-x markdown-toc-refresh-toc -->
+**Table of Contents**
+
+- [RAMMS-Sim](#ramms-sim)
+  - [Overview](#overview)
+  - [Prerequisites](#prerequisites)
+  - [Developing](#developing)
+    - [Code style](#code-style)
+  - [Installation](#installation)
+  - [Example Environments](#example-environments)
+  - [Current Functionality](#current-functionality)
+    - [1. Mobile Robotic Base (MeBot) Simulation](#1-mobile-robotic-base-mebot-simulation)
+    - [2. Accessible Van with Ramp](#2-accessible-van-with-ramp)
+    - [3. Kinova Jaco Gen 3 Manipulator](#3-kinova-jaco-gen-3-manipulator)
+  - [License](#license)
+  - [Contributing](#contributing)
+  - [Contact](#contact)
+
+<!-- markdown-toc end -->
+
 ## Overview
 
 RAMMS-Sim provides a high-fidelity simulation environment for developing and testing robotic assistive mobility and manipulation systems. Built on Unreal Engine 5, it offers realistic physics, rendering, and interaction capabilities for research and development in assistive robotics.
@@ -11,6 +31,24 @@ RAMMS-Sim provides a high-fidelity simulation environment for developing and tes
 - Unreal Engine 5
 - Git with Git LFS support
 - Git LFS configured on your system
+
+## Developing
+
+If you want to contribute or customize the plugin, you can clone the repository
+and set it up in your Unreal project. If you want to make changes to the code,
+please follow the code style guidelines below.
+
+### Code style
+
+1. Ensure `clang-format` is installed
+2. Ensure [pre-commit](https://pre-commit.com) is installed
+3. Set up `pre-commit` for this repository:
+
+  ``` console
+  pre-commit install
+  ```
+
+This helps ensure that consistent code formatting is applied.
 
 ## Installation
 
