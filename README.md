@@ -29,8 +29,6 @@ RAMMS-Sim provides a high-fidelity simulation environment for developing and tes
 ## Prerequisites
 
 - Unreal Engine 5
-- Git with Git LFS support
-- Git LFS configured on your system
 
 ## Developing
 
@@ -52,7 +50,8 @@ This helps ensure that consistent code formatting is applied.
 
 ## Installation
 
-This repository uses submodules for plugins and Git LFS for large assets. Clone recursively to ensure all dependencies are included:
+This repository uses submodules for plugins. Clone recursively to ensure all
+dependencies are included:
 
 ```bash
 git clone --recursive https://github.com/rammp-org/ramms-sim.git
@@ -62,13 +61,6 @@ If you've already cloned the repository without `--recursive`, initialize the su
 
 ```bash
 git submodule update --init --recursive
-```
-
-Ensure Git LFS is installed and configured to download all assets:
-
-```bash
-git lfs install
-git lfs pull
 ```
 
 ## Example Environments
