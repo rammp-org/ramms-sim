@@ -22,6 +22,8 @@ Robotic Assistive Mobility and Manipulation Simulation (RAMMS) - An Unreal Engin
 
 <!-- markdown-toc end -->
 
+https://github.com/user-attachments/assets/fdc96795-279f-4ccf-a092-382f6755a65d
+
 ## Overview
 
 RAMMS-Sim provides a high-fidelity simulation environment for developing and testing robotic assistive mobility and manipulation systems. Built on Unreal Engine 5, it offers realistic physics, rendering, and interaction capabilities for research and development in assistive robotics.
