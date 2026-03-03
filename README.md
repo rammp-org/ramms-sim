@@ -40,6 +40,10 @@ please follow the code style guidelines below.
 
 ### Code style
 
+See:
+
+https://dev.epicgames.com/documentation/en-us/unreal-engine/epic-cplusplus-coding-standard-for-unreal-engine
+
 1. Ensure `clang-format` is installed
 2. Ensure [pre-commit](https://pre-commit.com) is installed
 3. Set up `pre-commit` for this repository:
