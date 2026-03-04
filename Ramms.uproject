@@ -60,10 +60,6 @@
 			"Enabled": true
 		},
 		{
-			"Name": "Aura",
-			"Enabled": true
-		},
-		{
 			"Name": "RemoteControlActorModifierBridge",
 			"Enabled": true
 		},
