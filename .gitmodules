@@ -7,3 +7,6 @@
 [submodule "Plugins/RammsStreaming"]
 	path = Plugins/RammsStreaming
 	url = git@github.com:atdev-inc/ramms-streaming
+[submodule "Plugins/RammsAssets"]
+	path = Plugins/RammsAssets
+	url = git@github.com:atdev-inc/ramms-assets
