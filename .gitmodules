@@ -1,12 +1,12 @@
 [submodule "Plugins/RammsCore"]
 	path = Plugins/RammsCore
-	url = git@github.com:atdev-inc/ramms-core
+	url = git@github.com:rammp-org/ramms-core
 [submodule "Plugins/CameraCapture"]
 	path = Plugins/CameraCapture
 	url = git@github.com:finger563/unreal-camera-capture
 [submodule "Plugins/RammsStreaming"]
 	path = Plugins/RammsStreaming
-	url = git@github.com:atdev-inc/ramms-streaming
+	url = git@github.com:rammp-org/ramms-streaming
 [submodule "Plugins/RammsAssets"]
 	path = Plugins/RammsAssets
-	url = git@github.com:atdev-inc/ramms-assets
+	url = git@github.com:rammp-org/ramms-assets
