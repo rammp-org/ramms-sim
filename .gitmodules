@@ -10,3 +10,12 @@
 [submodule "Plugins/RammsAssets"]
 	path = Plugins/RammsAssets
 	url = git@github.com:rammp-org/ramms-assets
+[submodule "Plugins/RammsHumanPhysics"]
+	path = Plugins/RammsHumanPhysics
+	url = git@github.com:rammp-org/ramms-human-physics
+[submodule "Plugins/RammsNewtonPhysics"]
+	path = Plugins/RammsNewtonPhysics
+	url = git@github.com:rammp-org/ramms-newton-physics
+[submodule "Plugins/RammsMujocoPhysics"]
+	path = Plugins/RammsMujocoPhysics
+	url = git@github.com:rammp-org/ramms-mujoco-physics
