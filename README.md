@@ -63,7 +63,6 @@ Engine 5.7, it offers:
 - **Windows** with DirectX 12 (recommended) or **Linux** with Vulkan SM6
 - **GPU with ray tracing support** — Required for GPU-accelerated sensors;
   RT cores used when available, software ray tracing otherwise
-- **Git LFS** — Large binary assets are tracked with Git LFS
 - **Python 3.10+** (optional) — For remote execution scripts
 
 ## Installation
@@ -73,8 +72,6 @@ This repository uses git submodules for plugins. Clone recursively:
 ```bash
 git clone --recursive https://github.com/rammp-org/ramms-sim.git
 cd ramms-sim
-git lfs install
-git lfs pull
 ```
 
 If you've already cloned without `--recursive`, initialize the submodules:
