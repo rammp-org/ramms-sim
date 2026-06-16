@@ -10,6 +10,12 @@ Engine 5.7 simulation environment for robotic assistive technologies.
   - [Overview](#overview)
   - [Prerequisites](#prerequisites)
   - [Installation](#installation)
+  - [Building from the Command Line](#building-from-the-command-line)
+    - [Locate your engine installation](#locate-your-engine-installation)
+    - [Compile the editor target](#compile-the-editor-target)
+    - [Compile a standalone game target](#compile-a-standalone-game-target)
+    - [Package the project](#package-the-project)
+    - [Regenerate IDE project files (optional)](#regenerate-ide-project-files-optional)
   - [Project Structure](#project-structure)
     - [Plugin Submodules](#plugin-submodules)
     - [Directory Layout](#directory-layout)
@@ -82,6 +88,134 @@ git submodule update --init --recursive
 
 Then open `Ramms.uproject` in Unreal Engine 5.7. The plugins are automatically
 detected and compiled.
+
+## Building from the Command Line
+
+You can compile the C++ (project module + all plugin modules, including
+`RammsCore`) entirely from a terminal without opening the editor. This is the
+fastest way to validate C++ changes in CI or after editing controllers/plugins.
+
+These commands invoke **UnrealBuildTool (UBT)** through the engine's batch
+scripts. They build directly from `Ramms.uproject` and the `.Target.cs` files —
+generating IDE project files is optional (see the last subsection).
+
+> Prerequisites: submodules initialized (see [Installation](#installation)) and
+> a full UE 5.7 installation. The required .NET toolchain ships with the engine.
+
+The project defines two targets:
+
+| Target | Use |
+|--------|-----|
+| `RammsEditor` | Editor modules — build this to load the project (and your C++) in the editor or to run editor/commandlet/headless-editor sessions. |
+| `Ramms` | Standalone game/runtime — build this for packaged or `-game` runs. |
+
+Valid build configurations: `Debug`, `DebugGame`, `Development` (default),
+`Test`, `Shipping`. Platform tokens: `Win64`, `Mac`, `Linux`.
+
+### Locate your engine installation
+
+Set a variable pointing at your UE 5.7 root, then reuse it below. Adjust the
+path to match your install.
+
+**Windows (PowerShell):**
+```powershell
+$UE = "C:\Program Files\Epic Games\UE_5.7"
+```
+
+**Windows (cmd):**
+```bat
+set "UE=C:\Program Files\Epic Games\UE_5.7"
+```
+
+**macOS (zsh/bash):**
+```bash
+UE="/Users/Shared/Epic Games/UE_5.7"
+```
+
+**Linux (bash):**
+```bash
+UE="$HOME/UnrealEngine"   # your UE 5.7 install/build root (no Epic launcher on Linux)
+```
+
+Run the commands below from the repository root (the folder containing
+`Ramms.uproject`).
+
+### Compile the editor target
+
+This is the usual command after changing C++ — it rebuilds the project and every
+plugin module, so you can launch the editor without triggering a Live Coding /
+hot-reload pass.
+
+**Windows (PowerShell):**
+```powershell
+& "$UE\Engine\Build\BatchFiles\Build.bat" RammsEditor Win64 Development -Project="$PWD\Ramms.uproject" -WaitMutex
+```
+
+**macOS:**
+```bash
+"$UE/Engine/Build/BatchFiles/Mac/Build.sh" RammsEditor Mac Development -Project="$PWD/Ramms.uproject" -WaitMutex
+```
+
+**Linux:**
+```bash
+"$UE/Engine/Build/BatchFiles/Linux/Build.sh" RammsEditor Linux Development -Project="$PWD/Ramms.uproject" -WaitMutex
+```
+
+### Compile a standalone game target
+
+Swap the target to `Ramms` (and pick a configuration, e.g. `Shipping`) to build
+the runtime game module:
+
+**Windows (PowerShell):**
+```powershell
+& "$UE\Engine\Build\BatchFiles\Build.bat" Ramms Win64 Development -Project="$PWD\Ramms.uproject" -WaitMutex
+```
+
+**macOS / Linux:** use the platform's `Build.sh` (as above) with target `Ramms`
+and platform `Mac` / `Linux`.
+
+### Package the project
+
+To cook content and produce a runnable build (not just compile), use the
+Unreal Automation Tool (`RunUAT`):
+
+**Windows (PowerShell):**
+```powershell
+& "$UE\Engine\Build\BatchFiles\RunUAT.bat" BuildCookRun `
+  -Project="$PWD\Ramms.uproject" -NoP4 `
+  -Platform=Win64 -ClientConfig=Development `
+  -Build -Cook -Stage -Pak -Archive -ArchiveDirectory="$PWD\Packaged"
+```
+
+**macOS / Linux:**
+```bash
+"$UE/Engine/Build/BatchFiles/RunUAT.sh" BuildCookRun \
+  -Project="$PWD/Ramms.uproject" -NoP4 \
+  -Platform=Mac -ClientConfig=Development \
+  -Build -Cook -Stage -Pak -Archive -ArchiveDirectory="$PWD/Packaged"
+```
+(Use `-Platform=Linux` on Linux.) The packaged output lands in `Packaged/`.
+
+### Regenerate IDE project files (optional)
+
+Only needed for IDE/IntelliSense (Visual Studio, Rider, VS Code, Xcode) or after
+adding modules / editing a `.Build.cs`. It is **not** required for the
+command-line builds above.
+
+**Windows (PowerShell):**
+```powershell
+& "$UE\Engine\Build\BatchFiles\Build.bat" -ProjectFiles -Project="$PWD\Ramms.uproject" -Game -Engine -Progress
+```
+
+**macOS:**
+```bash
+"$UE/Engine/Build/BatchFiles/Mac/GenerateProjectFiles.sh" -Project="$PWD/Ramms.uproject" -Game -Engine
+```
+
+**Linux:**
+```bash
+"$UE/Engine/Build/BatchFiles/Linux/GenerateProjectFiles.sh" -Project="$PWD/Ramms.uproject" -Game -Engine
+```
 
 ## Project Structure
 
