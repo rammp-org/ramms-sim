@@ -75,3 +75,9 @@ DerivedDataCache/*
 .vsconfig
 .vs
 .DS_Store
+
+# --- RAMMS: external marketplace content (download from the team Google Drive, NOT committed) ---
+/Content/OfficeMedley/
+/Content/ConvenienceStore/
+/Content/BookStackBPV2/
+/Content/PM_Grip.uasset

@@ -17,7 +17,10 @@ public class Ramms : ModuleRules
 			"ChaosVehicles",
 			"PhysicsCore",
 			"UMG",
-			"Slate"
+			"Slate",
+			"HeadMountedDisplay",   // UMotionControllerComponent
+			"XRBase",               // UHeadMountedDisplayFunctionLibrary
+			"RammsCore"             // Kinova arm + gripper controllers (VR teleop)
 		});
 
 		PublicIncludePaths.AddRange(new string[] {
