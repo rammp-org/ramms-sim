@@ -1,0 +1,246 @@
+<?xml version='1.0' encoding='utf-8'?>
+<mujoco model="gen3_2f85">
+  <compiler angle="radian" />
+
+  <option impratio="10" integrator="implicitfast" cone="elliptic" />
+
+  <size nkey="1" />
+
+  <default>
+    <site size="0.001 0.005 0.005" group="4" rgba="0.5 0.5 0.5 0.3" />
+    <default class="visual">
+      <geom type="mesh" contype="0" conaffinity="0" group="2" rgba="0.75294 0.75294 0.75294 1" />
+    </default>
+    <default class="collision">
+      <geom type="mesh" group="3" />
+    </default>
+    <default class="large_actuator">
+      <general forcerange="-105 105" biastype="affine" gainprm="2000" biasprm="0 -2000 -100" />
+    </default>
+    <default class="small_actuator">
+      <general forcerange="-52 52" biastype="affine" gainprm="500" biasprm="0 -500 -50" />
+    </default>
+    <default class="2f85_main">
+      <site size="0.005 0.005 0.005" group="0" rgba="0.5 0.5 0.5 1" />
+      <default class="2f85_2f85">
+        <mesh scale="0.001 0.001 0.001" />
+        <general biastype="affine" />
+        <default class="2f85_driver">
+          <joint solreflimit="0.005" solimplimit="0.95 0.99" range="0 0.8" armature="0.005" damping="0.1" />
+        </default>
+        <default class="2f85_follower">
+          <joint solreflimit="0.005" solimplimit="0.95 0.99" range="-0.872664 0.872664" armature="0.001" />
+        </default>
+        <default class="2f85_spring_link">
+          <joint springref="2.62" stiffness="0.05" range="-0.296706 0.8" armature="0.001" damping="0.00125" />
+        </default>
+        <default class="2f85_coupler">
+          <joint solreflimit="0.005" solimplimit="0.95 0.99" range="-1.57 0" armature="0.001" />
+        </default>
+        <default class="2f85_visual">
+          <geom type="mesh" contype="0" conaffinity="0" group="2" />
+        </default>
+        <default class="2f85_collision">
+          <geom type="mesh" group="3" />
+          <default class="2f85_pad_box1">
+            <geom size="0.011 0.004 0.009375" type="box" priority="1" friction="0.7" solref="0.004" solimp="0.95 0.99" rgba="0.55 0.55 0.55 1" />
+          </default>
+          <default class="2f85_pad_box2">
+            <geom size="0.011 0.004 0.009375" type="box" priority="1" friction="0.6" solref="0.004" solimp="0.95 0.99" rgba="0.45 0.45 0.45 1" />
+          </default>
+        </default>
+      </default>
+    </default>
+  </default>
+
+  <asset>
+    <material name="2f85_metal" rgba="0.58 0.58 0.58 1" />
+    <material name="2f85_silicone" rgba="0.1882 0.1882 0.1882 1" />
+    <material name="2f85_gray" rgba="0.4627 0.4627 0.4627 1" />
+    <material name="2f85_black" rgba="0.149 0.149 0.149 1" />
+    <mesh name="base_link" file="assets/base_link.stl" />
+    <mesh name="shoulder_link" file="assets/shoulder_link.stl" />
+    <mesh name="half_arm_1_link" file="assets/half_arm_1_link.stl" />
+    <mesh name="half_arm_2_link" file="assets/half_arm_2_link.stl" />
+    <mesh name="forearm_link" file="assets/forearm_link.stl" />
+    <mesh name="spherical_wrist_1_link" file="assets/spherical_wrist_1_link.stl" />
+    <mesh name="spherical_wrist_2_link" file="assets/spherical_wrist_2_link.stl" />
+    <mesh name="bracelet_with_vision_link" file="assets/bracelet_with_vision_link.stl" />
+    <mesh name="2f85_base_mount" class="2f85_2f85" file="assets/base_mount.stl" />
+    <mesh name="2f85_base" class="2f85_2f85" file="assets/base.stl" />
+    <mesh name="2f85_driver" class="2f85_2f85" file="assets/driver.stl" />
+    <mesh name="2f85_coupler" class="2f85_2f85" file="assets/coupler.stl" />
+    <mesh name="2f85_follower" class="2f85_2f85" file="assets/follower.stl" />
+    <mesh name="2f85_pad" class="2f85_2f85" file="assets/pad.stl" />
+    <mesh name="2f85_silicone_pad" class="2f85_2f85" file="assets/silicone_pad.stl" />
+    <mesh name="2f85_spring_link" class="2f85_2f85" file="assets/spring_link.stl" />
+  </asset>
+
+  <worldbody>
+    <body name="base_link">
+      <inertial pos="-0.000648 -0.000166 0.084487" quat="0.999294 0.00139618 -0.0118387 0.035636" mass="1.697" diaginertia="0.00462407 0.00449437 0.00207755" />
+      <joint type="free" armature="0.5" damping="30 30 30" />
+      <geom class="visual" mesh="base_link" />
+      <geom class="collision" mesh="base_link" />
+      <body name="shoulder_link" pos="0 0 0.15643" quat="0 1 0 0">
+        <inertial pos="-2.3e-05 -0.010364 -0.07336" quat="0.707051 0.0451246 -0.0453544 0.704263" mass="1.3773" diaginertia="0.00488868 0.00457 0.00135132" />
+        <joint name="joint_1" pos="0 0 0" axis="0 0 1" />
+        <geom class="visual" mesh="shoulder_link" />
+        <geom class="collision" mesh="shoulder_link" />
+        <body name="half_arm_1_link" pos="0 0.005375 -0.12838" quat="0.707107 0.707107 0 0">
+          <inertial pos="-4.4e-05 -0.09958 -0.013278" quat="0.482348 0.516286 -0.516862 0.483366" mass="1.1636" diaginertia="0.0113017 0.011088 0.00102532" />
+          <joint name="joint_2" pos="0 0 0" axis="0 0 1" range="-2.24 2.24" />
+          <geom class="visual" mesh="half_arm_1_link" />
+          <geom class="collision" mesh="half_arm_1_link" />
+          <body name="half_arm_2_link" pos="0 -0.21038 -0.006375" quat="0.707107 -0.707107 0 0">
+            <inertial pos="-4.4e-05 -0.006641 -0.117892" quat="0.706144 0.0213722 -0.0209128 0.707437" mass="1.1636" diaginertia="0.0111633 0.010932 0.00100671" />
+            <joint name="joint_3" pos="0 0 0" axis="0 0 1" />
+            <geom class="visual" mesh="half_arm_2_link" />
+            <geom class="collision" mesh="half_arm_2_link" />
+            <body name="forearm_link" pos="0 0.006375 -0.21038" quat="0.707107 0.707107 0 0">
+              <inertial pos="-1.8e-05 -0.075478 -0.015006" quat="0.483678 0.515961 -0.515859 0.483455" mass="0.9302" diaginertia="0.00834839 0.008147 0.000598606" />
+              <joint name="joint_4" pos="0 0 0" axis="0 0 1" range="-2.57 2.57" />
+              <geom class="visual" mesh="forearm_link" />
+              <geom class="collision" mesh="forearm_link" />
+              <body name="spherical_wrist_1_link" pos="0 -0.20843 -0.006375" quat="0.707107 -0.707107 0 0">
+                <inertial pos="1e-06 -0.009432 -0.063883" quat="0.703558 0.0707492 -0.0707492 0.703558" mass="0.6781" diaginertia="0.00165901 0.001596 0.000346988" />
+                <joint name="joint_5" pos="0 0 0" axis="0 0 1" />
+                <geom class="visual" mesh="spherical_wrist_1_link" />
+                <geom class="collision" mesh="spherical_wrist_1_link" />
+                <body name="spherical_wrist_2_link" pos="0 0.00017505 -0.10593" quat="0.707107 0.707107 0 0">
+                  <inertial pos="1e-06 -0.045483 -0.00965" quat="0.44426 0.550121 -0.550121 0.44426" mass="0.6781" diaginertia="0.00170087 0.001641 0.00035013" />
+                  <joint name="joint_6" pos="0 0 0" axis="0 0 1" range="-2.09 2.09" />
+                  <geom class="visual" mesh="spherical_wrist_2_link" />
+                  <geom class="collision" mesh="spherical_wrist_2_link" />
+                  <body name="bracelet_link" pos="0 -0.10593 -0.00017505" quat="0.707107 -0.707107 0 0">
+                    <inertial pos="0.000281 0.011402 -0.029798" quat="0.394358 0.596779 -0.577293 0.393789" mass="0.5" diaginertia="0.000657336 0.000587019 0.000320645" />
+                    <joint name="joint_7" pos="0 0 0" axis="0 0 1" />
+                    <geom class="visual" mesh="bracelet_with_vision_link" />
+                    <geom class="collision" mesh="bracelet_with_vision_link" />
+                    <site name="pinch_site" pos="0 0 -0.061525" quat="0 1 0 0" />
+                    <camera name="wrist" pos="0 -0.05639 -0.058475" quat="0 0 0 1" resolution="640 480" fovy="41.8379" />
+                    <body name="2f85_base_mount" childclass="2f85_2f85" pos="0 0 -0.068525" quat="0 1 0 0">
+                      <geom class="2f85_visual" material="2f85_black" mesh="2f85_base_mount" />
+                      <geom class="2f85_collision" mesh="2f85_base_mount" />
+                      <body name="2f85_base" pos="0 0 0.0038" quat="0.707107 0 0 -0.707107">
+                        <inertial pos="0 -2.70394e-05 0.0354675" quat="0.999999 -0.00152849 0 0" mass="0.777441" diaginertia="0.000260285 0.000225381 0.000152708" />
+                        <geom class="2f85_visual" material="2f85_black" mesh="2f85_base" />
+                        <geom class="2f85_collision" mesh="2f85_base" />
+                        <site name="2f85_pinch" pos="0 0 0.145" group="5" rgba="0.9 0.9 0.9 1" />
+                        <body name="2f85_right_driver" pos="0 0.0306011 0.054904">
+                          <inertial pos="2.96931e-12 0.0177547 0.00107314" quat="0.681301 0.732003 0 0" mass="0.00899563" diaginertia="1.72352e-06 1.60906e-06 3.22006e-07" />
+                          <joint name="2f85_right_driver_joint" class="2f85_driver" pos="0 0 0" axis="1 0 0" />
+                          <geom class="2f85_visual" material="2f85_gray" mesh="2f85_driver" />
+                          <geom class="2f85_collision" mesh="2f85_driver" />
+                          <body name="2f85_right_coupler" pos="0 0.0315 -0.0041">
+                            <inertial pos="0 0.00301209 0.0232175" quat="0.705636 -0.0455904 0.0455904 0.705636" mass="0.0140974" diaginertia="4.16206e-06 3.52216e-06 8.88131e-07" />
+                            <joint name="2f85_right_coupler_joint" class="2f85_coupler" pos="0 0 0" axis="1 0 0" />
+                            <geom class="2f85_visual" material="2f85_black" mesh="2f85_coupler" />
+                            <geom class="2f85_collision" mesh="2f85_coupler" />
+                          </body>
+                        </body>
+                        <body name="2f85_right_spring_link" pos="0 0.0132 0.0609">
+                          <inertial pos="-8.65005e-09 0.0181624 0.0212658" quat="0.663403 -0.244737 0.244737 0.663403" mass="0.0221642" diaginertia="8.96853e-06 6.71733e-06 2.63931e-06" />
+                          <joint name="2f85_right_spring_link_joint" class="2f85_spring_link" pos="0 0 0" axis="1 0 0" springref="2.62" />
+                          <geom class="2f85_visual" material="2f85_black" mesh="2f85_spring_link" />
+                          <geom class="2f85_collision" mesh="2f85_spring_link" />
+                          <body name="2f85_right_follower" pos="0 0.055 0.0375">
+                            <inertial pos="0 -0.011046 0.0124786" quat="0.986437 0.164143 0 0" mass="0.0125222" diaginertia="2.67415e-06 2.4559e-06 6.02031e-07" />
+                            <joint name="2f85_right_follower_joint" class="2f85_follower" pos="0 -0.018 0.0065" axis="1 0 0" />
+                            <geom class="2f85_visual" material="2f85_black" mesh="2f85_follower" />
+                            <geom class="2f85_collision" mesh="2f85_follower" />
+                            <body name="2f85_right_pad" pos="0 -0.0189 0.01352">
+                              <inertial pos="0 -0.0025 0.0185" quat="0.707107 0 0 0.707107" mass="0.0035" diaginertia="4.73958e-07 3.64583e-07 1.23958e-07" />
+                              <geom name="2f85_right_pad1" class="2f85_pad_box1" pos="0 -0.0026 0.028125" mass="0" />
+                              <geom name="2f85_right_pad2" class="2f85_pad_box2" pos="0 -0.0026 0.009375" mass="0" />
+                              <geom class="2f85_visual" mesh="2f85_pad" />
+                              <body name="2f85_right_silicone_pad">
+                                <geom class="2f85_visual" material="2f85_black" mesh="2f85_silicone_pad" />
+                              </body>
+                            </body>
+                          </body>
+                        </body>
+                        <body name="2f85_left_driver" pos="0 -0.0306011 0.054904" quat="0 0 0 1">
+                          <inertial pos="0 0.0177547 0.00107314" quat="0.681301 0.732003 0 0" mass="0.00899563" diaginertia="1.72352e-06 1.60906e-06 3.22006e-07" />
+                          <joint name="2f85_left_driver_joint" class="2f85_driver" pos="0 0 0" axis="1 0 0" />
+                          <geom class="2f85_visual" material="2f85_gray" mesh="2f85_driver" />
+                          <geom class="2f85_collision" mesh="2f85_driver" />
+                          <body name="2f85_left_coupler" pos="0 0.0315 -0.0041">
+                            <inertial pos="0 0.00301209 0.0232175" quat="0.705636 -0.0455904 0.0455904 0.705636" mass="0.0140974" diaginertia="4.16206e-06 3.52216e-06 8.88131e-07" />
+                            <joint name="2f85_left_coupler_joint" class="2f85_coupler" pos="0 0 0" axis="1 0 0" />
+                            <geom class="2f85_visual" material="2f85_black" mesh="2f85_coupler" />
+                            <geom class="2f85_collision" mesh="2f85_coupler" />
+                          </body>
+                        </body>
+                        <body name="2f85_left_spring_link" pos="0 -0.0132 0.0609" quat="0 0 0 1">
+                          <inertial pos="-8.65005e-09 0.0181624 0.0212658" quat="0.663403 -0.244737 0.244737 0.663403" mass="0.0221642" diaginertia="8.96853e-06 6.71733e-06 2.63931e-06" />
+                          <joint name="2f85_left_spring_link_joint" class="2f85_spring_link" pos="0 0 0" axis="1 0 0" springref="2.62" />
+                          <geom class="2f85_visual" material="2f85_black" mesh="2f85_spring_link" />
+                          <geom class="2f85_collision" mesh="2f85_spring_link" />
+                          <body name="2f85_left_follower" pos="0 0.055 0.0375">
+                            <inertial pos="0 -0.011046 0.0124786" quat="0.986437 0.164143 0 0" mass="0.0125222" diaginertia="2.67415e-06 2.4559e-06 6.02031e-07" />
+                            <joint name="2f85_left_follower_joint" class="2f85_follower" pos="0 -0.018 0.0065" axis="1 0 0" />
+                            <geom class="2f85_visual" material="2f85_black" mesh="2f85_follower" />
+                            <geom class="2f85_collision" mesh="2f85_follower" />
+                            <body name="2f85_left_pad" pos="0 -0.0189 0.01352">
+                              <inertial pos="0 -0.0025 0.0185" quat="0.707107 0 0 0.707107" mass="0.0035" diaginertia="4.73958e-07 3.64583e-07 1.23958e-07" />
+                              <geom name="2f85_left_pad1" class="2f85_pad_box1" pos="0 -0.0026 0.028125" mass="0" />
+                              <geom name="2f85_left_pad2" class="2f85_pad_box2" pos="0 -0.0026 0.009375" mass="0" />
+                              <geom class="2f85_visual" mesh="2f85_pad" />
+                              <body name="2f85_left_silicone_pad">
+                                <geom class="2f85_visual" material="2f85_black" mesh="2f85_silicone_pad" />
+                              </body>
+                            </body>
+                          </body>
+                        </body>
+                      </body>
+                    </body>
+                  </body>
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+    <body name="base_target" mocap="true" />
+  </worldbody>
+
+  <contact>
+    <exclude body1="2f85_base" body2="2f85_right_driver" />
+    <exclude body1="2f85_base" body2="2f85_right_spring_link" />
+    <exclude body1="2f85_base" body2="2f85_left_driver" />
+    <exclude body1="2f85_base" body2="2f85_left_spring_link" />
+    <exclude body1="2f85_right_coupler" body2="2f85_right_follower" />
+    <exclude body1="2f85_left_coupler" body2="2f85_left_follower" />
+  </contact>
+
+  <equality>
+    <connect body1="2f85_right_follower" body2="2f85_right_coupler" anchor="0 0 0" solref="0.005" solimp="0.95 0.99" />
+    <connect body1="2f85_left_follower" body2="2f85_left_coupler" anchor="0 0 0" solref="0.005" solimp="0.95 0.99" />
+    <joint joint1="2f85_right_driver_joint" joint2="2f85_left_driver_joint" polycoef="0 1 0 0 0" solref="0.005" solimp="0.95 0.99" />
+    <weld name="base_weld" body1="base_target" body2="base_link" anchor="0 0 0" relpose="0 0 0 1 0 0 0" torquescale="1" solref="0.005" solimp="0.98 0.999" />
+  </equality>
+
+  <tendon>
+    <fixed name="2f85_split">
+      <joint joint="2f85_right_driver_joint" coef="0.5" />
+      <joint joint="2f85_left_driver_joint" coef="0.5" />
+    </fixed>
+  </tendon>
+
+  <actuator>
+    <general name="joint_1" class="large_actuator" joint="joint_1" />
+    <general name="joint_2" class="large_actuator" joint="joint_2" ctrlrange="-2.24973 2.24973" />
+    <general name="joint_3" class="large_actuator" joint="joint_3" />
+    <general name="joint_4" class="large_actuator" joint="joint_4" ctrlrange="-2.5796 2.5796" />
+    <general name="joint_5" class="small_actuator" joint="joint_5" />
+    <general name="joint_6" class="small_actuator" joint="joint_6" ctrlrange="-2.09963 2.09963" />
+    <general name="joint_7" class="small_actuator" joint="joint_7" />
+    <general name="2f85_fingers_actuator" class="2f85_2f85" tendon="2f85_split" ctrlrange="0 255" forcerange="-5 5" gainprm="0.313725" biasprm="0 -100 -10" />
+  </actuator>
+
+  <keyframe>
+    <key name="home" qpos="0 0 0 1 0 0 0 0 0.261799 3.14159 -2.26893 0 0.959931 1.5708 0 0 0 0 0 0 0 0" ctrl="0 0.261799 3.14159 -2.26893 0 0.959931 1.5708 0" />
+  </keyframe>
+</mujoco>
