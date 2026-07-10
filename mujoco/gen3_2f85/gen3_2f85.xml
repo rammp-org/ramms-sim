@@ -239,7 +239,5 @@
     <general name="2f85_fingers_actuator" class="2f85_2f85" tendon="2f85_split" ctrlrange="0 255" forcerange="-5 5" gainprm="0.313725" biasprm="0 -100 -10"/>
   </actuator>
 
-  <keyframe>
-    <key name="home" qpos="0 0 0 1 0 0 0 0 0.261799 3.14159 -2.26893 0 0.959931 1.5708 0 0 0 0 0 0 0 0" ctrl="0 0.261799 3.14159 -2.26893 0 0.959931 1.5708 0"/>
-  </keyframe>
+  <!-- Keyframe removed: define keyframes only in full scenes where qpos can match the final model.nq. -->
 </mujoco>
