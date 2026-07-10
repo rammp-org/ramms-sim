@@ -8,11 +8,13 @@ here, EE teleop will work in-engine.
 
 Run:  .mjtools/Scripts/python.exe mujoco/ik_test.py
 """
+from pathlib import Path
+
 import numpy as np
 import mujoco as mj
 
-SCENE = r"C:/Users/waemf/data/Ramms/mujoco/gen3_2f85/gen3_2f85_scene.xml"
-ARM_DOFS = 7          # joint_1..7 are the first 7 dofs
+SCENE = str(Path(__file__).resolve().parent / "gen3_2f85" / "gen3_2f85_scene.xml")
+ARM_DOFS = 7          # number of arm joints
 DAMP = 0.08           # DLS damping
 STEP_GAIN = 0.6       # fraction of IK delta applied per control update
 
