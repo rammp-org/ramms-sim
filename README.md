@@ -1,7 +1,7 @@
 # RAMMS-Sim
 
 Robotic Assistive Mobility and Manipulation Simulation (RAMMS) — An Unreal
-Engine 5.7 simulation environment for robotic assistive technologies.
+Engine 5.8 simulation environment for robotic assistive technologies.
 
 <!-- markdown-toc start - Don't edit this section. Run M-x markdown-toc-refresh-toc -->
 **Table of Contents**
@@ -48,7 +48,7 @@ https://github.com/user-attachments/assets/fdc96795-279f-4ccf-a092-382f6755a65d
 
 RAMMS-Sim provides a high-fidelity simulation environment for developing and
 testing robotic assistive mobility and manipulation systems. Built on Unreal
-Engine 5.7, it offers:
+Engine 5.8, it offers:
 
 - **Physics-based robotics** — Differential drive wheelchair, 7-DOF robotic
   arm with three IK solvers, two-finger gripper
@@ -65,7 +65,7 @@ Engine 5.7, it offers:
 
 ## Prerequisites
 
-- **Unreal Engine 5.7**
+- **Unreal Engine 5.8**
 - **Windows** with DirectX 12 (recommended) or **Linux** with Vulkan SM6
 - **GPU with ray tracing support** — Required for GPU-accelerated sensors;
   RT cores used when available, software ray tracing otherwise
@@ -86,7 +86,7 @@ If you've already cloned without `--recursive`, initialize the submodules:
 git submodule update --init --recursive
 ```
 
-Then open `Ramms.uproject` in Unreal Engine 5.7. The plugins are automatically
+Then open `Ramms.uproject` in Unreal Engine 5.8. The plugins are automatically
 detected and compiled.
 
 ## Building from the Command Line
@@ -100,7 +100,7 @@ scripts. They build directly from `Ramms.uproject` and the `.Target.cs` files �
 generating IDE project files is optional (see the last subsection).
 
 > Prerequisites: submodules initialized (see [Installation](#installation)) and
-> a full UE 5.7 installation. The required .NET toolchain ships with the engine.
+> a full UE 5.8 installation. The required .NET toolchain ships with the engine.
 
 The project defines two targets:
 
@@ -114,27 +114,27 @@ Valid build configurations: `Debug`, `DebugGame`, `Development` (default),
 
 ### Locate your engine installation
 
-Set a variable pointing at your UE 5.7 root, then reuse it below. Adjust the
+Set a variable pointing at your UE 5.8 root, then reuse it below. Adjust the
 path to match your install.
 
 **Windows (PowerShell):**
 ```powershell
-$UE = "C:\Program Files\Epic Games\UE_5.7"
+$UE = "C:\Program Files\Epic Games\UE_5.8"
 ```
 
 **Windows (cmd):**
 ```bat
-set "UE=C:\Program Files\Epic Games\UE_5.7"
+set "UE=C:\Program Files\Epic Games\UE_5.8"
 ```
 
 **macOS (zsh/bash):**
 ```bash
-UE="/Users/Shared/Epic Games/UE_5.7"
+UE="/Users/Shared/Epic Games/UE_5.8"
 ```
 
 **Linux (bash):**
 ```bash
-UE="$HOME/UnrealEngine"   # your UE 5.7 install/build root (no Epic launcher on Linux)
+UE="$HOME/UnrealEngine"   # your UE 5.8 install/build root (no Epic launcher on Linux)
 ```
 
 Run the commands below from the repository root (the folder containing
