@@ -11,13 +11,13 @@ Run with the .mjtools venv python (has mujoco 3.10):
 """
 import os, shutil, mujoco
 
-MEN        = r"C:/Users/waemf/data/mujoco_menagerie"
-ARM_XML    = os.path.join(MEN, "kinova_gen3", "gen3.xml")
-GRIP_XML   = os.path.join(MEN, "robotiq_2f85", "2f85.xml")
-ARM_ASSETS = os.path.join(MEN, "kinova_gen3", "assets")
-GRP_ASSETS = os.path.join(MEN, "robotiq_2f85", "assets")
+MEN = os.environ.get("MUJOCO_MENAGERIE_DIR")
+if not MEN:
+    raise SystemExit("Set MUJOCO_MENAGERIE_DIR to your mujoco_menagerie checkout")
+ARM_XML, GRIP_XML = os.path.join(MEN, "kinova_gen3", "gen3.xml"), os.path.join(MEN, "robotiq_2f85", "2f85.xml")
+ARM_ASSETS, GRP_ASSETS = os.path.join(MEN, "kinova_gen3", "assets"), os.path.join(MEN, "robotiq_2f85", "assets")
 
-OUTDIR = r"C:/Users/waemf/data/Ramms/mujoco/gen3_2f85"
+OUTDIR = os.environ.get("RAMMS_MUJOCO_OUTDIR", os.path.join(os.path.dirname(__file__), "gen3_2f85"))
 ASSETS = os.path.join(OUTDIR, "assets")
 PREFIX = "2f85_"
 
