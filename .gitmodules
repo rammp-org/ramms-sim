@@ -25,3 +25,6 @@
 [submodule "Plugins/unreal-robotics-lab"]
 	path = Plugins/unreal-robotics-lab
 	url = git@github.com:urlab-sim/UnrealRoboticsLab
+[submodule "Plugins/RammsCrowd"]
+	path = Plugins/RammsCrowd
+	url = git@github.com:rammp-org/ramms-crowd
