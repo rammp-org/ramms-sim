@@ -116,6 +116,12 @@ Plugins are git submodules. To update:
 ```bash
 git submodule update --remote Plugins/RammsCore
 git submodule update --remote Plugins/CameraCapture
+git submodule update --remote Plugins/RammsStreaming
+git submodule update --remote Plugins/RammsAssets
+git submodule update --remote Plugins/RammsCrowd
+git submodule update --remote Plugins/RammsHumanPhysics
+git submodule update --remote Plugins/RammsNewtonPhysics
+git submodule update --remote Plugins/RammsMujocoPhysics
 ```
 
 When adding new C++ classes to plugins:
