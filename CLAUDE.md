@@ -19,6 +19,7 @@ Unreal Engine 5.8 C++ simulation for robotic assistive mobility/manipulation: Me
 
 ## Build, run, test
 - Set `$UE = "C:\Program Files\Epic Games\UE_5.8"` (adjust to your install).
+- **Build URLab's native third-party deps once after cloning, and again whenever the `unreal-robotics-lab` submodule pointer moves:** `cd Plugins/unreal-robotics-lab/third_party; ./build_all.ps1` compiles MuJoCo/CoACD/libzmq into `third_party/install/`. Skip it and `RammsEditor` fails at the rules stage with `MuJoCo install is missing '...INSTALLED_SHA.txt'` - the `URLab` module (pulled in via `RammsMujocoSupport`) enforces a SHA drift check against those installs.
 - Compile after C++ edits: `& "$UE\Engine\Build\BatchFiles\Build.bat" RammsEditor Win64 Development -Project="$PWD\Ramms.uproject" -WaitMutex`. Standalone target is `Ramms`.
 - Package: `RunUAT.bat BuildCookRun -Project=... -Build -Cook -Stage -Pak -Archive`.
 - Run: open `Ramms.uproject` in UE 5.8, or launch the built editor/`-game`.
