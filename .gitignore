@@ -75,3 +75,10 @@ DerivedDataCache/*
 .vsconfig
 .vs
 .DS_Store
+
+# Marketplace/Fab content packs: NOT committed (size + Fab license — each user
+# claims the free packs themselves). The RammsCrowd plugin validates and
+# auto-migrates them on editor startup; see Plugins/RammsCrowd/doc/SETUP.md §0.
+Content/Fab/
+Content/CitySampleCrowd/
+Content/CitySampleVehicles/
