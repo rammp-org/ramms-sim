@@ -125,6 +125,7 @@ Ramms/
 │   ├── CameraCapture/         Camera data acquisition (submodule)
 │   ├── RammsStreaming/        TCP binary streaming (submodule)
 │   ├── RammsAssets/           Robot & sensor 3D models (submodule)
+│   ├── RammsCrowd/            NPC crowd simulation (submodule)
 │   ├── RammsHumanPhysics/     Experimental human physics plugin (submodule)
 │   ├── RammsNewtonPhysics/    Experimental Newton backend integration (submodule)
 │   ├── RammsMujocoPhysics/    Experimental MuJoCo backend integration (submodule)
