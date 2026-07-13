@@ -1,0 +1,78 @@
+diff --git a/Source/URLab/Private/Bridge/MsgpackHelpers.cpp b/Source/URLab/Private/Bridge/MsgpackHelpers.cpp
+index 117dbd5..20f68b7 100644
+--- a/Source/URLab/Private/Bridge/MsgpackHelpers.cpp
++++ b/Source/URLab/Private/Bridge/MsgpackHelpers.cpp
+@@ -29,16 +29,20 @@
+ // rpclib's msgpack-cxx headers use member functions and templates named
+ // `check`, which collides with UE's `check(cond)` assertion macro. Save
+ // the macro, undef while including rpclib, and restore afterwards. We do
+-// the same for `verify` for safety.
++// the same for `verify` for safety, and for `nil` on Apple platforms,
++// where MacTypes.h defines `nil` and breaks msgpack's `typedef nil_t nil`.
+ #pragma push_macro("check")
+ #pragma push_macro("verify")
++#pragma push_macro("nil")
+ #undef check
+ #undef verify
++#undef nil
+ 
+ THIRD_PARTY_INCLUDES_START
+ #include "rpc/msgpack.hpp"
+ THIRD_PARTY_INCLUDES_END
+ 
++#pragma pop_macro("nil")
+ #pragma pop_macro("verify")
+ #pragma pop_macro("check")
+ 
+diff --git a/Source/URLab/URLab.Build.cs b/Source/URLab/URLab.Build.cs
+index 749d2d4..3a69fd9 100644
+--- a/Source/URLab/URLab.Build.cs
++++ b/Source/URLab/URLab.Build.cs
+@@ -226,6 +226,29 @@ public class URLab : ModuleRules
+ 				}
+ 			}
+ 		}
++		else if (Target.Platform == UnrealTargetPlatform.Mac)
++		{
++			// The third-party dylibs carry @rpath install names
++			// (@rpath/libzmq.5.dylib etc), and UBT's Mac toolchain adds a
++			// @loader_path-relative RPATH entry for every linked dylib that
++			// lives outside the engine tree, so linking straight from
++			// third_party/install/<pkg>/lib resolves at editor runtime with
++			// no extra staging step. Skip symlinks (libzmq.dylib ->
++			// libzmq.5.2.6.dylib) so each library is linked exactly once.
++			string LibPath = Path.Combine(FullPath, "lib");
++			if (Directory.Exists(LibPath))
++			{
++				foreach (string LibFile in Directory.GetFiles(LibPath, "*.dylib", SearchOption.AllDirectories))
++				{
++					if (File.GetAttributes(LibFile).HasFlag(FileAttributes.ReparsePoint))
++					{
++						continue;
++					}
++					PublicAdditionalLibraries.Add(LibFile);
++					RuntimeDependencies.Add("$(BinaryOutputDir)/" + Path.GetFileName(LibFile), LibFile, StagedFileType.NonUFS);
++				}
++			}
++		}
+ 	}
+ 
+ 	// Set to true to skip the submodule/install SHA drift checks. The default
+diff --git a/third_party/CoACD/build.sh b/third_party/CoACD/build.sh
+old mode 100644
+new mode 100755
+index afce0c7..07e8ca0
+--- a/third_party/CoACD/build.sh
++++ b/third_party/CoACD/build.sh
+@@ -65,7 +65,7 @@ mkdir -p build
+ cd build
+ 
+ echo "Configuring CoACD..."
+-cmake .. -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DWITH_3RD_PARTY_LIBS=ON
++cmake .. -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DWITH_3RD_PARTY_LIBS=ON -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+ 
+ echo "Building CoACD..."
+ cmake --build . --config "$BUILD_TYPE" --target _coacd
+diff --git a/third_party/build_all.sh b/third_party/build_all.sh
+old mode 100644
+new mode 100755
