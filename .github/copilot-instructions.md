@@ -13,7 +13,7 @@ RAMMS-Sim (Robotic Assistive Mobility and Manipulation Simulation) is an Unreal 
 
 ### Plugin-Based Structure
 
-The project uses a modular plugin architecture with two main plugins as git submodules:
+The project uses a modular plugin architecture with several plugins managed as git submodules; the main ones are:
 
 - **RammsCore** (`Plugins/RammsCore/`) - Core simulation components
   - `RammsDifferentialDriveController` - Differential drive physics controller
