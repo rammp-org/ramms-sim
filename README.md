@@ -221,7 +221,7 @@ command-line builds above.
 
 ### Plugin Submodules
 
-The project uses a modular plugin architecture. Four plugins are managed as
+The project uses a modular plugin architecture. Seven plugins are managed as
 git submodules:
 
 | Plugin | Path | Description |
@@ -230,6 +230,9 @@ git submodules:
 | **CameraCapture** | `Plugins/CameraCapture/` | Multi-camera capture system — RGB + depth + motion vectors with custom camera intrinsics, EXR output, and frustum visualization |
 | **RammsStreaming** | `Plugins/RammsStreaming/` | Real-time binary streaming over TCP (RMSS protocol, port 30030) — image data, depth frames, motion vectors, point clouds |
 | **RammsAssets** | `Plugins/RammsAssets/` | 3D models and materials — Kinova Gen3 arm, gripper, MeBot base, operator seat, ORBBEC and LUCI camera models |
+| **RammsHumanPhysics** | `Plugins/RammsHumanPhysics/` | Experimental human body physics plugin for RAMMS |
+| **RammsNewtonPhysics** | `Plugins/RammsNewtonPhysics/` | Experimental Newton Dynamics integration scaffold — third-party detection, fixed-step subsystem, actor bridge component, and articulated robot API for Newton-first full-robot simulation |
+| **RammsMujocoPhysics** | `Plugins/RammsMujocoPhysics/` | Experimental MuJoCo integration scaffold — third-party detection, fixed-step subsystem, and actor bridge component for selective external simulation |
 
 An additional local plugin (**VolingaRenderer**) provides custom rendering
 capabilities.
@@ -256,6 +259,10 @@ Ramms/
 │   ├── CameraCapture/         Camera data acquisition (submodule)
 │   ├── RammsStreaming/        TCP binary streaming (submodule)
 │   ├── RammsAssets/           Robot & sensor 3D models (submodule)
+│   ├── RammsCrowd/            NPC crowd simulation (submodule)
+│   ├── RammsHumanPhysics/     Experimental human physics plugin (submodule)
+│   ├── RammsNewtonPhysics/    Experimental Newton backend integration (submodule)
+│   ├── RammsMujocoPhysics/    Experimental MuJoCo backend integration (submodule)
 │   └── VolingaRenderer/       Custom rendering (local)
 ├── Source/Ramms/              Main game module (game mode, pawn, vehicles)
 ├── py/                        Python remote execution scripts
@@ -454,6 +461,9 @@ git submodule update --remote Plugins/RammsCore
 git submodule update --remote Plugins/CameraCapture
 git submodule update --remote Plugins/RammsStreaming
 git submodule update --remote Plugins/RammsAssets
+git submodule update --remote Plugins/RammsHumanPhysics
+git submodule update --remote Plugins/RammsNewtonPhysics
+git submodule update --remote Plugins/RammsMujocoPhysics
 ```
 
 ### Adding C++ Classes to Plugins
