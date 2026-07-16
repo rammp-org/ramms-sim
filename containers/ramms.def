@@ -1,0 +1,72 @@
+# Apptainer/Singularity image for headless RAMMS on cluster GPU nodes.
+#
+# Deliberately self-contained: bundles the packaged Linux build produced by
+# Scripts/package_linux.sh — no Epic container-registry access required
+# (that registry needs Epic GitHub-org auth we don't want to depend on).
+#
+# Build (on any Linux box with apptainer, after package_linux.sh):
+#   apptainer build ramms.sif containers/ramms.def
+#
+# Run (SLURM node with an RT-core GPU — e.g. RTX 6000 Pro — and --nv for the
+# NVIDIA driver + Vulkan ICD libs):
+#   apptainer run --nv ramms.sif Map_GraspTest \
+#       -RenderOffscreen -Unattended -NoSound -stdout
+# or with the wrapper baked into the image:
+#   apptainer exec --nv ramms.sif /opt/ramms/run_headless.sh Map_GraspTest 0
+#
+# Rendering is offscreen Vulkan: no X server / EGL display needed, but the
+# NVIDIA Vulkan ICD must resolve inside the container — --nv binds the driver
+# libraries and %post writes the ICD manifest that points at them.
+
+Bootstrap: docker
+From: ubuntu:24.04
+
+%files
+    Packaged/Linux /opt/ramms/Packaged/Linux
+    Scripts/run_headless.sh /opt/ramms/run_headless.sh
+
+%post
+    apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        ca-certificates \
+        libvulkan1 \
+        vulkan-tools \
+        libnss3 \
+        libatomic1 \
+        && rm -rf /var/lib/apt/lists/*
+
+    # NVIDIA Vulkan ICD manifest: the driver library itself comes from the
+    # host via `apptainer run --nv`; this manifest tells the Vulkan loader
+    # where to find it.
+    mkdir -p /etc/vulkan/icd.d
+    cat > /etc/vulkan/icd.d/nvidia_icd.json <<'EOF'
+{
+    "file_format_version": "1.0.0",
+    "ICD": {
+        "library_path": "libGLX_nvidia.so.0",
+        "api_version": "1.3.0"
+    }
+}
+EOF
+
+    chmod +x /opt/ramms/run_headless.sh /opt/ramms/Packaged/Linux/Ramms.sh || true
+
+%environment
+    export VK_DRIVER_FILES=/etc/vulkan/icd.d/nvidia_icd.json
+    export VK_ICD_FILENAMES=/etc/vulkan/icd.d/nvidia_icd.json
+    export RAMMS_PACKAGED=/opt/ramms/Packaged/Linux
+
+%runscript
+    exec /opt/ramms/Packaged/Linux/Ramms.sh "$@"
+
+%test
+    vulkaninfo --summary 2>/dev/null | head -5 || echo "vulkaninfo unavailable (no GPU at build time — expected)"
+
+%labels
+    org.ramms.description "Headless RAMMS simulation (offscreen Vulkan rendering, URLab bridge)"
+
+%help
+    Headless RAMMS simulator image. Requires: NVIDIA GPU with RT cores
+    (ToF/sonar GPU ray tracing + Lumen HWRT), run with --nv.
+    Entry points:
+      apptainer run --nv ramms.sif <Map> <UE args...>   # raw launcher
+      apptainer exec --nv ramms.sif /opt/ramms/run_headless.sh <Map> <instance>
