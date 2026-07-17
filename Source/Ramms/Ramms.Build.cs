@@ -31,12 +31,6 @@ public class Ramms : ModuleRules
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });
 
-		// CabinetPhysicsTools uses FPhysicsAssetUtils (editor-only module).
-		if (Target.bBuildEditor)
-		{
-			PrivateDependencyModuleNames.Add("PhysicsUtilities");
-		}
-
 		// Uncomment if you are using Slate UI
 		// PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });
 
