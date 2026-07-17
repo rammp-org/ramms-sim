@@ -2,7 +2,7 @@
 # for LINUX from a WINDOWS machine, using the same UE Linux cross-toolchain
 # that UBT uses for Windows->Linux game builds.
 #
-# Output goes to Plugins/unreal-robotics-lab/third_party/install-linux/ —
+# Output goes to Plugins/unreal-robotics-lab/third_party/install-linux/ -
 # deliberately separate from install/ (the Windows-native libs your local
 # editor uses), because every dep build wipes its own install dir and the
 # two platforms would otherwise clobber each other. URLab.Build.cs picks
@@ -15,7 +15,7 @@
 #     toolchain installer sets it machine-wide).
 #   - CMake 3.24+ and Ninja on PATH.
 #   - Scripts/setup_urlab.sh's patches applied (run the setup once on this
-#     checkout, or apply the two patch files with git apply) — the CoACD
+#     checkout, or apply the two patch files with git apply) - the CoACD
 #     source fixes are required to compile with clang 20.
 #   - Submodules initialised (third_party/*/src checked out).
 #
@@ -45,12 +45,27 @@ $TC = Join-Path $MultiArch "x86_64-unknown-linux-gnu"
 $Clang = Join-Path $TC "bin\clang.exe"
 $ClangXX = Join-Path $TC "bin\clang++.exe"
 if (-not (Test-Path $ClangXX)) {
-    throw "Cross clang++ not found at $ClangXX — is the toolchain installed for x86_64?"
+    throw "Cross clang++ not found at $ClangXX - is the toolchain installed for x86_64?"
 }
 Log "toolchain: $TC"
 
 if (-not (Get-Command ninja -ErrorAction SilentlyContinue)) {
-    throw "ninja not found on PATH (required as the CMake generator for cross builds)."
+    # Fall back to the ninja bundled with Visual Studio's CMake tools.
+    $VsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+    $VsNinja = $null
+    if (Test-Path $VsWhere) {
+        $VsRoot = & $VsWhere -latest -property installationPath 2>$null
+        if ($VsRoot) {
+            $Candidate = Join-Path $VsRoot "Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe"
+            if (Test-Path $Candidate) { $VsNinja = Split-Path -Parent $Candidate }
+        }
+    }
+    if ($VsNinja) {
+        Log "ninja not on PATH - using VS-bundled ninja from $VsNinja"
+        $env:PATH = "$VsNinja;$env:PATH"
+    } else {
+        throw "ninja not found on PATH (required as the CMake generator for cross builds). Install ninja, or install VS's 'C++ CMake tools' component."
+    }
 }
 
 # Mirror build_all.sh --engine flag choices (see its comments for rationale).
@@ -72,6 +87,11 @@ $CommonCMake = @(
     "-DCMAKE_EXE_LINKER_FLAGS=$LdFlags",
     "-DCMAKE_SHARED_LINKER_FLAGS=$LdFlags",
     "-DCMAKE_BUILD_TYPE=$BuildType",
+    # CMAKE_SYSROOT/FIND_ROOT_PATH make find_library() re-root /usr/lib64
+    # etc. under the toolchain (ccd's find_library(m) fails without them --
+    # the --sysroot compiler flag alone is invisible to CMake's search).
+    "-DCMAKE_SYSROOT=$TC",
+    "-DCMAKE_FIND_ROOT_PATH=$TC",
     "-DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER",
     "-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY",
     "-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY"
@@ -82,11 +102,11 @@ function Build-Dep {
 
     $Src = Join-Path $ThirdParty "$SrcDir\src"
     if (-not (Test-Path (Join-Path $Src "CMakeLists.txt"))) {
-        throw "$Name source not found at $Src — initialise submodules first (git submodule update --init --recursive)."
+        throw "$Name source not found at $Src - initialise submodules first (git submodule update --init --recursive)."
     }
     $Install = Join-Path $InstallRoot $Name
     if (Test-Path $Install) {
-        Log "$Name — wiping previous install-linux artifacts"
+        Log "$Name - wiping previous install-linux artifacts"
         Remove-Item -Recurse -Force $Install
     }
     # Separate build dir from the native Windows build (src\build) so the
@@ -94,29 +114,29 @@ function Build-Dep {
     $BuildDir = Join-Path $Src "build-linux-cross"
     New-Item -ItemType Directory -Force -Path $BuildDir | Out-Null
 
-    Log "$Name — configuring"
+    Log "$Name - configuring"
     & cmake -S $Src -B $BuildDir "-DCMAKE_INSTALL_PREFIX=$Install" @CommonCMake @ExtraCMake
     if ($LASTEXITCODE -ne 0) { throw "$Name configure failed" }
 
-    Log "$Name — building"
+    Log "$Name - building"
     & cmake --build $BuildDir --config $BuildType @BuildTargetArgs
     if ($LASTEXITCODE -ne 0) { throw "$Name build failed" }
 
-    Log "$Name — installing"
+    Log "$Name - installing"
     & cmake --install $BuildDir --config $BuildType
     if ($LASTEXITCODE -ne 0) { throw "$Name install failed" }
 
     # Stamp the source SHA so URLab.Build.cs drift checks accept the install.
     $Sha = (& git -C $Src rev-parse HEAD).Trim()
     Set-Content -Path (Join-Path $Install "INSTALLED_SHA.txt") -Value $Sha
-    Log "$Name — INSTALLED_SHA=$Sha"
+    Log "$Name - INSTALLED_SHA=$Sha"
 }
 
 # --- CoACD custom overlay (mirrors third_party/CoACD/build.sh) ---
 $CoacdSrc = Join-Path $ThirdParty "CoACD\src"
 $CoacdCustom = Join-Path $ThirdParty "CoACD_custom"
 if (Test-Path $CoacdCustom) {
-    Log "CoACD — applying custom configuration overlay"
+    Log "CoACD - applying custom configuration overlay"
     Copy-Item -Force (Join-Path $CoacdCustom "CMakeLists.txt") $CoacdSrc
     foreach ($sub in "cmake", "public") {
         $from = Join-Path $CoacdCustom $sub
@@ -140,4 +160,4 @@ Build-Dep -Name "libzmq" -SrcDir "libzmq" `
     -ExtraCMake @("-DBUILD_STATIC=OFF", "-DBUILD_TESTS=OFF", "-DWITH_PERF_TOOL=OFF", "-DENABLE_DRAFTS=OFF") `
     -BuildTargetArgs @()
 
-Log "done — Linux third-party artifacts in $InstallRoot"
+Log "done - Linux third-party artifacts in $InstallRoot"

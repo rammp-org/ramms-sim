@@ -94,10 +94,18 @@ Both routes produce the same `Packaged/Linux` output.
 - Risk: RammsCore's sensor tracer includes engine **Renderer private
   headers** — build machine needs the exact UE 5.7 tree; engine upgrades will
   bite here first.
-- Cross-route caveat: the three CMake cross builds are authored from the
-  native recipes but not yet exercised — first run on the Windows box will
-  shake out toolchain/sysroot details (CoACD's TBB/OpenVDB tree is the likely
-  friction point).
+- Cross-route status (**verified on Windows 2026-07-17** through
+  build+cook+stage+pak of `Map_GraspTest`+`Map_GraspTestURL`): shakeout fixes
+  now in the scripts — (a) `.ps1` files made ASCII-clean (UTF-8 em-dashes
+  without BOM fail to parse under Windows PowerShell 5.1), (b)
+  `CMAKE_SYSROOT`/`CMAKE_FIND_ROOT_PATH` added to the common CMake args
+  (ccd's `find_library(m)` can't see the sysroot from compiler flags alone),
+  (c) ninja auto-discovered from VS's CMake tools via vswhere when not on
+  PATH. CoACD's TBB/OpenVDB tree compiled without friction. Also fixed:
+  `Source/Ramms` was missing an editor-only `PhysicsUtilities` module dep
+  (CabinetPhysicsTools → `FPhysicsAssetUtils`), which broke the cook-time
+  RammsEditor rebuild. Staging verified: libmujoco/lib_coacd/libzmq + boost
+  + TBB land in `Ramms/Binaries/Linux/` as ELF x86-64.
 
 ### 2. Single-instance headless bring-up — **Phase 1**
 - `Scripts/run_headless.sh` (landed): offscreen-Vulkan launch with fixed
@@ -153,7 +161,9 @@ Both routes produce the same `Packaged/Linux` output.
       URLab port-override patch (compiles on Mac), Windows→Linux cross route
       (`build_all_linux_cross.ps1` + `build_linux_cross.ps1` + Build.cs
       `install-linux/` resolution)
-      *(authored on Mac — first Linux/Windows run will shake out details)*
+      *(authored on Mac; Windows cross route verified 2026-07-17 —
+      third-party cross-compile, UBT Linux build, and cook/stage/pak of the
+      grasp-test maps all pass. Native-Linux route still unexercised.)*
 - [ ] Phase 1: Linux build + packaged headless instance verified end-to-end
       (incl. GPU ToF/sonar) on an RT-core node; smoke test scripted
 - [ ] Phase 2: N instances/node via `ramms-launch`; envs/GPU benchmark
