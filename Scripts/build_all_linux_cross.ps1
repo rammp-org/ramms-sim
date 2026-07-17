@@ -13,11 +13,13 @@
 #   - UE Linux cross-toolchain installed (the same one you already use for
 #     Windows->Linux packaging); LINUX_MULTIARCH_ROOT must be set (the
 #     toolchain installer sets it machine-wide).
-#   - CMake 3.24+ and Ninja on PATH.
-#   - Scripts/setup_urlab.sh's patches applied (run the setup once on this
-#     checkout, or apply the two patch files with git apply) - the CoACD
-#     source fixes are required to compile with clang 20.
+#   - CMake 3.24+ and Ninja on PATH (falls back to the ninja bundled with
+#     Visual Studio's CMake tools, located via vswhere).
 #   - Submodules initialised (third_party/*/src checked out).
+#
+# The URLab local patches (Scripts/patches/*.patch) are applied automatically
+# via Scripts\setup_urlab.ps1 below - the CoACD source fixes are required to
+# compile with clang 20, and the Build.cs fix makes UBT read install-linux/.
 #
 # Usage:
 #   powershell -ExecutionPolicy Bypass -File Scripts\build_all_linux_cross.ps1
@@ -36,16 +38,33 @@ $BuildType = "Release"
 
 function Log($msg) { Write-Host "[cross-thirdparty] $msg" -ForegroundColor Cyan }
 
+# --- URLab local patches (idempotent; a git submodule update reverts them,
+# and without them CoACD fails under clang 20 and UBT links the wrong
+# third-party root when targeting Linux) ---
+& (Join-Path $PSScriptRoot "setup_urlab.ps1")
+
 # --- UE Linux cross-toolchain ---
+$ToolchainHelp = @"
+The UE Linux cross-compile toolchain is required (same prerequisite as
+Windows->Linux packaging). To install it (fully automated):
+  1. Download the 'native toolchain' installer for your engine version from
+     https://dev.epicgames.com/documentation/en-us/unreal-engine/linux-development-requirements-for-unreal-engine
+     (UE 5.7 -> v26_clang-20.1.8-rockylinux8.exe).
+  2. Run the installer (installs to C:\UnrealToolchains\<version>\ and sets
+     LINUX_MULTIARCH_ROOT machine-wide).
+  3. Open a NEW terminal so the environment variable is visible, and re-run
+     this script.
+See README section 'Cross-compile for Linux from Windows'.
+"@
 $MultiArch = $env:LINUX_MULTIARCH_ROOT
 if (-not $MultiArch) {
-    throw "LINUX_MULTIARCH_ROOT is not set. Install the UE Linux cross-toolchain (same prerequisite as Windows->Linux packaging)."
+    throw "LINUX_MULTIARCH_ROOT is not set.`n$ToolchainHelp"
 }
 $TC = Join-Path $MultiArch "x86_64-unknown-linux-gnu"
 $Clang = Join-Path $TC "bin\clang.exe"
 $ClangXX = Join-Path $TC "bin\clang++.exe"
 if (-not (Test-Path $ClangXX)) {
-    throw "Cross clang++ not found at $ClangXX - is the toolchain installed for x86_64?"
+    throw "Cross clang++ not found at $ClangXX - LINUX_MULTIARCH_ROOT points at an incomplete or wrong-version toolchain install.`n$ToolchainHelp"
 }
 Log "toolchain: $TC"
 

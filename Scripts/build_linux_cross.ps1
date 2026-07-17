@@ -9,12 +9,10 @@
 #   LINUX_MULTIARCH_ROOT  set by the UE Linux cross-toolchain installer
 #
 # Order of operations for a fresh checkout on Windows:
-#   1. Apply URLab patches once:  (see Scripts/setup_urlab.sh header - on
-#      Windows apply the three Scripts\patches\*.patch files with git apply
-#      in the submodule roots, or run setup_urlab.sh from Git Bash/WSL with
-#      --no-thirdparty --no-projectfiles)
-#   2. Scripts\build_all_linux_cross.ps1   (Linux third-party -> install-linux/)
-#   3. This script.
+#   1. Scripts\build_all_linux_cross.ps1   (Linux third-party -> install-linux/)
+#   2. This script.
+# Both scripts apply the URLab local patches automatically (idempotently)
+# via Scripts\setup_urlab.ps1, so no manual git apply step is needed.
 #
 # The packaged output (Packaged\Linux) is what containers/ramms.def bundles -
 # copy it to a Linux box / the cluster and run Scripts/run_headless.sh.
@@ -33,8 +31,24 @@ $UERoot = if ($env:UE_ROOT) { $env:UE_ROOT } else { "C:\Program Files\Epic Games
 
 function Log($msg) { Write-Host "[build_linux_cross] $msg" -ForegroundColor Cyan }
 
+# URLab local patches: required here even when install-linux/ already exists,
+# because a git submodule update reverts the Build.cs install-linux fix and
+# the port-override feature this build compiles into the Linux binary.
+& (Join-Path $PSScriptRoot "setup_urlab.ps1")
+
 if (-not $env:LINUX_MULTIARCH_ROOT) {
-    throw "LINUX_MULTIARCH_ROOT is not set - install the UE Linux cross-toolchain first."
+    throw @"
+LINUX_MULTIARCH_ROOT is not set - the UE Linux cross-compile toolchain is missing.
+To install it (fully automated):
+  1. Download the 'native toolchain' installer for your engine version from
+     https://dev.epicgames.com/documentation/en-us/unreal-engine/linux-development-requirements-for-unreal-engine
+     (UE 5.7 -> v26_clang-20.1.8-rockylinux8.exe).
+  2. Run the installer (installs to C:\UnrealToolchains\<version>\ and sets
+     LINUX_MULTIARCH_ROOT machine-wide).
+  3. Open a NEW terminal so the environment variable is visible, and re-run
+     this script.
+See README section 'Cross-compile for Linux from Windows'.
+"@
 }
 $BuildBat = Join-Path $UERoot "Engine\Build\BatchFiles\Build.bat"
 if (-not (Test-Path $BuildBat)) {
