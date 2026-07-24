@@ -126,14 +126,18 @@ def main():
                               {"command": command, "unattended": True, "exec_mode": exec_mode}))
         buf = b""
         result = None
-        while result is None:
-            chunk = conn.recv(65536)
-            if not chunk:
-                break
-            buf += chunk
-            msg = parse_msg(buf)  # single JSON object per command
-            if msg and msg.get("type") == "command_result":
-                result = msg
+        try:
+            while result is None:
+                chunk = conn.recv(65536)
+                if not chunk:
+                    break
+                buf += chunk
+                msg = parse_msg(buf)  # single JSON object per command
+                if msg and msg.get("type") == "command_result":
+                    result = msg
+        except socket.timeout:
+            print("ERROR: timed out waiting for a command result from the editor.", file=sys.stderr)
+            return 1
     finally:
         mcast.sendto(make_msg("close_connection", node_id, remote_id), MULTICAST_GROUP)
         conn.close()
