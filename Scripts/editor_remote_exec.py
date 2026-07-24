@@ -95,8 +95,12 @@ def main():
             info = msg.get("data", {})
             print("found editor node: %s (%s)" % (info.get("project_name", "?"), remote_id))
     if remote_id is None:
-        print("ERROR: no editor responded on %s:%d - is the editor running with Remote Execution enabled?"
-              % MULTICAST_GROUP, file=sys.stderr)
+        print(
+            "ERROR: no editor responded on %s:%d - is the editor running with Remote Execution enabled?"
+            % MULTICAST_GROUP,
+            file=sys.stderr,
+        )
+        mcast.close()
         return 1
 
     # Open our TCP listener; the editor connects back to it.
