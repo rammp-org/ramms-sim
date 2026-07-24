@@ -53,7 +53,7 @@ def parse_msg(payload):
 def main():
     ap = argparse.ArgumentParser()
     group = ap.add_mutually_exclusive_group(required=True)
-    group.add_argument("--code", help="python statements to execute (ExecuteFile mode)")
+    group.add_argument("--code", help="python statements to execute (ExecuteStatement mode)")
     group.add_argument("--file", help="path to a python file whose contents are executed")
     group.add_argument("--eval", help="single expression to evaluate and print")
     args = ap.parse_args()
