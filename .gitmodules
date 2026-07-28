@@ -19,3 +19,12 @@
 [submodule "Plugins/RammsMujocoPhysics"]
 	path = Plugins/RammsMujocoPhysics
 	url = git@github.com:rammp-org/ramms-mujoco-physics
+[submodule "Plugins/RammsMujocoSupport"]
+	path = Plugins/RammsMujocoSupport
+	url = git@github.com:rammp-org/ramms-mujoco-support
+[submodule "Plugins/unreal-robotics-lab"]
+	path = Plugins/unreal-robotics-lab
+	url = git@github.com:urlab-sim/UnrealRoboticsLab
+[submodule "Plugins/RammsCrowd"]
+	path = Plugins/RammsCrowd
+	url = git@github.com:rammp-org/ramms-crowd
