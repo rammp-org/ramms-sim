@@ -19,6 +19,9 @@
 #     (Apple's MacTypes.h defines `nil`, breaking msgpack's `typedef nil_t nil`).
 #   - URLab.Build.cs: Mac branch in AddThirdPartyLibrary — links the third-party
 #     dylibs (MuJoCo/CoACD/libzmq); without it the plugin fails to link on Mac.
+#   - URLab.Build.cs: ThirdPartyPath resolves to third_party/install-linux/
+#     when cross-compiling Windows→Linux (artifacts from
+#     Scripts/build_all_linux_cross.ps1 — see doc/PARALLEL_SIM_PLAN.md).
 #   - third_party/CoACD/build.sh: CMAKE_POLICY_VERSION_MINIMUM=3.5 (CMake 4.x
 #     compatibility) + executable bit.
 #   - third_party/build_all.sh: executable bit.
@@ -71,6 +74,23 @@ else
 	exit 1
 fi
 
+# --- 1b. apply port-override patch (idempotent) ---
+# Adds -URLabStepPort= / -URLabStatePort= / -URLabCtrlPort= / -URLabInfoPort= /
+# -URLabCamPort= command-line switches so multiple sim instances can share a
+# host (cluster / parallel training — see doc/PARALLEL_SIM_PLAN.md). Kept as
+# a separate patch so it can be dropped once upstreamed.
+PORTS_PATCH="$REPO_ROOT/Scripts/patches/urlab-port-overrides.patch"
+if git -C "$SUBMODULE" apply --reverse --check "$PORTS_PATCH" 2>/dev/null; then
+	log "port-override patch already applied — skipping"
+elif git -C "$SUBMODULE" apply --check "$PORTS_PATCH" 2>/dev/null; then
+	git -C "$SUBMODULE" apply "$PORTS_PATCH"
+	log "port-override patch applied"
+else
+	log "ERROR: port-override patch no longer applies cleanly — upstream has drifted."
+	log "Fix by hand and regenerate (see the header of $PORTS_PATCH)."
+	exit 1
+fi
+
 # --- 2. apply nested CoACD source fixes (idempotent) ---
 if [ ! -f "$COACD_SRC/CMakeLists.txt" ]; then
 	log "CoACD src submodule uninitialized — running git submodule update --init --recursive"
@@ -93,7 +113,16 @@ if [ "$BUILD_THIRDPARTY" = 1 ]; then
 	log "building third-party dependencies (this can take a while on first run)..."
 	# --no-submodule-sync: the default sync checks out each dep's pinned SHA,
 	# which would DISCARD the CoACD source patch applied above.
-	bash "$SUBMODULE/third_party/build_all.sh" --no-submodule-sync
+	#
+	# On Linux, --engine points the third-party builds at UE's bundled
+	# clang/libc++ toolchain. Without it, system gcc/libstdc++ produces
+	# ABI-incompatible .so files (undefined std::* symbols at editor startup).
+	# macOS uses the system toolchain, matching what UBT does there.
+	THIRDPARTY_ARGS=(--no-submodule-sync)
+	if [ "$(uname -s)" = Linux ]; then
+		THIRDPARTY_ARGS+=(--engine "$UE_ROOT")
+	fi
+	bash "$SUBMODULE/third_party/build_all.sh" "${THIRDPARTY_ARGS[@]}"
 	log "third-party build finished"
 fi
 

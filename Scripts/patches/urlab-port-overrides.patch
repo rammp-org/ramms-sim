@@ -1,0 +1,163 @@
+diff --git a/Source/URLab/Private/Bridge/BridgeServerConfigUtils.cpp b/Source/URLab/Private/Bridge/BridgeServerConfigUtils.cpp
+index dacea2d..9eae485 100644
+--- a/Source/URLab/Private/Bridge/BridgeServerConfigUtils.cpp
++++ b/Source/URLab/Private/Bridge/BridgeServerConfigUtils.cpp
+@@ -6,7 +6,9 @@
+ #include "Bridge/BridgeServerConfigUtils.h"
+ 
+ #include "Interfaces/IPluginManager.h"
++#include "Misc/CommandLine.h"
+ #include "Misc/ConfigCacheIni.h"
++#include "Misc/Parse.h"
+ #include "Misc/Paths.h"
+ #include "HAL/FileManager.h"
+ 
+@@ -67,4 +69,19 @@ void SaveToIni(const FURLabBridgeServerConfig& In)
+ 	File.Dirty = true;
+ 	File.Write(Path);
+ }
++
++FString OverrideEndpointPort(const FString& Endpoint, const TCHAR* Switch)
++{
++	int32 Port = 0;
++	if (!FParse::Value(FCommandLine::Get(), Switch, Port) || Port <= 0)
++	{
++		return Endpoint;
++	}
++	int32 ColonIndex = INDEX_NONE;
++	if (!Endpoint.FindLastChar(TEXT(':'), ColonIndex))
++	{
++		return Endpoint;
++	}
++	return Endpoint.Left(ColonIndex + 1) + FString::FromInt(Port);
++}
+ } // namespace URLabBridgeServerConfigUtils
+diff --git a/Source/URLab/Private/MuJoCo/Components/Sensors/MjCamera.cpp b/Source/URLab/Private/MuJoCo/Components/Sensors/MjCamera.cpp
+index 6bb9663..02ffed1 100644
+--- a/Source/URLab/Private/MuJoCo/Components/Sensors/MjCamera.cpp
++++ b/Source/URLab/Private/MuJoCo/Components/Sensors/MjCamera.cpp
+@@ -21,6 +21,7 @@
+ // CoACD (MIT), and libzmq (MPL 2.0). See ThirdPartyNotices.txt for details.
+ 
+ #include "MuJoCo/Components/Sensors/MjCamera.h"
++#include "Bridge/BridgeServerConfigUtils.h"
+ #include "MuJoCo/Components/Sensors/CameraShmWriter.h"
+ #include "MuJoCo/Core/AMjManager.h"
+ #include "MuJoCo/Core/MjDebugVisualizer.h"
+@@ -552,7 +553,12 @@ void UMjCamera::SetStreamingEnabled(bool bEnable)
+ 
+ 			const FIntPoint Res(resolution.Num() > 0 ? resolution[0] : 0,
+ 				resolution.Num() > 1 ? resolution[1] : 0);
+-			ZmqWorker = new FCameraZmqWorker(ZmqEndpoint, Topic, Res);
++			// -URLabCamPort= rebases every camera to the same per-instance
++			// port; the worker's bind retry (+0..9) then spreads the cameras
++			// across the block, and clients learn the real port from the
++			// handshake / GetActualZmqEndpoint.
++			ZmqWorker = new FCameraZmqWorker(
++				URLabBridgeServerConfigUtils::OverrideEndpointPort(ZmqEndpoint, TEXT("URLabCamPort=")), Topic, Res);
+ 			WorkerThread = FRunnableThread::Create(ZmqWorker, TEXT("CameraZmqWorkerThread"), 0, TPri_BelowNormal);
+ 		}
+ 
+diff --git a/Source/URLab/Private/MuJoCo/Core/AMjManager.cpp b/Source/URLab/Private/MuJoCo/Core/AMjManager.cpp
+index 1023d38..b7ce201 100644
+--- a/Source/URLab/Private/MuJoCo/Core/AMjManager.cpp
++++ b/Source/URLab/Private/MuJoCo/Core/AMjManager.cpp
+@@ -21,6 +21,7 @@
+ // CoACD (MIT), and libzmq (MPL 2.0). See ThirdPartyNotices.txt for details.
+ 
+ #include "MuJoCo/Core/AMjManager.h"
++#include "Bridge/BridgeServerConfigUtils.h"
+ #include "MuJoCo/Core/MjPhysicsEngine.h"
+ #include "MuJoCo/Core/MjRenderSnapshot.h"
+ #include "MuJoCo/Core/MjDebugVisualizer.h"
+@@ -186,9 +187,12 @@ void AAMjManager::BeginPlay()
+ 		// Cooked path: no editor subsystem. Manager owns its bridge and
+ 		// brings up both RPC transports inline. Bridge owns all RPC
+ 		// transports; manager only owns publish/subscribe streams.
++		// -URLabStepPort= overrides the port so multiple packaged
++		// instances can share a host (cluster / parallel training).
+ 		BridgeServer = NewObject<UURLabBridgeServer>(this, TEXT("BridgeServer"));
+ 		BridgeServer->SetOwnedByManager(true);
+-		BridgeServer->Start();          // ZMQ on tcp://0.0.0.0:5559
++		BridgeServer->Start(URLabBridgeServerConfigUtils::OverrideEndpointPort(
++			TEXT("tcp://0.0.0.0:5559"), TEXT("URLabStepPort=")));
+ 		BridgeServer->EnsureShmBound(); // SHM under "live"
+ 	}
+ 	BridgeServer->RegisterManager(this);
+diff --git a/Source/URLab/Private/Transport/ZmqPublishTransport.cpp b/Source/URLab/Private/Transport/ZmqPublishTransport.cpp
+index 1829c86..4f6dbe8 100644
+--- a/Source/URLab/Private/Transport/ZmqPublishTransport.cpp
++++ b/Source/URLab/Private/Transport/ZmqPublishTransport.cpp
+@@ -20,6 +20,7 @@
+ #if PLATFORM_WINDOWS
+ #include "Windows/HideWindowsPlatformTypes.h"
+ #endif
++#include "Bridge/BridgeServerConfigUtils.h"
+ #include "MuJoCo/Core/MjArticulation.h"
+ #include "MuJoCo/Core/AMjManager.h"
+ #include "MuJoCo/Core/MjPhysicsEngine.h"
+@@ -80,6 +81,9 @@ void UURLabZmqPublishTransport::InitZmqSocket()
+ 	ZmqContext = zmq_ctx_new();
+ 	ZmqPublisher = zmq_socket(ZmqContext, ZMQ_PUB);
+ 
++	// Per-instance override for multi-sim hosts (see BridgeServerConfigUtils).
++	ZmqEndpoint = URLabBridgeServerConfigUtils::OverrideEndpointPort(ZmqEndpoint, TEXT("URLabStatePort="));
++
+ 	int rc = zmq_bind(ZmqPublisher, TCHAR_TO_UTF8(*ZmqEndpoint));
+ 	if (rc == 0)
+ 	{
+diff --git a/Source/URLab/Private/Transport/ZmqSubscribeTransport.cpp b/Source/URLab/Private/Transport/ZmqSubscribeTransport.cpp
+index ffa160e..2a86a42 100644
+--- a/Source/URLab/Private/Transport/ZmqSubscribeTransport.cpp
++++ b/Source/URLab/Private/Transport/ZmqSubscribeTransport.cpp
+@@ -21,6 +21,7 @@
+ // CoACD (MIT), and libzmq (MPL 2.0). See ThirdPartyNotices.txt for details.
+ 
+ #include "Transport/ZmqSubscribeTransport.h"
++#include "Bridge/BridgeServerConfigUtils.h"
+ #include "MuJoCo/Core/MjArticulation.h"
+ #include "MuJoCo/Core/AMjManager.h"
+ #include "Transport/NetworkManager.h"
+@@ -57,6 +58,10 @@ void UURLabZmqSubscribeTransport::InitZmqSocket()
+ 
+ 	ZmqContext = zmq_ctx_new();
+ 
++	// Per-instance overrides for multi-sim hosts (see BridgeServerConfigUtils).
++	ControlEndpoint = URLabBridgeServerConfigUtils::OverrideEndpointPort(ControlEndpoint, TEXT("URLabCtrlPort="));
++	InfoEndpoint = URLabBridgeServerConfigUtils::OverrideEndpointPort(InfoEndpoint, TEXT("URLabInfoPort="));
++
+ 	// Setup Subscriber (Controls)
+ 	ControlSubscriber = zmq_socket(ZmqContext, ZMQ_SUB);
+ 	int rc = zmq_bind(ControlSubscriber, TCHAR_TO_UTF8(*ControlEndpoint));
+diff --git a/Source/URLab/Public/Bridge/BridgeServerConfigUtils.h b/Source/URLab/Public/Bridge/BridgeServerConfigUtils.h
+index 6406935..8ee60df 100644
+--- a/Source/URLab/Public/Bridge/BridgeServerConfigUtils.h
++++ b/Source/URLab/Public/Bridge/BridgeServerConfigUtils.h
+@@ -23,4 +23,11 @@ URLAB_API void SaveToIni(const FURLabBridgeServerConfig& In);
+ 
+ /** Section name used in the INI. Exposed for tests. */
+ URLAB_API extern const TCHAR* SectionName;
++
++/** Per-instance port overrides for multi-sim hosts: if the given command-line
++ *  switch (e.g. "URLabStepPort=") is present with a positive value, returns
++ *  Endpoint with its trailing :port replaced; otherwise returns Endpoint
++ *  unchanged. Switches: URLabStepPort= URLabStatePort= URLabCtrlPort=
++ *  URLabInfoPort= URLabCamPort=. */
++URLAB_API FString OverrideEndpointPort(const FString& Endpoint, const TCHAR* Switch);
+ } // namespace URLabBridgeServerConfigUtils
+diff --git a/Source/URLabEditor/Private/MjBridgeServerSubsystem.cpp b/Source/URLabEditor/Private/MjBridgeServerSubsystem.cpp
+index e93e151..0cc0c71 100644
+--- a/Source/URLabEditor/Private/MjBridgeServerSubsystem.cpp
++++ b/Source/URLabEditor/Private/MjBridgeServerSubsystem.cpp
+@@ -40,7 +40,10 @@ void UURLabBridgeServerSubsystem::StartServer()
+ 	{
+ 		Server = NewObject<UURLabBridgeServer>(this, TEXT("EditorBridgeServer"));
+ 	}
+-	const FString Endpoint = FString::Printf(TEXT("tcp://0.0.0.0:%d"), Config.StepPort);
++	// Command line beats INI so editor instances can be port-isolated the
++	// same way packaged ones are.
++	const FString Endpoint = URLabBridgeServerConfigUtils::OverrideEndpointPort(
++		FString::Printf(TEXT("tcp://0.0.0.0:%d"), Config.StepPort), TEXT("URLabStepPort="));
+ 	Server->Start(Endpoint);
+ 	Server->EnsureShmBound(); // open req.shm/rep.shm under "live"
+ 	UE_LOG(LogURLabEditor, Log,

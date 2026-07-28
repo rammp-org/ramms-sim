@@ -19,6 +19,7 @@ Engine 5.7 simulation environment for robotic assistive technologies.
     - [Compile the editor target](#compile-the-editor-target)
     - [Compile a standalone game target](#compile-a-standalone-game-target)
     - [Package the project](#package-the-project)
+    - [Cross-compile for Linux from Windows](#cross-compile-for-linux-from-windows)
     - [Regenerate IDE project files (optional)](#regenerate-ide-project-files-optional)
   - [Project Structure](#project-structure)
     - [Plugin Submodules](#plugin-submodules)
@@ -287,6 +288,46 @@ Unreal Automation Tool (`RunUAT`):
   -Build -Cook -Stage -Pak -Archive -ArchiveDirectory="$PWD/Packaged"
 ```
 (Use `-Platform=Linux` on Linux.) The packaged output lands in `Packaged/`.
+
+### Cross-compile for Linux from Windows
+
+Linux builds (e.g. for headless simulation on clusters — see
+`doc/PARALLEL_SIM_PLAN.md`) can be produced entirely on a Windows machine
+using Epic's standard Windows→Linux cross-compilation workflow. This needs a
+**one-time toolchain install**:
+
+1. Download the **native toolchain** installer for your engine version from
+   Epic's [Linux Development Requirements](https://dev.epicgames.com/documentation/en-us/unreal-engine/linux-development-requirements-for-unreal-engine)
+   page — for **UE 5.7** that is **v26 clang-20.1.8 rockylinux8**
+   (`v26_clang-20.1.8-rockylinux8.exe`).
+2. Run the installer. It is fully automated: it unpacks the clang/lld
+   cross-toolchain and sysroot (default: `C:\UnrealToolchains\<version>\`)
+   and sets the `LINUX_MULTIARCH_ROOT` environment variable machine-wide.
+3. **Open a new terminal** (existing shells don't see the new environment
+   variable), and verify:
+
+   ```powershell
+   echo $env:LINUX_MULTIARCH_ROOT
+   # -> C:\UnrealToolchains\v26_clang-20.1.8-rockylinux8\
+   ```
+
+With the toolchain in place, build and package with the repo scripts (they
+apply the required URLab patches automatically and cross-compile the
+MuJoCo/CoACD/libzmq third-party libraries into `third_party/install-linux/`
+before the UBT build):
+
+```powershell
+# 1. Cross-compile URLab third-party deps (once, and after submodule bumps)
+powershell -ExecutionPolicy Bypass -File Scripts\build_all_linux_cross.ps1
+
+# 2. Build the Linux game target; add -Package to cook/stage/pak
+powershell -ExecutionPolicy Bypass -File Scripts\build_linux_cross.ps1 -Package
+```
+
+The packaged output lands in `Packaged\Linux` — copy it to a Linux machine
+(or bundle it with `containers/ramms.def`) and launch via
+`Scripts/run_headless.sh`. Both scripts check for the toolchain and fail
+with install instructions if `LINUX_MULTIARCH_ROOT` is missing.
 
 ### Regenerate IDE project files (optional)
 
