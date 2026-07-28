@@ -72,7 +72,7 @@ Engine 5.8, it offers:
 - **Unreal Engine 5.8**
 - **Windows** with DirectX 12 (recommended) or **Linux** with Vulkan SM6
 - **Visual Studio 2022** (Windows) — with the *Game development with C++*
-  workload (MSVC toolchain), required both by UE 5.7 and to compile the
+  workload (MSVC toolchain), required both by UE 5.8 and to compile the
   native third-party dependencies
 - **CMake** — On your `PATH`, for building the unreal-robotics-lab
   third-party dependencies
