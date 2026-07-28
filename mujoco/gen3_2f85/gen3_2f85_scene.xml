@@ -1,0 +1,32 @@
+<mujoco model="gen3_2f85_scene">
+  <!-- Combined Kinova Gen3 + Robotiq 2F-85 robot (composed from MuJoCo Menagerie). -->
+  <include file="gen3_2f85.xml"/>
+
+  <statistic center="0.3 0 0.4" extent="1.2"/>
+
+  <visual>
+    <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <global azimuth="120" elevation="-20"/>
+  </visual>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="3072"/>
+    <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="0.2 0.3 0.4" rgb2="0.1 0.2 0.3"
+      markrgb="0.8 0.8 0.8" width="300" height="300"/>
+    <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5" reflectance="0.2"/>
+  </asset>
+
+  <worldbody>
+    <light pos="0 0 1.5" dir="0 0 -1" directional="true"/>
+    <geom name="floor" type="plane" size="0 0 0.05" material="groundplane"/>
+
+    <!-- Graspable object: a small free box. condim=4 (sliding+torsional friction) + friction give a
+         stable grasp; the gripper pads have priority=1 so their tuned friction dominates the contact. -->
+    <body name="object" pos="0.5 0 0.02">
+      <freejoint/>
+      <geom name="object_geom" type="box" size="0.02 0.02 0.02" rgba="0.55 0.75 0.55 1"
+        friction="1 0.05 0.01" condim="4"/>
+    </body>
+  </worldbody>
+</mujoco>

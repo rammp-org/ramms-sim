@@ -10,6 +10,10 @@ Engine 5.8 simulation environment for robotic assistive technologies.
   - [Overview](#overview)
   - [Prerequisites](#prerequisites)
   - [Installation](#installation)
+    - [1. Clone with submodules](#1-clone-with-submodules)
+    - [2. Build the unreal-robotics-lab third-party dependencies](#2-build-the-unreal-robotics-lab-third-party-dependencies)
+    - [3. Download content packs from Fab](#3-download-content-packs-from-fab)
+    - [4. Open the project](#4-open-the-project)
   - [Building from the Command Line](#building-from-the-command-line)
     - [Locate your engine installation](#locate-your-engine-installation)
     - [Compile the editor target](#compile-the-editor-target)
@@ -67,11 +71,24 @@ Engine 5.8, it offers:
 
 - **Unreal Engine 5.8**
 - **Windows** with DirectX 12 (recommended) or **Linux** with Vulkan SM6
+- **Visual Studio 2022** (Windows) — with the *Game development with C++*
+  workload (MSVC toolchain), required both by UE 5.7 and to compile the
+  native third-party dependencies
+- **CMake** — On your `PATH`, for building the unreal-robotics-lab
+  third-party dependencies
 - **GPU with ray tracing support** — Required for GPU-accelerated sensors;
   RT cores used when available, software ray tracing otherwise
 - **Python 3.10+** (optional) — For remote execution scripts
 
 ## Installation
+
+First-time setup is four steps: clone with submodules, build the
+`unreal-robotics-lab` native third-party dependencies, download the Fab
+content packs, and open the project. Steps 2 and 3 are required **before**
+the first build/launch — skipping step 2 makes the build fail outright, and
+skipping step 3 leaves example maps and the crowd system without their assets.
+
+### 1. Clone with submodules
 
 This repository uses git submodules for plugins. Clone recursively:
 
@@ -86,8 +103,82 @@ If you've already cloned without `--recursive`, initialize the submodules:
 git submodule update --init --recursive
 ```
 
-Then open `Ramms.uproject` in Unreal Engine 5.8. The plugins are automatically
-detected and compiled.
+### 2. Build the unreal-robotics-lab third-party dependencies
+
+The `URLab` module (pulled in via `unreal-robotics-lab` and
+`RammsMujocoSupport`) links against native libraries — **MuJoCo**, **CoACD**,
+and **libzmq** — that are compiled from source into
+`Plugins/unreal-robotics-lab/third_party/install/`. This must be done once
+before the first project build, and again whenever the `unreal-robotics-lab`
+submodule pointer moves (each dependency's build script records the installed
+SHA, and the build system enforces a drift check against it).
+
+Requires **CMake** and a C++ toolchain (Visual Studio 2022 / MSVC on
+Windows, Xcode command-line tools on macOS) on your `PATH` — see
+[Prerequisites](#prerequisites).
+
+**Windows (PowerShell):**
+```powershell
+cd Plugins/unreal-robotics-lab/third_party
+./build_all.ps1
+```
+
+The script syncs each dependency's source submodule to the expected revision,
+builds it in Release, and installs into `third_party/install/`.
+
+**macOS / Linux:** do **not** run `build_all.sh` directly. Upstream
+unreal-robotics-lab does not (yet) compile on macOS, so the repository ships
+local patches (`Scripts/patches/`) that fix it — the `nil` macro clash between
+Apple's `MacTypes.h` and rpclib/msgpack, the missing Mac dylib link branch in
+`URLab.Build.cs`, and CoACD build fixes for modern clang/CMake. Run the setup
+script from the repository root instead; it applies the patches, builds the
+third-party dependencies with the patches preserved, and regenerates project
+files:
+
+```bash
+UE_ROOT="/Users/Shared/Epic Games/UE_5.7" Scripts/setup_urlab.sh
+```
+
+The script is idempotent — re-run it any time. In particular, re-run it after
+`git submodule update`, which discards the local patches. Flags:
+`--no-thirdparty` skips the dependency build, `--no-projectfiles` skips
+project file generation; `UE_ROOT` defaults to
+`/Users/Shared/Epic Games/UE_5.7`.
+
+> If you skip this step, compiling `RammsEditor` fails at the build-rules
+> stage with an error like `MuJoCo install is missing '...INSTALLED_SHA.txt'`.
+> The same error after a `git pull` means the submodule moved — re-run
+> `build_all.ps1` (Windows) or `Scripts/setup_urlab.sh` (macOS/Linux) to
+> refresh the installs.
+
+### 3. Download content packs from Fab
+
+Marketplace content under `Content/Fab/` is **not committed** to the
+repository (multi-GB size, and the Fab license requires each user to claim
+the free packs themselves). Without it the project still builds and runs, but
+example environments show missing assets and the crowd system falls back to
+proxy meshes.
+
+- **City Sample Crowds** (required for the crowd system) — claim and install
+  via **Epic Games Launcher → Fab Library → City Sample Crowds → Add to
+  Project**, then restart the editor. The `RammsCrowd` plugin detects the
+  pack on editor startup and automatically migrates it to
+  `/Game/Fab/CitySampleCrowd` (one-time, a few minutes, with toast
+  notifications). If it is missing, an editor toast links to the Fab listing
+  and crowd agents simulate with proxy meshes. See
+  `Plugins/RammsCrowd/doc/SETUP.md` §0 for details.
+- **Example environment & prop packs** (optional) — the example maps use a
+  number of free packs (furniture, grocery/supermarket props, street/urban
+  environments, etc.). Claim them on [Fab](https://www.fab.com) and add them
+  to the project via the **Fab plugin** inside the Unreal Editor so they land
+  under `Content/Fab/`. A map that references a pack you haven't installed
+  simply shows missing-asset placeholders for those actors.
+
+### 4. Open the project
+
+Open `Ramms.uproject` in Unreal Engine 5.8. The plugins are automatically
+detected and compiled (or build from the command line — see the next
+section).
 
 ## Building from the Command Line
 
@@ -99,7 +190,8 @@ These commands invoke **UnrealBuildTool (UBT)** through the engine's batch
 scripts. They build directly from `Ramms.uproject` and the `.Target.cs` files —
 generating IDE project files is optional (see the last subsection).
 
-> Prerequisites: submodules initialized (see [Installation](#installation)) and
+> Prerequisites: submodules initialized and the unreal-robotics-lab
+> third-party dependencies built (see [Installation](#installation)), plus
 > a full UE 5.8 installation. The required .NET toolchain ships with the engine.
 
 The project defines two targets:
@@ -221,7 +313,7 @@ command-line builds above.
 
 ### Plugin Submodules
 
-The project uses a modular plugin architecture. Four plugins are managed as
+The project uses a modular plugin architecture. Seven plugins are managed as
 git submodules:
 
 | Plugin | Path | Description |
@@ -230,6 +322,9 @@ git submodules:
 | **CameraCapture** | `Plugins/CameraCapture/` | Multi-camera capture system — RGB + depth + motion vectors with custom camera intrinsics, EXR output, and frustum visualization |
 | **RammsStreaming** | `Plugins/RammsStreaming/` | Real-time binary streaming over TCP (RMSS protocol, port 30030) — image data, depth frames, motion vectors, point clouds |
 | **RammsAssets** | `Plugins/RammsAssets/` | 3D models and materials — Kinova Gen3 arm, gripper, MeBot base, operator seat, ORBBEC and LUCI camera models |
+| **RammsHumanPhysics** | `Plugins/RammsHumanPhysics/` | Experimental human body physics plugin for RAMMS |
+| **RammsNewtonPhysics** | `Plugins/RammsNewtonPhysics/` | Experimental Newton Dynamics integration scaffold — third-party detection, fixed-step subsystem, actor bridge component, and articulated robot API for Newton-first full-robot simulation |
+| **RammsMujocoPhysics** | `Plugins/RammsMujocoPhysics/` | Experimental MuJoCo integration scaffold — third-party detection, fixed-step subsystem, and actor bridge component for selective external simulation |
 
 An additional local plugin (**VolingaRenderer**) provides custom rendering
 capabilities.
@@ -256,6 +351,10 @@ Ramms/
 │   ├── CameraCapture/         Camera data acquisition (submodule)
 │   ├── RammsStreaming/        TCP binary streaming (submodule)
 │   ├── RammsAssets/           Robot & sensor 3D models (submodule)
+│   ├── RammsCrowd/            NPC crowd simulation (submodule)
+│   ├── RammsHumanPhysics/     Experimental human physics plugin (submodule)
+│   ├── RammsNewtonPhysics/    Experimental Newton backend integration (submodule)
+│   ├── RammsMujocoPhysics/    Experimental MuJoCo backend integration (submodule)
 │   └── VolingaRenderer/       Custom rendering (local)
 ├── Source/Ramms/              Main game module (game mode, pawn, vehicles)
 ├── py/                        Python remote execution scripts
@@ -431,7 +530,8 @@ detailed usage.
 
 This repository does not include all example environments to keep the
 repository size manageable. Additional environments and assets can be
-downloaded for free using the **Fab plugin** within Unreal Engine.
+downloaded for free using the **Fab plugin** within Unreal Engine — see
+[Download content packs from Fab](#3-download-content-packs-from-fab).
 
 ## Developing
 
@@ -454,6 +554,9 @@ git submodule update --remote Plugins/RammsCore
 git submodule update --remote Plugins/CameraCapture
 git submodule update --remote Plugins/RammsStreaming
 git submodule update --remote Plugins/RammsAssets
+git submodule update --remote Plugins/RammsHumanPhysics
+git submodule update --remote Plugins/RammsNewtonPhysics
+git submodule update --remote Plugins/RammsMujocoPhysics
 ```
 
 ### Adding C++ Classes to Plugins
