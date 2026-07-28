@@ -25,10 +25,32 @@ index 117dbd5..20f68b7 100644
  #pragma pop_macro("check")
  
 diff --git a/Source/URLab/URLab.Build.cs b/Source/URLab/URLab.Build.cs
-index 749d2d4..3a69fd9 100644
+index 749d2d4..74f6a20 100644
 --- a/Source/URLab/URLab.Build.cs
 +++ b/Source/URLab/URLab.Build.cs
-@@ -226,6 +226,29 @@ public class URLab : ModuleRules
+@@ -135,7 +135,20 @@ public class URLab : ModuleRules
+ 
+ 	private string ThirdPartyPath
+ 	{
+-		get { return Path.Combine(PluginDirectory, "third_party", "install"); }
++		get
++		{
++			// Windows->Linux cross-compilation reads Linux-built third-party
++			// artifacts from install-linux/ (produced by the host project's
++			// Scripts/build_all_linux_cross.ps1). A separate root is required
++			// because each dep build wipes its own install dir, so Linux and
++			// Windows artifacts sharing install/ would clobber each other.
++			if (Target.Platform == UnrealTargetPlatform.Linux &&
++				BuildHostPlatform.Current.Platform == UnrealTargetPlatform.Win64)
++			{
++				return Path.Combine(PluginDirectory, "third_party", "install-linux");
++			}
++			return Path.Combine(PluginDirectory, "third_party", "install");
++		}
+ 	}
+ 
+ 	private void AddThirdPartyLibrary(string LibraryName, ReadOnlyTargetRules Target)
+@@ -226,6 +239,29 @@ public class URLab : ModuleRules
  				}
  			}
  		}
