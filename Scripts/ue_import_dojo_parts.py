@@ -36,6 +36,7 @@ DEST_DIR   = "/Game/DojoParts"
 MAT_DIR    = DEST_DIR + "/Materials"
 MASTER_NAME = "M_Dojo_Master"
 GLASS_MASTER_NAME = "M_Dojo_Master_Glass"
+MASKED_MASTER_NAME = "M_Dojo_Master_Masked"
 SKIP = []                    # regexes on the asset folder name
 SIMULATE = True              # parts simulate physics (constraints hold them)
 
@@ -226,6 +227,38 @@ def build_glass_master(def_base):
     return mat
 
 
+def build_masked_master(def_base, def_orm, def_normal):
+    """Opaque graph + BaseColor.A as opacity mask (alpha-cutout cutlery)."""
+    path = MAT_DIR + "/" + MASKED_MASTER_NAME
+    if EAL.does_asset_exist(path):
+        return EAL.load_asset(path)
+    mat = assets.create_asset(MASKED_MASTER_NAME, MAT_DIR, unreal.Material,
+                              unreal.MaterialFactoryNew())
+    mat.set_editor_property("blend_mode", unreal.BlendMode.BLEND_MASKED)
+    mat.set_editor_property("two_sided", True)
+    base = _tex_param(mat, "BaseColor", -1100, -300,
+                      unreal.MaterialSamplerType.SAMPLERTYPE_COLOR, def_base)
+    tint = _vec_param(mat, "Tint", -1100, -80, (1.0, 1.0, 1.0, 1.0))
+    basem = _mul(mat, -650, -250, base, "RGB", tint, "")
+    MEL.connect_material_property(basem, "", unreal.MaterialProperty.MP_BASE_COLOR)
+    MEL.connect_material_property(base, "A", unreal.MaterialProperty.MP_OPACITY_MASK)
+    orm = _tex_param(mat, "ORM", -1100, 120,
+                     unreal.MaterialSamplerType.SAMPLERTYPE_MASKS, def_orm)
+    MEL.connect_material_property(orm, "R", unreal.MaterialProperty.MP_AMBIENT_OCCLUSION)
+    rs = _scalar_param(mat, "RoughnessScale", -1100, 330, 1.0)
+    rough = _mul(mat, -650, 120, orm, "G", rs, "")
+    MEL.connect_material_property(rough, "", unreal.MaterialProperty.MP_ROUGHNESS)
+    ms = _scalar_param(mat, "MetallicScale", -1100, 430, 1.0)
+    metal = _mul(mat, -650, 260, orm, "B", ms, "")
+    MEL.connect_material_property(metal, "", unreal.MaterialProperty.MP_METALLIC)
+    nrm = _tex_param(mat, "Normal", -1100, 550,
+                     unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL, def_normal)
+    MEL.connect_material_property(nrm, "RGB", unreal.MaterialProperty.MP_NORMAL)
+    MEL.recompile_material(mat)
+    EAL.save_loaded_asset(mat)
+    return mat
+
+
 def make_instance(inst_name, master, base_tex, orm_tex, normal_tex, translucent):
     path = MAT_DIR + "/" + inst_name
     mic = EAL.load_asset(path) if EAL.does_asset_exist(path) else \
@@ -272,9 +305,15 @@ def add_component(bp, parent_handle, cls, name):
     return handle, SDBFL.get_object(data)
 
 
-def set_simulated(comp, simulate):
+def set_simulated(comp, simulate, mass_kg=None):
     bi = comp.get_editor_property("body_instance")
     bi.set_editor_property("simulate_physics", simulate)
+    if mass_kg:
+        try:
+            bi.set_editor_property("override_mass", True)
+            bi.set_editor_property("mass_in_kg_override", float(mass_kg))
+        except Exception as e:
+            unreal.log_warning("    mass override failed: " + repr(e))
     comp.set_editor_property("body_instance", bi)
 
 
@@ -300,6 +339,9 @@ def configure_constraint(comp, child_name, parent_name, joint):
     pi.set_editor_property("disable_collision", True)
 
     lo, hi = float(joint["limits"][0]), float(joint["limits"][1])
+    # NOTE: empirically (CabinetB french doors) UE's twist angle about the
+    # make_rot_from_x frame matches the Blender-space rotation sign directly
+    # -- do NOT negate the revolute range here.
     half = (hi - lo) / 2.0
     mid = (hi + lo) / 2.0
     ll = pi.get_editor_property("linear_limit")
@@ -334,14 +376,37 @@ def configure_constraint(comp, child_name, parent_name, joint):
     return mid
 
 
+def clear_components(bp):
+    """Remove previously-added components so an existing Blueprint can be
+    rebuilt in place (deleting the asset fails once instances are placed in
+    a level; reusing it updates those instances on compile instead)."""
+    gather = SDS.k2_gather_subobject_data_for_blueprint(bp)
+    if not gather:
+        return
+    doomed = []
+    for h in gather[1:]:
+        d = SDS.k2_find_subobject_data_from_handle(h)
+        obj = SDBFL.get_object(d)
+        if isinstance(obj, (unreal.StaticMeshComponent,
+                            unreal.PhysicsConstraintComponent)):
+            doomed.append(h)
+    if doomed:
+        try:
+            SDS.delete_subobjects(gather[0], doomed, bp)
+        except Exception as e:
+            unreal.log_warning("    clear_components: " + repr(e))
+
+
 def build_blueprint(name, entry, meshes):
     bp_dir = DEST_DIR + "/Blueprints"
     bp_path = bp_dir + "/BP_" + name
     if EAL.does_asset_exist(bp_path):
-        EAL.delete_asset(bp_path)
-    factory = unreal.BlueprintFactory()
-    factory.set_editor_property("parent_class", unreal.Actor)
-    bp = assets.create_asset("BP_" + name, bp_dir, unreal.Blueprint, factory)
+        bp = EAL.load_asset(bp_path)
+        clear_components(bp)
+    else:
+        factory = unreal.BlueprintFactory()
+        factory.set_editor_property("parent_class", unreal.Actor)
+        bp = assets.create_asset("BP_" + name, bp_dir, unreal.Blueprint, factory)
 
     gather = SDS.k2_gather_subobject_data_for_blueprint(bp)
     actor_root = gather[0]
@@ -369,7 +434,7 @@ def build_blueprint(name, entry, meshes):
         else:
             rel = org
         comp.set_editor_property("relative_location", ue_pos(rel))
-        set_simulated(comp, SIMULATE)
+        set_simulated(comp, SIMULATE, pentry.get("mass"))
 
     for part in order:
         j = parts[part].get("joint")
@@ -424,7 +489,9 @@ def main():
 
     master = build_master_material(*(first_opaque or (None, None, None)))
     glass = build_glass_master(first_glass)
-    unreal.log("masters: {} / {}".format(master.get_name(), glass.get_name()))
+    masked = build_masked_master(*(first_opaque or (None, None, None)))
+    unreal.log("masters: {} / {} / {}".format(
+        master.get_name(), glass.get_name(), masked.get_name()))
 
     ok = 0
     for name in names:
@@ -434,8 +501,10 @@ def main():
         for g, info in sorted(entry.get("materials", {}).items()):
             b, o, n = tex[(name, g)]
             trans = bool(info.get("translucent"))
+            parent = glass if trans else (
+                masked if info.get("masked") else master)
             mic = make_instance("MI_{}_{}".format(name, g),
-                                glass if trans else master, b, o, n, trans)
+                                parent, b, o, n, trans)
             mic_by_slot[info.get("slot", "{}_{}".format(name, g))] = mic
 
         meshes = {}

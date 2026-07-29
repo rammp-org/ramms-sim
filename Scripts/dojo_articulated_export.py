@@ -154,9 +154,6 @@ CONFIG = {
 #                 doors posed open wider than that)
 # ---------------------------------------------------------------------------
 OVERRIDES = {
-    # CabinetB display cabinet: two full-width glass panes sliding in tracks
-    # (they overlap in depth, so they cannot be hinged) + a small pull.
-    "CabinetB_Glass_low_8.001": {"kind": "DOOR_SLIDE", "split_meshes": True},
     # Egg-tray flip lid mounted on the big fridge's upper door: the name
     # contains "Holder" which the exclusion regex would keep static.
     "FridgeUpperHolderPlasticDoor": {"kind": "DOOR"},
@@ -167,12 +164,8 @@ OVERRIDES = {
     # rotation can close it -- replace with the true hinge (door edge at the
     # body's front-right corner, measured from the mesh) and pin the close
     # angle (probed: door flush across the front at +150).
-    "Door": {"pivot": (0.1587, 0.6098, 0.114), "close_angle": 150},
-    # microwave_3 (all parts blandly named Cube_NNN, so nothing classifies):
-    # Cube_030 is the thin front panel = the door (already closed; hinge on
-    # its left edge, measured from the mesh), Cube_029 the handle bar on it.
-    "Cube_030": {"kind": "DOOR", "pivot": (-0.241, 1.352, 0.137)},
-    "Cube_029": {"bone_of": "Cube_030"},
+    # NOTE pivots here are in the ASSET ROOT's local frame
+    "Door": {"pivot": (0.1587, -0.1942, 0.0), "close_angle": 150},
 }
 
 AI = {"X": 0, "Y": 1, "Z": 2}
@@ -188,7 +181,7 @@ def mover_cfg(orig, obj=None):
     cfg = {}
     if obj is not None:
         for key in ("kind", "pivot", "axis", "limits", "close_angle",
-                    "close_swing", "bone_of", "hinge"):
+                    "close_swing", "bone_of", "hinge", "mass"):
             v = obj.get("dojo_" + key)
             if v is None:
                 continue
@@ -205,6 +198,7 @@ def mover_cfg(orig, obj=None):
 # name-driven classification (matched against the ORIGINAL name, .NNN stripped)
 MOVER_EXCLUDE = re.compile(r"hinge|hinger|rail|structure|holder|track", re.I)
 PAT_DOOR = re.compile(r"door", re.I)
+PAT_HANDLE = re.compile(r"handle|knob|pull|grip", re.I)
 PAT_DRAWER = re.compile(r"drawer", re.I)
 
 
@@ -271,10 +265,14 @@ def is_mover_name(bn):
 # ===========================================================================
 def split_root(root):
     """Return a list of assets: dicts with name + the subtree nodes that make
-    up one physical object."""
+    up one physical object + the root's world matrix as the asset's ANCHOR:
+    process_asset re-bases the work copies into this local frame, so every
+    pivot/override/dojo_* property is ROOT-LOCAL and survives moving or
+    re-arranging assets in the scene."""
     mode = CONFIG["split"].get(root.name, "whole")
     if mode == "whole":
-        return [dict(name=root.name, nodes=[root])]
+        return [dict(name=root.name, nodes=[root],
+                     anchor=root.matrix_world.copy())]
 
     kind, arg = mode
     if kind == "prefix":
@@ -288,7 +286,8 @@ def split_root(root):
                     groups[p].append(d)
                     claimed.update(x.name for x in [d] + descendants(d))
                     break
-        return [dict(name=f"{root.name}__{p}", nodes=objs)
+        return [dict(name=f"{root.name}__{p}", nodes=objs,
+                     anchor=root.matrix_world.copy())
                 for p, objs in groups.items() if objs]
 
     if kind == "children":
@@ -314,7 +313,8 @@ def split_root(root):
                 assets[id(best)].append(g["node"])
             else:
                 assets[id(g)] = [g["node"]]
-        return [dict(name=f"{root.name}__{safe_name(nodes[0].name)}", nodes=nodes)
+        return [dict(name=f"{root.name}__{safe_name(nodes[0].name)}",
+                     nodes=nodes, anchor=root.matrix_world.copy())
                 for nodes in assets.values()]
 
     raise ValueError(f"unknown split mode for {root.name}: {mode!r}")
@@ -587,13 +587,13 @@ def analyze_asset(asset, name_map, harvested):
 # ===========================================================================
 # close doors that are posed open (work copy only)
 # ===========================================================================
-def _best_close_angle(u, all_meshes):
+def _best_close_angle(u, all_meshes, exclude=None):
     """Best hinge angle (deg) closing this door, and score ratio vs staying.
     Score = union bounds volume + a penalty for the door's centre sitting
     deep INSIDE the static bounds (union volume alone is minimised by a door
     swallowed into the cabinet; a closed door hugs a face). Swing is capped
     at 120 deg: anything larger flips the panel to the wrong hinge side."""
-    door_names = {m.name for m in u["meshes"]}
+    door_names = {m.name for m in u["meshes"]} | (exclude or set())
     static_pts = [p for m in all_meshes if m.name not in door_names
                   for p in obj_points(m)]
     door_pts = [p for m in u["meshes"] for p in obj_points(m)]
@@ -649,6 +649,28 @@ def _best_close_angle(u, all_meshes):
             if v < best_v:
                 best_a, best_v = best_a + off, v
     return best_a, (best_v / v0 if v0 > 1e-12 else 1.0)
+
+
+def fill_mover_meshes_from_skin(an, bones, skin, name_map):
+    """Doors modeled as bare pivot EMPTIES (the big fridge) own no meshes;
+    the close passes need the meshes the rig associates by name."""
+    p_of = part_of_bone(bones)
+    by_bone = {}
+    for o in name_map.values():
+        if o.type == "MESH" and o.name in skin:
+            by_bone.setdefault(p_of.get(skin[o.name], "root"), []).append(o)
+    for u in an["movers"]:
+        bn = u.get("bone")
+        if u["split"] or not bn or u["meshes"]:
+            continue
+        ms = by_bone.get(bn, [])
+        if not ms:
+            continue
+        u["meshes"] = ms
+        u["objs"] = list(dict.fromkeys(u["objs"] + ms))
+        u["mn"], u["mx"] = aabb([p for m in ms for p in obj_points(m)])
+        u["ctr"] = (u["mn"] + u["mx"]) / 2
+        u["dim"] = u["mx"] - u["mn"]
 
 
 def close_open_doors(an, name_map, notes):
@@ -746,7 +768,8 @@ def close_open_doors(an, name_map, notes):
     # only for pure Z-rotations that don't grow the asset's bounds (a legit
     # perpendicular corner door would grow them and is left alone).
     if len(doors) >= 3:
-        quats = [u["objs"][0].matrix_world.to_quaternion() for u in doors]
+        quats = [(u["meshes"][0] if u["meshes"] else u["objs"][0])
+                 .matrix_world.to_quaternion() for u in doors]
         clusters = []
         for i, q in enumerate(quats):
             for cl in clusters:
@@ -790,12 +813,13 @@ def close_open_doors(an, name_map, notes):
 
     # Pass 2 — drawers flush, then bounds-based trial for remaining doors
     flush_open_drawers()
+    all_door_meshes = {m.name for d in doors for m in d["meshes"]}
     for _ in range(len(doors)):
         best = None
         for u in doors:
             if u.get("closed"):
                 continue
-            ang, ratio = _best_close_angle(u, all_meshes)
+            ang, ratio = _best_close_angle(u, all_meshes, all_door_meshes)
             if ang and ratio < 0.98 and (best is None or ratio < best[2]):
                 best = (u, ang, ratio)
         if best is None:
@@ -920,7 +944,7 @@ def split_slide_units(u, maxh):
     return panes
 
 
-def compute_rig(an, name_map, notes):
+def compute_rig(an, name_map, notes, split_panes=True):
     """Bones (world space) + skin map {copy_mesh_name: bone} + vertex-group
     renames for pre-skinned meshes."""
     cmn, cctr, cdim = an["cmn"], an["cctr"], an["cdim"]
@@ -944,6 +968,14 @@ def compute_rig(an, name_map, notes):
         bn = f"{prefix[u['kind']]}_{counters[u['kind']]}"
         if u["kind"] == "DOOR":
             head, tail, u["motion"] = door_bone(u, an, notes)
+        elif u["kind"] == "DOOR_SLIDE":
+            # sliding pane: prismatic ALONG its width (drawer_bone would
+            # point it out the front)
+            wa = 0 if u["dim"].x >= u["dim"].y else 1
+            head = u["ctr"].copy()
+            tail = head.copy()
+            tail[wa] += max(0.25 * u["dim"][wa], 0.05)
+            u["motion"] = "slide"
         else:
             head, tail = drawer_bone(u, an)
             u["motion"] = "slide"
@@ -977,8 +1009,9 @@ def compute_rig(an, name_map, notes):
             bones.append(dict(name=hbn, head=h, tail=t, parent=bn))
             skin[m.name] = hbn
 
-    # sliding panes (split_meshes movers)
-    for u in [u for u in an["movers"] if u["split"]]:
+    # sliding panes (split_meshes movers; physically splits the mesh, so
+    # the preliminary rig pass skips it)
+    for u in [u for u in an["movers"] if u["split"] and split_panes]:
         for pane in split_slide_units(u, an["maxh"]):
             counters["DOOR_SLIDE"] += 1
             bn = f"slide_{counters['DOOR_SLIDE']}"
@@ -1041,6 +1074,15 @@ def compute_rig(an, name_map, notes):
                     octr = (omn + omx) / 2
                     u = min(cands, key=lambda u: (u["ctr"] - octr).length)
                     return u["bone"], f"'{kind.lower()}' in name -> {u['orig']}"
+            # 3b) handles/knobs/pulls attach to the nearest mover they touch
+            # (microwave_3's part empty is literally named 'Handle')
+            if PAT_HANDLE.search(nm):
+                cands = [u for u in movers_flat
+                         if bbox_gap(omn, omx, u["mn"], u["mx"]) < 0.15]
+                if cands:
+                    octr = (omn + omx) / 2
+                    u = min(cands, key=lambda u: (u["ctr"] - octr).length)
+                    return u["bone"], f"handle name -> {u['orig']}"
         return "root", None
 
     for orig, obj in name_map.items():
@@ -1297,18 +1339,23 @@ def island_boxes(obj):
         boxes.append(((mn + mx) / 2, mx - mn))
     bm.free()
     ms = CONFIG["ucx_min_size"]
+    padded = [(c, Vector((max(s.x, ms), max(s.y, ms), max(s.z, ms))))
+              for c, s in boxes]
+    zmin = min((c.z - s.z / 2) for c, s in padded) if padded else 0.0
     out, keys = [], set()
-    for c, s in boxes:
-        s = Vector((max(s.x, ms), max(s.y, ms), max(s.z, ms)))
-        if s.x * s.y * s.z < CONFIG["ucx_dust_volume"]:
+    for c, s in padded:
+        # islands touching the part's bottom are FEET -- support-critical,
+        # exempt from the dust filter and sorted first so the cap keeps them
+        foot = (c.z - s.z / 2) <= zmin + 0.02
+        if not foot and s.x * s.y * s.z < CONFIG["ucx_dust_volume"]:
             continue                        # physically irrelevant junk
         key = tuple(round(v, 3) for v in (*c, *s))
         if key in keys:                     # coincident duplicate shells
             continue
         keys.add(key)
-        out.append((c, s))
-    out.sort(key=lambda cs: -(cs[1].x * cs[1].y * cs[1].z))
-    return out
+        out.append((foot, c, s))
+    out.sort(key=lambda t: (not t[0], -(t[2].x * t[2].y * t[2].z)))
+    return [(c, s) for _, c, s in out]
 
 
 def make_ucx(name, boxes, coll):
@@ -1350,15 +1397,25 @@ def export_fbx_static(objs, filepath):
     )
 
 
-def dominant_bone(o, group_rename):
-    """Part bone of a pre-skinned mesh: the renamed vertex group carrying
-    the most total weight (static parts need a hard assignment)."""
+def _preskin_bone_map(o, group_rename):
+    """vertex-group index -> part bone for a pre-skinned mesh. Renamed
+    groups map to their mover bone; the merged 'root' group counts as root
+    (ignoring it made every slightly-door-weighted mesh join the door)."""
     idx_to_bone = {}
     for vg in o.vertex_groups:
         bn = group_rename.get((o.name, vg.name))
         if bn:
             idx_to_bone[vg.index] = bn
-    if not idx_to_bone:
+        elif vg.name == "root":
+            idx_to_bone[vg.index] = "root"
+    return idx_to_bone
+
+
+def dominant_bone(o, group_rename):
+    """Part bone of a pre-skinned mesh: the vertex group carrying the most
+    total weight (static parts need a hard assignment)."""
+    idx_to_bone = _preskin_bone_map(o, group_rename)
+    if not any(b != "root" for b in idx_to_bone.values()):
         return None
     tally = {}
     for v in o.data.vertices:
@@ -1369,17 +1426,120 @@ def dominant_bone(o, group_rename):
     return max(tally, key=tally.get) if tally else None
 
 
+def split_preskinned_by_bone(o, group_rename, notes):
+    """A pre-skinned mesh whose weights span SEVERAL part bones (the old
+    microwave: one mesh holds body(n4) + door(n5) faces) must be split so
+    each rigid part gets its own faces. Faces move by per-face majority of
+    their verts' dominant groups. Returns {object_name: bone} for the
+    resulting objects (o keeps the majority bone's faces)."""
+    idx_to_bone = _preskin_bone_map(o, group_rename)
+    if len({b for b in idx_to_bone.values()}) < 2:
+        return None
+    vb = {}
+    for v in o.data.vertices:
+        best, bw = None, 0.0
+        for g in v.groups:
+            bn = idx_to_bone.get(g.group)
+            if bn is not None and g.weight > bw:
+                best, bw = bn, g.weight
+        vb[v.index] = best
+    face_bone = {}
+    counts = {}
+    for p in o.data.polygons:
+        tal = {}
+        for vi in p.vertices:
+            bn = vb.get(vi)
+            if bn:
+                tal[bn] = tal.get(bn, 0) + 1
+        fb = max(tal, key=tal.get) if tal else "root"
+        face_bone[p.index] = fb
+        counts[fb] = counts.get(fb, 0) + 1
+    if len(counts) < 2:
+        return None
+    major = max(counts, key=counts.get)
+    forced = {}
+    for bone in [b for b in counts if b != major]:
+        bpy.ops.object.select_all(action="DESELECT")
+        o.select_set(True)
+        bpy.context.view_layer.objects.active = o
+        bpy.ops.object.mode_set(mode="EDIT")
+        bpy.context.tool_settings.mesh_select_mode = (False, False, True)
+        bpy.ops.mesh.select_all(action="DESELECT")
+        bpy.ops.object.mode_set(mode="OBJECT")
+        for p in o.data.polygons:
+            p.select = face_bone.get(p.index) == bone
+        bpy.ops.object.mode_set(mode="EDIT")
+        bpy.ops.mesh.separate(type="SELECTED")
+        bpy.ops.object.mode_set(mode="OBJECT")
+        newo = next(x for x in bpy.context.selected_objects if x is not o)
+        forced[newo.name] = bone
+        # face indices shift after separation: recompute for the remainder
+        remaining = [i for i, p in enumerate(o.data.polygons)]
+        face_bone = {}
+        vb2 = {}
+        for v in o.data.vertices:
+            best, bw = None, 0.0
+            for g in v.groups:
+                bn = idx_to_bone.get(g.group)
+                if bn is not None and g.weight > bw:
+                    best, bw = bn, g.weight
+            vb2[v.index] = best
+        for p in o.data.polygons:
+            tal = {}
+            for vi in p.vertices:
+                bn = vb2.get(vi)
+                if bn:
+                    tal[bn] = tal.get(bn, 0) + 1
+            face_bone[p.index] = max(tal, key=tal.get) if tal else major
+        notes.append(f"pre-skinned mesh split: {len(forced)} extra part(s) "
+                     f"from '{o.name}'")
+    forced[o.name] = major
+    return forced
+
+
+def part_masses(an, asset, bones):
+    """{part: mass_kg} from dojo_mass custom properties: a mover's mass
+    lives on its part empty/mesh; the root part's mass on any of the
+    asset's top-level nodes."""
+    p_of = part_of_bone(bones)
+    masses = {}
+    for u in an["movers"]:
+        bn = u.get("bone")
+        if not bn:
+            continue
+        m = mover_cfg(u["orig"], u.get("obj")).get("mass")
+        if m is not None:
+            masses[p_of.get(bn, "root")] = float(m)
+    for node in asset["nodes"]:
+        src = bpy.data.objects.get(node.name) or node
+        m = src.get("dojo_mass")
+        if m is not None:
+            masses["root"] = float(m)
+            break
+    return masses
+
+
 def export_static_parts(nm, folder, bones, skin, joints, name_map,
-                        group_rename, notes):
+                        group_rename, notes, masses=None):
     """Join each rigid part's meshes, shift the part origin onto its joint
     pivot, generate UCX island boxes, export one static FBX per part.
     Returns (parts_manifest, {part: joined_object})."""
     p_of = part_of_bone(bones)
+    meshes_in = [o for o in name_map.values()
+                 if o.type == "MESH" and len(o.data.polygons)]
+    forced_bone = {}
+    for o in list(meshes_in):
+        forced = split_preskinned_by_bone(o, group_rename, notes)
+        if forced:
+            forced_bone.update(forced)
+            for nm2 in forced:
+                ob2 = bpy.data.objects.get(nm2)
+                if ob2 is not None and ob2 not in meshes_in:
+                    meshes_in.append(ob2)
     groups = {}
-    for o in name_map.values():
-        if o.type != "MESH" or not len(o.data.polygons):
-            continue
-        bone = skin.get(o.name) or dominant_bone(o, group_rename) or "root"
+    for o in meshes_in:
+        bone = forced_bone.get(o.name) or dominant_bone(o, group_rename) \
+            or skin.get(o.name) or "root"
         groups.setdefault(p_of.get(bone, "root"), []).append(o)
 
     work = ensure_collection("EXPORT_WORK")
@@ -1413,6 +1573,7 @@ def export_static_parts(nm, folder, bones, skin, joints, name_map,
         parts[part] = {
             "fbx": os.path.basename(fp),
             "origin": [round(v, 4) for v in piv],
+            "mass": (masses or {}).get(part),
             "joint": joints.get(part),
             "collision_boxes": [[[round(v, 4) for v in c],
                                  [round(v, 4) for v in s]] for c, s in boxes],
@@ -1462,6 +1623,12 @@ def write_usd(nm, folder, parts, part_objs, baked_info, notes):
             sh.CreateInput("diffuseColor", Sdf.ValueTypeNames.Color3f
                            ).ConnectToSource(t.CreateOutput(
                                "rgb", Sdf.ValueTypeNames.Float3))
+            if info.get("masked"):
+                sh.CreateInput("opacity", Sdf.ValueTypeNames.Float
+                               ).ConnectToSource(t.CreateOutput(
+                                   "a", Sdf.ValueTypeNames.Float))
+                sh.CreateInput("opacityThreshold",
+                               Sdf.ValueTypeNames.Float).Set(0.5)
         if tex.get("ORM"):
             t = reader("orm", tex["ORM"], False)
             sh.CreateInput("roughness", Sdf.ValueTypeNames.Float
@@ -1480,6 +1647,9 @@ def write_usd(nm, folder, parts, part_objs, baked_info, notes):
     for part, entry in parts.items():
         x = UsdGeom.Xform.Define(stage, body_path[part])
         UsdPhysics.RigidBodyAPI.Apply(x.GetPrim())
+        if entry.get("mass"):
+            UsdPhysics.MassAPI.Apply(x.GetPrim()).CreateMassAttr(
+                float(entry["mass"]))
         x.AddTranslateOp().Set(Gf.Vec3d(*entry["origin"]))
 
         # render mesh (visual only -- no collision API)
@@ -1585,6 +1755,20 @@ def write_mjcf(nm, folder, parts, part_objs, notes):
         rel = org - parent_origin
         body = ET.SubElement(parent_el, "body", name=part,
                              pos=f"{rel.x:.4f} {rel.y:.4f} {rel.z:.4f}")
+        if entry.get("mass"):
+            bmn = [min(c[i] - sz[i] / 2 for c, sz in entry["collision_boxes"])
+                   for i in range(3)]
+            bmx = [max(c[i] + sz[i] / 2 for c, sz in entry["collision_boxes"])
+                   for i in range(3)]
+            m = float(entry["mass"])
+            d = [max(bmx[i] - bmn[i], 1e-3) for i in range(3)]
+            ctr = [(bmx[i] + bmn[i]) / 2 for i in range(3)]
+            iner = [m / 12.0 * (d[(i + 1) % 3] ** 2 + d[(i + 2) % 3] ** 2)
+                    for i in range(3)]
+            ET.SubElement(body, "inertial",
+                          pos=f"{ctr[0]:.4f} {ctr[1]:.4f} {ctr[2]:.4f}",
+                          mass=f"{m:.4f}",
+                          diaginertia=f"{iner[0]:.6f} {iner[1]:.6f} {iner[2]:.6f}")
         j = entry.get("joint")
         if j:
             a = Vector(j["axis"])
@@ -1648,6 +1832,18 @@ def mat_is_translucent(mat):
                 ti = nd.inputs.get(key)
                 if ti is not None and not ti.is_linked and ti.default_value > 0.2:
                     return True
+    return False
+
+
+def mat_is_masked(mat):
+    """Alpha-cutout material (cutlery silhouettes on flat planes): the
+    Principled Alpha input is fed by a texture. Baked as BaseColor alpha +
+    a masked shader, instead of being flattened opaque."""
+    if not mat.use_nodes:
+        return False
+    for nd in mat.node_tree.nodes:
+        if nd.type == "BSDF_PRINCIPLED" and nd.inputs["Alpha"].is_linked:
+            return True
     return False
 
 
@@ -1741,6 +1937,11 @@ def bake_materials(meshes, asset_nm, tex_dir, res):
         src = src_of.get(cname)
         if src is not None and mat_is_translucent(src):
             translucent[g] = True
+    masked = {g: False for g in groups}
+    for cname, g in group_of.items():
+        src = src_of.get(cname)
+        if src is not None and not translucent[g] and mat_is_masked(src):
+            masked[g] = True
 
     # per-group atlas resolution: share the texel budget by world-space
     # surface area, power-of-two, floored at bake_resolution_min, capped at res
@@ -1820,16 +2021,16 @@ def bake_materials(meshes, asset_nm, tex_dir, res):
                 d.uv[0] = tx + ((d.uv[0] - umin) / uw) * tw
                 d.uv[1] = ty + ((d.uv[1] - vmin) / vh) * th
 
-    def newimg(g, suffix, noncolor):
+    def newimg(g, suffix, noncolor, use_alpha=False):
         im = bpy.data.images.new(f"{asset_nm}_{g}_{suffix}",
-                                 res_of[g], res_of[g], alpha=False)
+                                 res_of[g], res_of[g], alpha=use_alpha)
         im.colorspace_settings.name = "Non-Color" if noncolor else "sRGB"
         return im
 
     img = {g: {} for g in groups}
     for g in groups:
         if "base" in maps:
-            img[g]["base"] = newimg(g, "basecolor", False)
+            img[g]["base"] = newimg(g, "basecolor", False, use_alpha=True)
         if "rough" in maps:
             img[g]["rough"] = newimg(g, "roughness", True)
         if "metal" in maps:
@@ -1892,6 +2093,10 @@ def bake_materials(meshes, asset_nm, tex_dir, res):
         emit_bake("Roughness", "rough")
     if "metal" in maps:
         emit_bake("Metallic", "metal")
+    if "base" in maps and any(masked.values()):
+        for g in groups:
+            img[g]["alpha"] = newimg(g, "alphamask", True)
+        emit_bake("Alpha", "alpha")
     if "normal" in maps:
         set_target("normal")
         select_meshes()
@@ -1938,7 +2143,16 @@ def bake_materials(meshes, asset_nm, tex_dir, res):
     for g in groups:
         gi = img[g]
         if "base" in maps:
+            ba, w, h = arr_of(gi["base"])
+            if masked.get(g) and "alpha" in gi:
+                aa, _, _ = arr_of(gi["alpha"])
+                ba[..., 3] = aa[..., 0]
+            else:
+                ba[..., 3] = 1.0
+            gi["base"].pixels.foreach_set(ba.reshape(-1))
             save_im(gi["base"], g, "BaseColor")
+            if "alpha" in gi:
+                bpy.data.images.remove(gi.pop("alpha"))
         if "rough" in maps and "metal" in maps:
             ra, w, h = arr_of(gi["rough"])
             ma, _, _ = arr_of(gi["metal"])
@@ -1979,8 +2193,14 @@ def bake_materials(meshes, asset_nm, tex_dir, res):
             return t
 
         if "base" in maps:
-            nt.links.new(tex(img[g]["base"], 300).outputs["Color"],
-                         bsdf.inputs["Base Color"])
+            bt = tex(img[g]["base"], 300)
+            nt.links.new(bt.outputs["Color"], bsdf.inputs["Base Color"])
+            if masked.get(g):
+                nt.links.new(bt.outputs["Alpha"], bsdf.inputs["Alpha"])
+                try:
+                    baked.blend_method = "CLIP"
+                except Exception:
+                    pass
         if g in orm_of:
             sep = nt.nodes.new("ShaderNodeSeparateColor")
             sep.location = (-470, 0)
@@ -2011,6 +2231,7 @@ def bake_materials(meshes, asset_nm, tex_dir, res):
     return {g: {"slot": f"{asset_nm}_{g}",
                 "textures": paths[g],
                 "translucent": translucent[g],
+                "masked": masked[g],
                 "resolution": res_of[g]} for g in groups}
 
 
@@ -2055,11 +2276,29 @@ def process_asset(asset, report, annotate=False):
         if obj.type in {"MESH", "CURVE"}:
             bake_object(obj)
 
+    # re-base the work copies into the asset root's LOCAL frame: pivots,
+    # OVERRIDES and dojo_* props are root-relative from here on, so moving
+    # an asset around the scene does not invalidate them
+    anchor = asset.get("anchor")
+    if anchor is not None:
+        # TRANSLATION only: pivots/props become root-relative so assets can
+        # be moved around the scene freely. Root rotations/scales (Collada
+        # wrappers carry both) keep flowing through the normal flatten path
+        # -- inverting them would reorient or rescale the export.
+        ainv = Matrix.Translation(-anchor.translation)
+        copies = set(name_map.values())
+        for o in name_map.values():
+            if o.parent not in copies:
+                o.matrix_world = ainv @ o.matrix_world
+        bpy.context.view_layer.update()
+
     preskinned, harvested = harvest_preskinned(name_map)
     if not any(o.type == "MESH" for o in name_map.values()):
         raise RuntimeError("asset has no meshes")
     an = analyze_asset(asset, name_map, harvested)
     if CONFIG["close_open_doors"]:
+        pb, ps, _pg = compute_rig(an, name_map, [], split_panes=False)
+        fill_mover_meshes_from_skin(an, pb, ps, name_map)
         close_open_doors(an, name_map, notes)
     bones, skin, group_rename = compute_rig(an, name_map, notes)
     center_base = Vector((an["cctr"].x, an["cctr"].y, an["cmn"].z))
@@ -2117,10 +2356,13 @@ def process_asset(asset, report, annotate=False):
     )
 
     if CONFIG["export_mode"] == "static_parts" and not CONFIG["visualize"]:
-        work_names = [o.name for o in name_map.values()]
+        work = ensure_collection("EXPORT_WORK")
+        work_names = list({o.name for o in name_map.values()}
+                          | {o.name for o in work.objects})
         if CONFIG["export"]:
             parts, part_objs = export_static_parts(
-                nm, folder, bones, skin, joints, name_map, group_rename, notes)
+                nm, folder, bones, skin, joints, name_map, group_rename,
+                notes, masses=part_masses(an, asset, bones))
             report[asset["name"]]["parts"] = parts
             if CONFIG["emit_usd"]:
                 write_usd(nm, folder, parts, part_objs, baked_info, notes)

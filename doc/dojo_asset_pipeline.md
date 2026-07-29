@@ -64,11 +64,21 @@ report = mod.main()
 1. **Name-driven**: an EMPTY whose name matches the door/drawer regexes
    (`door`, `drawer`, ...) becomes a mover; everything else is static and is
    welded to the asset root (or to a mover it is named after / overlaps).
-2. **`dojo_*` custom properties** on the part empty override inference:
+2. **`dojo_*` custom properties** on the part empty (or mesh) override
+   inference. Positions (`dojo_pivot`, `OVERRIDES` pivots) are in the asset
+   ROOT's local frame (translation only — the exporter re-bases each asset
+   to the origin before analysis), so moving assets around the scene never
+   invalidates them. Recognized keys: `dojo_kind` (`DOOR`/`DRAWER`/`DOOR_SLIDE`/`STATIC`) or
    `dojo_joint` (`revolute`/`prismatic`/`fixed`), `dojo_pivot`, `dojo_axis`,
-   `dojo_limits`, plus fixers `dojo_close_angle`, `dojo_close_swing`,
-   `dojo_bone_of`, `dojo_hinge`. Edit them in Object Properties → Custom
-   Properties, re-export, done.
+   `dojo_limits`, plus fixers `dojo_close_angle` (pin the auto-close
+   rotation), `dojo_close_swing`, `dojo_bone_of` (weld a static to a named
+   mover -- also honored by the close passes, so door-mounted trays rotate
+   with their door), `dojo_hinge`, and `dojo_mass` (kg -- on a mover empty
+   for that part, or on the asset root for the root part; flows into the UE
+   BodyInstance mass override, UsdPhysics MassAPI, and an MJCF `<inertial>`
+   with box-approximated inertia). Edit them in Object Properties → Custom
+   Properties, re-export, done. `Scripts/dojo_scene_fixes.py` shows the
+   idiom (and records the one-time repairs made to dojo.blend).
 3. **`OVERRIDES`** dict in the script (same keys, by object name) beats both.
 
 Run the **annotate pass** once per scene so the analyzer's inferences become
@@ -80,10 +90,14 @@ mod.main(annotate=True)   # writes dojo_* props onto the part empties; save the 
 ```
 
 Doors posed open in the scene are auto-closed before export (bounds-trial +
-sibling clustering); the recorded closing angle also determines the joint's
-opening sign. Materials are baked per *material group* (normalized source
-material name) into BaseColor/ORM/Normal PNG sets — each group stays its own
-slot/material in every engine, so appearance variants are parameter swaps.
+sibling clustering; a preliminary rig pass first attaches name-associated
+meshes so bare-pivot doors close too); the recorded closing angle also
+determines the joint's opening sign. Materials are baked per *material
+group* (normalized source material name) into BaseColor/ORM/Normal PNG sets
+— each group stays its own slot/material in every engine, so appearance
+variants are parameter swaps. Alpha-cutout sources (cutlery silhouettes)
+bake their alpha into BaseColor.A and are flagged `masked` in the manifest;
+translucent groups (`glass`) are flagged `translucent`.
 
 ### Collision
 
@@ -103,13 +117,16 @@ python Scripts/editor_remote_exec.py --file Scripts/ue_import_dojo_parts.py
 
 Per asset it imports the part FBXs as Static Meshes (UCX collision, real
 scale), imports textures, creates `MI_<asset>_<group>` instances of
-`M_Dojo_Master` / `M_Dojo_Master_Glass` (built on first run; expose `Tint`,
-`RoughnessScale`, `MetallicScale`, glass `Opacity`), and assembles
+`M_Dojo_Master` / `M_Dojo_Master_Glass` / `M_Dojo_Master_Masked` (built on
+first run; expose `Tint`, `RoughnessScale`, `MetallicScale`, glass
+`Opacity`; the masked master drives alpha-cutout cutlery), and assembles
 `BP_<asset>`: one simulated `StaticMeshComponent` per part plus one
 `PhysicsConstraintComponent` per joint —
 
 - **revolute** → twist-limited constraint, frame X aligned to the hinge
-  axis, `angular_rotation_offset` centering the `[lo, hi]` range;
+  axis, `angular_rotation_offset` centering the range. Empirically (CabinetB
+  french doors) UE's twist about the make_rot_from_x frame matches the
+  Blender-space rotation sign DIRECTLY — do not negate the range;
 - **prismatic** → linear-X-limited constraint, frame shifted half-range
   along the travel axis so motion runs `[closed, open]`.
 
