@@ -166,14 +166,35 @@ def fix_fridge():
     # The four main doors are posed open by exactly +90 deg; the bounds
     # metric cannot see the closed pose (door-mounted trays pollute the
     # static bounds), so pin the close rotation directly.
-    for name in ("FridgeUpperDoor", "FridgeLowerDoor",
-                 "FridgeLowerDoor_001", "FridgeUpperDoor_001"):
+    # the door empties were collapsed onto shared positions when the doors
+    # were posed open -- restore per-door hinges (root-local frame; values
+    # recovered from the original export before the collapse)
+    hinges = {"FridgeUpperDoor": [0.412, -0.562, -0.326],
+              "FridgeLowerDoor": [0.412, -0.562, -0.964],
+              "FridgeLowerDoor_001": [0.413, -0.562, -0.666],
+              "FridgeUpperDoor_001": [0.413, -0.562, 0.263]}
+    for name, piv in hinges.items():
         o = bpy.data.objects.get(name)
         if o is None:
             print("  MISSING:", name)
             continue
         o["dojo_close_angle"] = -90.0
-        print("  close_angle -90 on", name)
+        o["dojo_pivot"] = piv
+        o["dojo_axis"] = [0.0, 0.0, 1.0]
+        print("  close_angle -90 + hinge on", name)
+    # the phantom trim mover shares a hinge with a real door: make it
+    # static so it welds to its door by name instead of splitting panels
+    o = bpy.data.objects.get("FridgeUpperDoor_002")
+    if o is not None:
+        o["dojo_kind"] = "STATIC"
+        print("  FridgeUpperDoor_002 -> STATIC")
+    # egg lid: authored pivot is good; clear any stale frame-corrupted props
+    lid = bpy.data.objects.get("FridgeUpperHolderPlasticDoor")
+    if lid is not None:
+        for k in ("dojo_pivot", "dojo_axis", "dojo_limits"):
+            if k in lid:
+                del lid[k]
+        print("  egg lid props cleared")
     # egg tray + rod live on the upper door's interior but have no door-ish
     # names -- weld them to the door explicitly
     for name in ("defaultMaterial.008", "defaultMaterial.040",

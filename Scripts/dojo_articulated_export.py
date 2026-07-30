@@ -472,8 +472,12 @@ def analyze_asset(asset, name_map, harvested):
         u["meshes"] = ms
         u["objs"] = [u["obj"]]
         u["raw_pivot"] = u["obj"].matrix_world.translation.copy()
+        # effective pivot (prop/override wins) drives BOTH merging and the
+        # hinge: the fridge's door empties are co-located in the scene, so
+        # only the annotated per-door pivots keep the doors distinct
         ovp = mover_cfg(u["orig"], u["obj"]).get("pivot")
-        if ovp is not None:     # authored pivot is unusable: replace outright
+        u["pivot_explicit"] = ovp is not None
+        if ovp is not None:
             u["raw_pivot"] = Vector(ovp)
 
     # merge movers that share one REAL pivot: Sketchfab splits a single door
@@ -513,11 +517,17 @@ def analyze_asset(asset, name_map, harvested):
     for u in movers:
         u["ctr"] = (u["mn"] + u["mx"]) / 2
         u["dim"] = u["mx"] - u["mn"]
-        # a REAL pivot sits on/near the part; origin-parked pivots don't
+        # a REAL pivot sits on/near the part; origin-parked pivots don't.
+        # EXPLICIT pivots (props/OVERRIDES) are trusted outright: the part's
+        # bare subtree may sit nowhere near the true hinge.
         piv = u["raw_pivot"]
-        pad = 0.35 * max(u["dim"].length, 0.05)
-        near = all(u["mn"][i] - pad <= piv[i] <= u["mx"][i] + pad for i in range(3))
-        u["pivot"] = piv.copy() if near else None
+        if u.get("pivot_explicit"):
+            u["pivot"] = piv.copy()
+        else:
+            pad = 0.35 * max(u["dim"].length, 0.05)
+            near = all(u["mn"][i] - pad <= piv[i] <= u["mx"][i] + pad
+                       for i in range(3))
+            u["pivot"] = piv.copy() if near else None
 
     # a tiny mover riding a much bigger one articulates relative to it
     # (egg-tray lid on the fridge door): parent it to that mover's bone
@@ -661,14 +671,19 @@ def fill_mover_meshes_from_skin(an, bones, skin, name_map):
             by_bone.setdefault(p_of.get(skin[o.name], "root"), []).append(o)
     for u in an["movers"]:
         bn = u.get("bone")
-        if u["split"] or not bn or u["meshes"]:
+        if u["split"] or not bn:
             continue
-        ms = by_bone.get(bn, [])
+        # UNION of subtree meshes and skin-associated meshes: door panels
+        # may be name-associated while trays are parented under the empty
+        # (or vice versa) -- the close must rotate ALL of them together
+        have = {m.name for m in u["meshes"]}
+        ms = [m for m in by_bone.get(bn, []) if m.name not in have]
         if not ms:
             continue
-        u["meshes"] = ms
+        u["meshes"] = u["meshes"] + ms
         u["objs"] = list(dict.fromkeys(u["objs"] + ms))
-        u["mn"], u["mx"] = aabb([p for m in ms for p in obj_points(m)])
+        u["mn"], u["mx"] = aabb([p for m in u["meshes"]
+                                 for p in obj_points(m)])
         u["ctr"] = (u["mn"] + u["mx"]) / 2
         u["dim"] = u["mx"] - u["mn"]
 
@@ -684,6 +699,40 @@ def close_open_doors(an, name_map, notes):
     doors = [u for u in an["movers"]
              if u["kind"] == "DOOR" and u["pivot"] is not None
              and u["obj"] is not None and not u["split"]]
+
+    def carry_nested(u, rot):
+        """Movers mounted ON u (egg lid on the fridge door) ride its close:
+        rotate their meshes/empties and their pivots too."""
+        stack, nested = [u], []
+        while stack:
+            cur = stack.pop()
+            for v in an["movers"]:
+                if v is not cur and v.get("parent_mover") is cur:
+                    nested.append(v)
+                    stack.append(v)
+        for v in nested:
+            # a nested mover that closes on its own (close_angle prop or
+            # already closed) must NOT also inherit the parent's rotation
+            if v.get("closed") or                     mover_cfg(v["orig"], v.get("obj")).get("close_angle") is not None:
+                continue
+            for ob in v.get("objs", []):
+                p, carried = ob.parent, False
+                while p is not None:
+                    if p in v["objs"] or p in u["objs"]:
+                        carried = True
+                        break
+                    p = p.parent
+                if not carried:
+                    ob.matrix_world = rot @ ob.matrix_world
+            if v.get("pivot") is not None:
+                v["pivot"] = rot @ v["pivot"]
+            v["raw_pivot"] = rot @ v["raw_pivot"]
+            if v["meshes"]:
+                bpy.context.view_layer.update()
+                v["mn"], v["mx"] = aabb([p for m in v["meshes"]
+                                         for p in obj_points(m)])
+                v["ctr"] = (v["mn"] + v["mx"]) / 2
+                v["dim"] = v["mx"] - v["mn"]
 
     # Pass 0 — explicit override: rotate by OVERRIDES["close_angle"] as-is,
     # for doors whose geometry defeats the bounds metric (microwave_2's door
@@ -705,6 +754,7 @@ def close_open_doors(an, name_map, notes):
                 p = p.parent
             if not carried:
                 ob.matrix_world = rot @ ob.matrix_world
+        carry_nested(u, rot)
         bpy.context.view_layer.update()
         upts = [p for m in u["meshes"] for p in obj_points(m)]
         u["mn"], u["mx"] = aabb(upts)
@@ -837,6 +887,7 @@ def close_open_doors(an, name_map, notes):
                 p = p.parent
             if not carried:
                 ob.matrix_world = rot @ ob.matrix_world
+        carry_nested(u, rot)
         bpy.context.view_layer.update()
         upts = [p for m in u["meshes"] for p in obj_points(m)]
         u["mn"], u["mx"] = aabb(upts)
@@ -944,7 +995,7 @@ def split_slide_units(u, maxh):
     return panes
 
 
-def compute_rig(an, name_map, notes, split_panes=True):
+def compute_rig(an, name_map, notes, split_panes=True, reuse_skin=None):
     """Bones (world space) + skin map {copy_mesh_name: bone} + vertex-group
     renames for pre-skinned meshes."""
     cmn, cctr, cdim = an["cmn"], an["cctr"], an["cdim"]
@@ -1085,6 +1136,11 @@ def compute_rig(an, name_map, notes, split_panes=True):
                     return u["bone"], f"handle name -> {u['orig']}"
         return "root", None
 
+    if reuse_skin:
+        known = {b["name"] for b in bones}
+        for mname, bone in reuse_skin.items():
+            if mname not in skin and bone in known:
+                skin[mname] = bone
     for orig, obj in name_map.items():
         if obj.type != "MESH" or obj.name in skin:
             continue
@@ -2296,11 +2352,13 @@ def process_asset(asset, report, annotate=False):
     if not any(o.type == "MESH" for o in name_map.values()):
         raise RuntimeError("asset has no meshes")
     an = analyze_asset(asset, name_map, harvested)
+    prelim_skin = None
     if CONFIG["close_open_doors"]:
-        pb, ps, _pg = compute_rig(an, name_map, [], split_panes=False)
-        fill_mover_meshes_from_skin(an, pb, ps, name_map)
+        pb, prelim_skin, _pg = compute_rig(an, name_map, [], split_panes=False)
+        fill_mover_meshes_from_skin(an, pb, prelim_skin, name_map)
         close_open_doors(an, name_map, notes)
-    bones, skin, group_rename = compute_rig(an, name_map, notes)
+    bones, skin, group_rename = compute_rig(an, name_map, notes,
+                                            reuse_skin=prelim_skin)
     center_base = Vector((an["cctr"].x, an["cctr"].y, an["cmn"].z))
     joints = joint_specs(an, bones, center_base)
 
