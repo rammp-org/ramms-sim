@@ -28,3 +28,6 @@
 [submodule "Plugins/RammsCrowd"]
 	path = Plugins/RammsCrowd
 	url = git@github.com:rammp-org/ramms-crowd
+[submodule "Plugins/RammsAccess"]
+	path = Plugins/RammsAccess
+	url = git@github.com:rammp-org/ramms-access.git
