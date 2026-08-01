@@ -342,6 +342,18 @@ def configure_constraint(comp, child_name, parent_name, joint):
     # NOTE: empirically (CabinetB french doors) UE's twist angle about the
     # make_rot_from_x frame matches the Blender-space rotation sign directly
     # -- do NOT negate the revolute range here.
+    # The closed rest pose sits at angle 0, which for one-sided ranges like
+    # [-120, 0] is exactly ON the limit boundary; UE's limit enforcement
+    # then nudges the door a few degrees open over time. Pad the closed
+    # side so the rest pose is strictly interior.
+    if joint["type"] == "prismatic":
+        if lo == 0.0:
+            lo = -0.01           # 1 cm interior margin for closed drawers
+    else:
+        if hi == 0.0:
+            hi = 3.0
+        if lo == 0.0:
+            lo = -3.0
     half = (hi - lo) / 2.0
     mid = (hi + lo) / 2.0
     ll = pi.get_editor_property("linear_limit")
@@ -463,6 +475,18 @@ def build_blueprint(name, entry, meshes):
 
 # --------------------------------------------------------------------------- run
 def main():
+    # Importing while Play-In-Editor/Simulate is active breaks asset checks
+    # (a modal "Overwrite Existing Object" dialog for the master materials
+    # deadlocks the editor). Refuse to run until play has ended.
+    try:
+        les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
+        if les.is_in_play_in_editor():
+            les.editor_request_end_play()
+            unreal.log_error("=== editor was in PIE/Simulate: play end "
+                             "requested, RE-RUN the import ===")
+            return
+    except Exception:
+        pass
     # UE 5.7 routes FBX through Interchange by default, which ignores the
     # legacy FbxImportUI options AND the UCX_ collision meshes -- route these
     # imports through the legacy FBX importer instead (session-scoped).

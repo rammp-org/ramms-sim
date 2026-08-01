@@ -160,12 +160,9 @@ OVERRIDES = {
     # Tall bottle shelf on the fridge door's inner face; no "door" in the
     # name, so the association heuristics would weld it to the body.
     "FridgePlasticHolder": {"bone_of": "FridgeUpperDoor"},
-    # microwave_2's door: its authored pivot sits inside the body where no
-    # rotation can close it -- replace with the true hinge (door edge at the
-    # body's front-right corner, measured from the mesh) and pin the close
-    # angle (probed: door flush across the front at +150).
-    # NOTE pivots here are in the ASSET ROOT's local frame
-    "Door": {"pivot": (0.1587, -0.1942, 0.0), "close_angle": 150},
+    # microwave_2's door config moved to dojo_* props on its 'Door' empty
+    # (written by dojo_scene_fixes.py) so it can be hand-tuned in Blender;
+    # an OVERRIDES entry here would shadow those props.
 }
 
 AI = {"X": 0, "Y": 1, "Z": 2}
