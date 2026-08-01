@@ -82,4 +82,5 @@ DerivedDataCache/*
 Content/Fab/
 Content/CitySampleCrowd/
 Content/CitySampleVehicles/
+__pycache__
 Packaged/
