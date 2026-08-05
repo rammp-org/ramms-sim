@@ -31,6 +31,31 @@ public class Ramms : ModuleRules
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });
 
+		// Pixel Streaming: RAMMS swaps the default streamer's video producer to
+		// the viewport MediaCapture path (see doc/PIXEL_STREAMING_PLAN.md).
+		// The stock backbuffer producer pushes EVERY Slate window's backbuffer,
+		// so any persistent toast (e.g. an AssetGuideline notification) makes
+		// the capture pipeline rebuild per frame and the stream stays black.
+		// PixelStreaming2 only ships on these platforms.
+		if (Target.Platform == UnrealTargetPlatform.Win64
+			|| Target.Platform == UnrealTargetPlatform.Linux
+			|| Target.Platform == UnrealTargetPlatform.Mac)
+		{
+			PrivateDependencyModuleNames.AddRange(new string[] {
+				"PixelStreaming2",
+				"PixelStreaming2Core",
+				"MediaIOCore"
+			});
+			// FVideoProducerMediaCapture lives in the plugin's Internal API surface.
+			PrivateIncludePaths.Add(System.IO.Path.Combine(
+				EngineDirectory, "Plugins", "Media", "PixelStreaming2", "Source", "PixelStreaming2", "Internal"));
+			PrivateDefinitions.Add("RAMMS_WITH_PIXEL_STREAMING=1");
+		}
+		else
+		{
+			PrivateDefinitions.Add("RAMMS_WITH_PIXEL_STREAMING=0");
+		}
+
 		// Uncomment if you are using Slate UI
 		// PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });
 
