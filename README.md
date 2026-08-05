@@ -31,6 +31,7 @@ Engine 5.7 simulation environment for robotic assistive technologies.
     - [Sensor Simulation](#sensor-simulation)
     - [Camera Capture System](#camera-capture-system)
     - [Real-Time Streaming](#real-time-streaming)
+  - [Pixel Streaming (Remote Browser Access)](#pixel-streaming-remote-browser-access)
   - [Configuration](#configuration)
     - [Renderer & Ray Tracing](#renderer--ray-tracing)
     - [Game Settings](#game-settings)
@@ -400,7 +401,7 @@ Ramms/
 ├── Source/Ramms/              Main game module (game mode, pawn, vehicles)
 ├── py/                        Python remote execution scripts
 ├── urdf/                      Robot URDF model files
-├── doc/                       Documentation images
+├── doc/                       Documentation (pixel streaming, planning docs) & images
 ├── Ramms.uproject             Project file
 └── Ramms.sln                  Visual Studio solution
 ```
@@ -501,6 +502,43 @@ Binary streaming over TCP for external tools and controllers:
 
 **Components:** `URammsStreamSourceComponent`, `URammsStreamSinkComponent`,
 `URammsStreamingSubsystem`
+
+## Pixel Streaming (Remote Browser Access)
+
+View and drive the sim from any web browser — desktop, tablet, or phone —
+with no client install. Built on Unreal's Pixel Streaming 2 plugin (WebRTC):
+the sim hardware-encodes its viewport and streams it out; browser
+mouse/keyboard/touch input streams back in. Works for local dev sessions,
+watching headless cluster instances live, and multi-viewer demo setups.
+
+Quick start (two processes + a browser):
+
+```bash
+# 1. Signalling server (one-time setup: clone Epic's PixelStreamingInfrastructure
+#    at the UE5.7 branch, `npm install && npm run build`)
+cd PixelStreamingInfrastructure/SignallingWebServer
+node ./dist/index.js --serve --http_root ./www --player_port 8080 --streamer_port 8888
+```
+
+```powershell
+# 2. Any -game or packaged launch, plus the connection URL flag
+& "$UE\Engine\Binaries\Win64\UnrealEditor.exe" "$PWD\Ramms.uproject" Map_Demo `
+  -game -windowed -resx=1280 -resy=720 `
+  -PixelStreamingConnectionURL=ws://127.0.0.1:8888 -log
+```
+
+Then open **http://127.0.0.1:8080** and click into the page — WASD drives
+the chair. Other devices on the LAN use the host's IP; extra viewers are
+just extra tabs.
+
+RAMMS automatically hardens the video path at startup (it swaps the default
+streamer to a viewport-only capture producer — stock UE 5.7 captures every
+window and goes silently black if e.g. a notification toast is open).
+
+See **[doc/PIXEL_STREAMING.md](doc/PIXEL_STREAMING.md)** for macOS/Linux
+launch commands, flags, architecture, and troubleshooting, and
+[doc/PIXEL_STREAMING_PLAN.md](doc/PIXEL_STREAMING_PLAN.md) for the cluster /
+remote-HMI / demo roadmap.
 
 ## Configuration
 

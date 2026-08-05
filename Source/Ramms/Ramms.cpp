@@ -2,7 +2,18 @@
 
 #include "Ramms.h"
 #include "Modules/ModuleManager.h"
+#include "RammsPixelStreamingSetup.h"
 
-IMPLEMENT_PRIMARY_GAME_MODULE(FDefaultGameModuleImpl, Ramms, "Ramms");
+class FRammsGameModule : public FDefaultGameModuleImpl
+{
+public:
+	virtual void StartupModule() override
+	{
+		FDefaultGameModuleImpl::StartupModule();
+		RammsPixelStreaming::InstallViewportProducerSwap();
+	}
+};
+
+IMPLEMENT_PRIMARY_GAME_MODULE(FRammsGameModule, Ramms, "Ramms");
 
 DEFINE_LOG_CATEGORY(LogRamms)
