@@ -175,13 +175,20 @@ Consequences and fixes:
   assets and commit the change; "Dismiss" works per-session. Do NOT flip
   `r.VirtualTextures=True` casually — it is False on purpose (sensor/perf);
   evaluate separately if the crowd textures actually need it.
-- Durable hardening: ANY persistent toast (shader-compile notifications,
-  plugin messages) re-breaks streaming the same way in dev `-game` runs.
-  For a robust dev workflow, switch the streamer to the viewport
-  MediaCapture producer (`UPixelStreaming2StreamerComponent` /
-  `UPixelStreaming2VideoProducer` → `CreateActiveViewportCapture`), which
-  captures only the scene viewport and is immune to extra windows.
-  Packaged cluster builds (use case A) are unaffected either way.
+- Durable hardening — **IMPLEMENTED (2026-08-05)**: `Source/Ramms/
+  RammsPixelStreamingSetup.cpp` (installed from the primary game module)
+  swaps the default streamer's producer to
+  `FVideoProducerMediaCapture::CreateActiveViewportCapture()` once
+  Pixel Streaming reports ready (with a short ticker retry — OnReady fires
+  a few ms before the default streamer exists). The viewport producer
+  captures only the scene viewport, so ANY toast (AssetGuideline,
+  shader-compile notifications, plugin messages) is harmless. Validated on
+  Windows with the AssetGuideline toast visible: video streams normally.
+  No-op in editor/PIE, when no `-PixelStreamingConnectionURL` is given, and
+  on platforms without PS2 (`RAMMS_WITH_PIXEL_STREAMING=0`). Removing the
+  guideline (above) is still worth doing for editor hygiene, but streaming
+  no longer depends on it. Packaged cluster builds (use case A) were
+  unaffected either way.
 - Upstream: worth an Epic report — `FVideoProducerBackBuffer` needs a
   game-viewport window filter; a second differently-sized window yields
   permanently-black video with no log output (silent `Ok` returns in
