@@ -124,28 +124,22 @@ rammp-ui, so it should not live inside either):
 Cluster-side wiring (launch flags, portal) stays with the existing
 parallel-sim files in this repo (`Scripts/`, `containers/`, ramms-tools).
 
-## Local runbook (spike A — validated 2026-08-03 on Mac)
+## Local runbook (spike A — VALIDATED end-to-end on Windows 2026-08-05)
 
-Two processes; order doesn't matter (the streamer reconnects).
+> The maintained how-to (all platforms, flags, troubleshooting) is
+> **[PIXEL_STREAMING.md](PIXEL_STREAMING.md)** — this section keeps only the
+> plan-level history and findings. Spike A is done: browser view + drive
+> (keyboard teleop through PS) validated on Windows/NVENC with the RAMMS
+> viewport-producer hardening below; runtime connect/disconnect behaves
+> (streamer reconnects; frontend retries).
 
-**1. Signalling server + web frontend** (one-time setup: clone
-`github.com/EpicGamesExt/PixelStreamingInfrastructure` at the branch
-matching the engine — `UE5.7` — then `npm install && npm run build` at the
-repo root. Current local checkout: `~/atdev/PixelStreamingInfrastructure`.)
-
-```bash
-cd ~/atdev/PixelStreamingInfrastructure/SignallingWebServer
-node ./dist/index.js --serve --http_root ./www --player_port 8080 --streamer_port 8888
-```
-
-**2. The sim, streaming** (any map; PixelStreaming2 must be enabled in the
-.uproject — it is):
-
-```bash
-"/Users/Shared/Epic Games/UE_5.7/Engine/Binaries/Mac/UnrealEditor.app/Contents/MacOS/UnrealEditor" \
-  ~/atdev/Ramms/Ramms.uproject VehicleBasic -game -windowed -resx=1280 -resy=720 \
-  -PixelStreamingConnectionURL=ws://127.0.0.1:8888 -PixelStreamingEncoderCodec=VP8 -log
-```
+Two processes; order doesn't matter (the streamer reconnects). Signalling:
+`PixelStreamingInfrastructure` @ `UE5.7` branch, `npm install && npm run
+build`, then `node ./dist/index.js --serve --http_root ./www --player_port
+8080 --streamer_port 8888`. Sim: any map, `-game`, with
+`-PixelStreamingConnectionURL=ws://127.0.0.1:8888` on the command line
+(default H264 hardware encode — do not pass `-PixelStreamingEncoderCodec=VP8`;
+that was a dead-end Mac experiment from before the root cause was found).
 
 **ROOT CAUSE FOUND (2026-08-05, Windows, proven bidirectionally): the
 "Missing Project Settings!" AssetGuideline toast breaks PS2 video.**
@@ -194,24 +188,11 @@ Consequences and fixes:
   permanently-black video with no log output (silent `Ok` returns in
   `TEpicRtcVideoEncoder::Encode`, capturer churn in `FVideoCapturer`).
 
-**3. View + drive**: open http://127.0.0.1:8080 and click into the page —
-video streams out, mouse/keyboard/touch stream back in (WASD drives the
-chair). Other devices on the LAN: same URL with this machine's IP. More
-simultaneous viewers: just open more tabs/devices (SFU only needed at
-scale).
-
-Gotchas learned:
-- On Mac, launch the binary inside `UnrealEditor.app/Contents/MacOS/` — the
-  bare `Engine/Binaries/Mac/UnrealEditor` stub fails to resolve the project
-  ("Failed to find game directory").
-- `-game` runs log to `~/Library/Logs/Ramms/Ramms.log`, not the project's
-  Saved dir and not the editor log location.
-- First `-game` boot compiles shaders for many minutes at full CPU with no
-  visible progress; subsequent boots are ~a minute. The streamer shows in
-  the signalling log as `DefaultStreamer` once EpicRtc joins.
-- Linux/cluster variant: identical flags on the packaged build, plus
-  `-RenderOffscreen` (no window) — see `Scripts/run_headless.sh` once the
-  `RAMMS_PS_URL` hook lands (phase 2).
+View + drive, per-platform launch commands, flags, and troubleshooting
+(including the Mac launch-path and log-location gotchas) are maintained in
+[PIXEL_STREAMING.md](PIXEL_STREAMING.md). Linux/cluster variant: identical
+flags on the packaged build, plus `-RenderOffscreen` (no window) — see
+`Scripts/run_headless.sh` once the `RAMMS_PS_URL` hook lands (phase 2).
 
 ## Phases
 
