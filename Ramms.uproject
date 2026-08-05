@@ -118,6 +118,10 @@
 		{
 			"Name": "ZoneGraphAnnotations",
 			"Enabled": true
+		},
+		{
+			"Name": "PixelStreaming2",
+			"Enabled": true
 		}
 	]
 }
