@@ -147,18 +147,45 @@ node ./dist/index.js --serve --http_root ./www --player_port 8080 --streamer_por
   -PixelStreamingConnectionURL=ws://127.0.0.1:8888 -PixelStreamingEncoderCodec=VP8 -log
 ```
 
-**Mac limitation (established empirically 2026-08-04): VIDEO DOES NOT
-STREAM from Mac game-mode in 5.7.** Every combination was tried — H264 and
-VP8, MediaCapture and legacy backbuffer capture
-(`PixelStreaming2.UseMediaCapture false`), windowed and `-RenderOffscreen`.
-In all of them the WebRTC session, data channel, INPUT (browser drives the
-sim), and Opus audio encoder work — but the video encoder is never
-instantiated (log signature: audio encoder line at player join, no video
-encoder line, browser stuck at "waiting for video"). Treat Mac as a
-protocol/input development platform only; do video validation on
-Linux/NVENC (the production path, exercised daily by Epic's containers) or
-Windows. Keep `-PixelStreamingEncoderCodec=VP8` off on those platforms —
-default H264 (or AV1) with hardware encode is correct there.
+**ROOT CAUSE FOUND (2026-08-05, Windows, proven bidirectionally): the
+"Missing Project Settings!" AssetGuideline toast breaks PS2 video.**
+The Fab CitySampleCrowd pack ships an AssetGuideline
+(`/Game/Fab/CitySampleCrowd/AssetGuidelines/CitySampleCrowdAssetGuideline_VT_StaticLighting`)
+demanding `r.VirtualTextures=True`; this project deliberately sets it
+False, so every `-game` launch (editor binaries; `UnrealEd` owns
+AssetGuideline, so packaged builds are immune) spawns a persistent
+notification toast — a second Slate window. UE 5.7's
+`FVideoProducerBackBuffer` pushes **every** Slate window's backbuffer
+unfiltered, so the 1146x161 toast alternates with the 1280x720 viewport
+each frame; `FVideoCapturer` treats each alternation as an input resolution
+change and recreates the whole capture pipeline every frame (observed: ~5
+`PixelCaptureMediaCapture` objects destroyed per frame, 300+ per session).
+The capturer never survives initialization, and the encoder's "no data yet"
+paths return success **silently** — hence signalling/input/Opus all fine,
+video permanently black, zero diagnostic output, identical on every
+platform. Minimizing the toast window makes video appear within a second;
+restoring it kills video again.
+
+Consequences and fixes:
+- The 2026-08-04 "Mac limitation" conclusion is almost certainly this same
+  bug (the toast appears on Mac too) — **retest Mac after removing the
+  guideline** before writing Mac off. The VP8-on-Mac advice is moot.
+- Immediate fix: in an editor session (or on the toast itself), click
+  **"Remove Guideline"** to strip the AssetGuideline from the CitySample
+  assets and commit the change; "Dismiss" works per-session. Do NOT flip
+  `r.VirtualTextures=True` casually — it is False on purpose (sensor/perf);
+  evaluate separately if the crowd textures actually need it.
+- Durable hardening: ANY persistent toast (shader-compile notifications,
+  plugin messages) re-breaks streaming the same way in dev `-game` runs.
+  For a robust dev workflow, switch the streamer to the viewport
+  MediaCapture producer (`UPixelStreaming2StreamerComponent` /
+  `UPixelStreaming2VideoProducer` → `CreateActiveViewportCapture`), which
+  captures only the scene viewport and is immune to extra windows.
+  Packaged cluster builds (use case A) are unaffected either way.
+- Upstream: worth an Epic report — `FVideoProducerBackBuffer` needs a
+  game-viewport window filter; a second differently-sized window yields
+  permanently-black video with no log output (silent `Ok` returns in
+  `TEpicRtcVideoEncoder::Encode`, capturer churn in `FVideoCapturer`).
 
 **3. View + drive**: open http://127.0.0.1:8080 and click into the page —
 video streams out, mouse/keyboard/touch stream back in (WASD drives the
