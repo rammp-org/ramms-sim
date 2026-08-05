@@ -7,12 +7,13 @@
 # Build (on any Linux box with apptainer, after package_linux.sh):
 #   apptainer build ramms.sif containers/ramms.def
 #
-# Run (SLURM node with an RT-core GPU — e.g. RTX 6000 Pro — and --nv for the
-# NVIDIA driver + Vulkan ICD libs):
-#   apptainer run --nv ramms.sif Map_GraspTest \
+# Run (SLURM node with an RT-core GPU — e.g. RTX 6000 Pro — --nv for the
+# NVIDIA driver + Vulkan ICD libs, --writable-tmpfs for UE's stray cache
+# writes outside -saveddir):
+#   apptainer run --nv --writable-tmpfs ramms.sif Map_GraspTest \
 #       -RenderOffscreen -Unattended -NoSound -stdout
 # or with the wrapper baked into the image:
-#   apptainer exec --nv ramms.sif /opt/ramms/run_headless.sh Map_GraspTest 0
+#   apptainer exec --nv --writable-tmpfs ramms.sif /opt/ramms/run_headless.sh Map_GraspTest 0
 #
 # Rendering is offscreen Vulkan: no X server / EGL display needed, but the
 # NVIDIA Vulkan ICD must resolve inside the container — --nv binds the driver
@@ -26,12 +27,16 @@ From: ubuntu:24.04
     Scripts/run_headless.sh /opt/ramms/run_headless.sh
 
 %post
+    # libx11-6 / libxext6: transitive deps of the NVIDIA Vulkan ICD library
+    # even for offscreen rendering — not present in the ubuntu:24.04 base.
     apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         ca-certificates \
         libvulkan1 \
         vulkan-tools \
         libnss3 \
         libatomic1 \
+        libx11-6 \
+        libxext6 \
         && rm -rf /var/lib/apt/lists/*
 
     # NVIDIA Vulkan ICD manifest: the driver library itself comes from the
@@ -48,7 +53,11 @@ From: ubuntu:24.04
 }
 EOF
 
+    # Execution bits: archive round-trips (e.g. 7z) drop them, and the actual
+    # ELF under Binaries/Linux matters as much as the wrapper scripts.
     chmod +x /opt/ramms/run_headless.sh /opt/ramms/Packaged/Linux/Ramms.sh || true
+    chmod +x /opt/ramms/Packaged/Linux/Ramms/Binaries/Linux/* 2>/dev/null || true
+    find /opt/ramms/Packaged/Linux -name "*.sh" -exec chmod +x {} + 2>/dev/null || true
 
 %environment
     export VK_DRIVER_FILES=/etc/vulkan/icd.d/nvidia_icd.json
@@ -67,6 +76,13 @@ EOF
 %help
     Headless RAMMS simulator image. Requires: NVIDIA GPU with RT cores
     (ToF/sonar GPU ray tracing + Lumen HWRT), run with --nv.
+
+    Run with --writable-tmpfs: besides the -saveddir location, UE writes a
+    few caches outside the project Saved dir (Engine/Saved/Config,
+    <Project>/Intermediate/) which land inside the read-only image and spam
+    errors otherwise. Set RAMMS_SAVED_DIR to a bound writable path (e.g. a
+    scratch mount) for logs/config you want to keep.
+
     Entry points:
-      apptainer run --nv ramms.sif <Map> <UE args...>   # raw launcher
-      apptainer exec --nv ramms.sif /opt/ramms/run_headless.sh <Map> <instance>
+      apptainer run --nv --writable-tmpfs ramms.sif <Map> <UE args...>
+      apptainer exec --nv --writable-tmpfs ramms.sif /opt/ramms/run_headless.sh <Map> <instance>

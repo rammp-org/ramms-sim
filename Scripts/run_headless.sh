@@ -55,7 +55,11 @@ CTRL_PORT=$(( BLOCK + 6 ))
 INFO_PORT=$(( BLOCK + 7 ))
 CAM_PORT=$(( BLOCK + 8 ))
 
-SAVED_DIR="${RAMMS_SAVED_DIR:-$PACKAGED/Saved_inst$INSTANCE}"
+# Default the per-instance Saved dir to the CURRENT directory, not the
+# packaged tree: inside a container the packaged build is read-only (and on
+# SLURM, cwd is the submit dir on writable shared FS). Override with
+# RAMMS_SAVED_DIR for scratch mounts.
+SAVED_DIR="${RAMMS_SAVED_DIR:-$PWD/RammsSaved/inst$INSTANCE}"
 mkdir -p "$SAVED_DIR"
 
 log "map=$MAP fps=$FPS step_port=$STEP_PORT saved=$SAVED_DIR"
