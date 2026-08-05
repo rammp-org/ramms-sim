@@ -12,6 +12,11 @@
 #             until the headless pipeline is fully proven; Shipping for scale.
 #   MAPS      Optional '+'-separated map list to cook (default: all maps).
 #             Example: MAPS="Map_GraspTest+Map_CurbTest+Map_CrowdTest"
+#   CLEAN     Set CLEAN=1 to wipe cooked/staged output before packaging.
+#             Use after C++ class or plugin/submodule changes: stale
+#             incremental-cook data mismatched against new binaries loads
+#             with corrupt export templates at runtime (e.g. "Assertion
+#             failed: ExportObject.TemplateObject->IsA(LoadClass)").
 
 set -euo pipefail
 
@@ -31,6 +36,11 @@ RUNUAT="$UE_ROOT/Engine/Build/BatchFiles/RunUAT.sh"
 if [ ! -f "$RUNUAT" ]; then
 	log "ERROR: engine not found at '$UE_ROOT' (set UE_ROOT to your UE 5.7 root)"
 	exit 1
+fi
+
+if [ "${CLEAN:-0}" = 1 ]; then
+	log "CLEAN=1 — wiping cooked/staged output for a from-scratch cook"
+	rm -rf "$REPO_ROOT/Saved/Cooked" "$REPO_ROOT/Saved/StagedBuilds" "$REPO_ROOT/Packaged/Linux"
 fi
 
 ARGS=(
