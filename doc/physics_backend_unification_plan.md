@@ -1,6 +1,29 @@
 # Physics backend unification plan
 
-> ## Hand-off state (2026-08-05) — read this first when picking up
+> ## Hand-off state (2026-08-06) — read this first when picking up
+>
+> **Milestone B worker-side runtime validation is DONE** on a healthy
+> machine (Threadripper 9960X / RTX 5090, venv per plugin README): probe,
+> both canaries, and the 27-test suite pass; the new `newton_worker parity`
+> harness (Milestone B acceptance artifact) shows **~1e-4 qpos parity over
+> 4 s** on fixed-base gen3_2f85 with contacts disabled, on both solvers
+> (artifacts in `Scripts/parity_artifacts/`). Fixes that fell out: CPU-
+> solver readback bug (frozen-state readback), unnamed-joint mapping,
+> canary liveness check, kernel warmup inside `load_model` (first step was
+> paying minutes of kernel compile against a 2 s step timeout), gen3 MJCF
+> corrections in `mujoco/gen3_2f85/` (explicit two-value `solreflimit`,
+> explicit `2f85_base_mount` inertial).
+>
+> **Resolved same day:** the mujoco-warp 3.10.x mesh-CCD kernel crash on
+> Blackwell/sm_120 GPUs — `ThirdParty/newton` bumped to **v1.5.0rc2**
+> (mujoco / mujoco-warp 3.11), full gate re-verified and parity artifacts
+> regenerated under the new pins. **Remaining blocker, upstream-shaped**
+> (details in the plugin `Scripts/README.md`): Newton's contact-set
+> translation rewrites collision filtering, so contact-regime parity is
+> ~0.5 rad — gates Milestone E grasping. **Next:** the plugin README's
+> pickup checklist (PIE validation → set_state).
+>
+> ## Hand-off state (2026-08-05) — superseded by the above
 >
 > **Where the work lives:** superproject branch `feat/newton-improvements`;
 > the `Plugins/RammsNewtonPhysics` submodule carries the rework (commits
