@@ -384,6 +384,39 @@ Live mode first).
     dev box's i9-14900K instability prevents kernel compilation.
 - **C (~1 wk)**: lifecycle — recompile, reset/restore, PIE start/stop, worker-crash
   fallback to local `mj_step`; step-handler arbitration vs replay.
+  - **Status 2026-08-05: core lifecycle implemented** (compiles clean;
+    runtime validation pending a warp-capable machine, same as B). The step
+    handler tracks `d->time` between its own writebacks and detects external
+    discontinuities inside the same physics iteration URLab applies them:
+    time≈0 ⇒ sim reset — the handler drops to local `mj_step` while Tick
+    mirrors the reset in the worker asynchronously (v1 reset = full rebuild)
+    and re-arms at the engine's current time (bounded, tiny divergence from
+    the locally-stepped frames in between, reconciled by the first
+    writeback); any other jump ⇒ snapshot restore — cleanly deactivates
+    with a "needs worker set_state" status. Mid-run activation: worker
+    starts from the initial model state, so `InstallHandler` reads engine
+    time under `CallbackMutex` and either auto-resets the sim
+    (`bResetSimOnActivate`, default on) or refuses activation. Already
+    covered previously: recompile rebind (model pointer identity),
+    worker-crash per-step fallback + game-thread deactivation, PIE
+    start/stop (EndPlay uninstalls before teardown; async client retirement
+    so a long load can't block EndPlay). Still open in C: proper worker
+    `set_state` (unlocks restore + divergence-free reset/attach), and
+    explicit arbitration with replay/Direct/Puppet (currently: Live-mode
+    gate + mutual-exclusion documentation; displacement of our handler by
+    replay is not yet detected).
+- **D (1–2 wk)**: editor tooling — toolbar pill (backend / worker alive / solver /
+  achieved Hz), backend selector, ValidateRobot (dry-run worker load), export menu.
+  - **Status 2026-08-05: first cut implemented** — new `RammsNewtonPhysicsEditor`
+    module adds Tools ▸ RAMMS Newton ▸ {Probe Newton Availability (async
+    probe → toast with newton/python/CUDA/solvers), Validate Scene Under
+    Newton (dry-run worker load of the live compiled model → layout +
+    warnings toast; PIE-gated), Export Compiled Scene (MJCF + assets →
+    `Saved/NewtonExport/<timestamp>/`, the §5.4 fleet/training artifact;
+    PIE-gated)}. `SerializeCompiledModel` promoted to public static on
+    `URammsNewtonSolverComponent` for reuse. Remaining in D: the toolbar
+    status pill (live worker state / achieved Hz) and a per-manager backend
+    selector UX.
 - **D (1–2 wk)**: editor tooling — toolbar pill (backend / worker alive / solver /
   achieved Hz), backend selector, ValidateRobot (dry-run worker load), export menu.
 - **E (~1 wk)**: fleet mirror script + env-picker; docs; RAMMS robots (gen3_2f85)
