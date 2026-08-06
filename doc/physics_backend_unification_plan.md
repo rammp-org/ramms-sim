@@ -1,4 +1,36 @@
-# Physics backend unification plan — Chaos / Newton / MuJoCo
+# Physics backend unification plan
+
+> ## Hand-off state (2026-08-05) — read this first when picking up
+>
+> **Where the work lives:** superproject branch `feat/newton-improvements`;
+> the `Plugins/RammsNewtonPhysics` submodule carries the rework (commits
+> "WIP depend on Unreal Robotics Lab..." + "WIP Adding editor module +
+> solver component"). The plugin's own **README.md is the operational
+> hand-off doc** — architecture, new-machine setup (venv + canary
+> verification), status table, and the ordered pickup checklist. This file
+> is the design rationale and decision record.
+>
+> **Done (compile-clean):** Milestone A (worker + protocol + probe + UE
+> client/settings/subsystem, 23-test pytest suite), Milestone B
+> implementation (CustomStepHandler bridge), Milestone C core lifecycle
+> (reset resync, restore refusal, attach policy, crash fallback), Milestone
+> D first cut (Tools ▸ RAMMS Newton menu). Phase 0 done: RammsMujocoPhysics
+> submodule removed; RammsHumanPhysics KEPT deliberately (RCareWorld
+> placeholder).
+>
+> **The blocker that shaped everything:** the original dev machine's
+> i9-14900K is degraded (Raptor Lake defect) and cannot reliably compile
+> warp kernels — random native crashes and silent miscompiles. All
+> runtime validation of B/C is therefore pending a healthy machine; the
+> code compiles and the design bakes in subprocess isolation + canary +
+> liveness checks because of this. **First action on the new machine:**
+> plugin README "Setting up on a new machine" — both canaries must pass
+> before anything else is meaningful.
+>
+> **Environment pins:** `ThirdParty/newton` at tag v1.4.0 (editable
+> install), mujoco 3.10.0, mujoco-warp 3.10.0.3, warp-lang 1.16.0; venv is
+> untracked — recreate per machine. URLab third_party install must be
+> built (superproject README). — Chaos / Newton / MuJoCo
 
 Status: proposal (2026-08-04). Covers the review of `Plugins/RammsNewtonPhysics` and
 `Plugins/unreal-robotics-lab` (URLab), and the roadmap to (a) bring the Newton
