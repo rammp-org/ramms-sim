@@ -1,4 +1,4 @@
-<?xml version='1.0' encoding='utf-8'?>
+﻿<?xml version='1.0' encoding='utf-8'?>
 <mujoco model="gen3_2f85">
   <compiler angle="radian" />
 
@@ -26,16 +26,16 @@
         <mesh scale="0.001 0.001 0.001" />
         <general biastype="affine" />
         <default class="2f85_driver">
-          <joint solreflimit="0.005" solimplimit="0.95 0.99" range="0 0.8" armature="0.005" damping="0.1" />
+          <joint solreflimit="0.005 1" solimplimit="0.95 0.99" range="0 0.8" armature="0.005" damping="0.1" />
         </default>
         <default class="2f85_follower">
-          <joint solreflimit="0.005" solimplimit="0.95 0.99" range="-0.872664 0.872664" armature="0.001" />
+          <joint solreflimit="0.005 1" solimplimit="0.95 0.99" range="-0.872664 0.872664" armature="0.001" />
         </default>
         <default class="2f85_spring_link">
           <joint springref="2.62" stiffness="0.05" range="-0.296706 0.8" armature="0.001" damping="0.00125" />
         </default>
         <default class="2f85_coupler">
-          <joint solreflimit="0.005" solimplimit="0.95 0.99" range="-1.57 0" armature="0.001" />
+          <joint solreflimit="0.005 1" solimplimit="0.95 0.99" range="-1.57 0" armature="0.001" />
         </default>
         <default class="2f85_visual">
           <geom type="mesh" contype="0" conaffinity="0" group="2" />
@@ -120,6 +120,7 @@
                     <site name="pinch_site" pos="0 0 -0.061525" quat="0 1 0 0" />
                     <camera name="wrist" pos="0 -0.05639 -0.058475" quat="0 0 0 1" resolution="640 480" fovy="41.8379" />
                     <body name="2f85_base_mount" childclass="2f85_2f85" pos="0 0 -0.068525" quat="0 1 0 0">
+                      <inertial pos="-0.00036058 8.5363e-05 -5.9199e-05" quat="-0.00052222 0.70609977 0.00052371 0.70811197" mass="0.15000286" diaginertia="0.00010235 5.36e-05 5.2172e-05"/>
                       <geom class="2f85_visual" material="2f85_black" mesh="2f85_base_mount" />
                       <geom class="2f85_collision" mesh="2f85_base_mount" />
                       <body name="2f85_base" pos="0 0 0.0038" quat="0.707107 0 0 -0.707107">
