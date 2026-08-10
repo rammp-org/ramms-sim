@@ -46,6 +46,13 @@ CONFIG = {
     "ucx_max_boxes": 24,
     "ucx_dust_volume": 2e-6,
     "cleanup": True,
+    # Texture baking (per material group): only materials whose principled
+    # inputs are LINKED (image/procedural textures) are baked; constant
+    # materials stay on the cheap shared-rgba path. ROBOT_BAKE_FORCE=1 bakes
+    # Base Color even when constant (machinery smoke-test).
+    "bake_res": int(os.environ.get("ROBOT_BAKE_RES", "1024")),
+    "bake_force": os.environ.get("ROBOT_BAKE_FORCE") == "1",
+    "bake_samples": 16,
 }
 
 COLL_PREFIXES = ("UBX_", "UCX_", "USP_", "UCP_")
@@ -278,6 +285,90 @@ def spec_to_part_local(shapes, origin):
     return shapes
 
 
+def _principled(mat):
+    if mat is None or not mat.use_nodes:
+        return None
+    for node in mat.node_tree.nodes:
+        if node.type == "BSDF_PRINCIPLED":
+            return node
+    return None
+
+
+def _input_linked(mat, socket_name):
+    node = _principled(mat)
+    sock = node.inputs.get(socket_name) if node else None
+    return bool(sock and sock.is_linked)
+
+
+def bake_piece_textures(piece, mat, assets_dir, base, notes):
+    """Bake the piece's LINKED principled inputs to PNGs (per material group).
+
+    Returns {role: relpath} with roles matching URLab's MJCF material layers
+    ("rgb", "roughness", "normal"). Bakes are per PIECE, not per shared
+    material: each piece gets its own UV unwrap, so a shared texture would
+    not transfer. Metallic has no native Cycles bake type and is skipped
+    (noted) when linked — constant metallic doesn't need baking anyway.
+    """
+    todo = []
+    if CONFIG["bake_force"] or _input_linked(mat, "Base Color"):
+        todo.append(("rgb", "DIFFUSE"))
+    if _input_linked(mat, "Roughness"):
+        todo.append(("roughness", "ROUGHNESS"))
+    if _input_linked(mat, "Normal"):
+        todo.append(("normal", "NORMAL"))
+    if _input_linked(mat, "Metallic"):
+        notes.append("bake %s: linked Metallic skipped (no Cycles bake type)" % base)
+    if not todo:
+        return {}
+
+    bpy.ops.object.select_all(action="DESELECT")
+    piece.select_set(True)
+    bpy.context.view_layer.objects.active = piece
+    if not piece.data.uv_layers:
+        bpy.ops.object.mode_set(mode="EDIT")
+        bpy.ops.mesh.select_all(action="SELECT")
+        bpy.ops.uv.smart_project(angle_limit=1.15, island_margin=0.003)
+        bpy.ops.object.mode_set(mode="OBJECT")
+
+    scene = bpy.context.scene
+    prev_engine = scene.render.engine
+    scene.render.engine = "CYCLES"
+    scene.cycles.device = "CPU"
+    scene.cycles.samples = CONFIG["bake_samples"]
+    scene.render.bake.use_selected_to_active = False
+
+    out = {}
+    nt = mat.node_tree
+    img_node = nt.nodes.new("ShaderNodeTexImage")
+    prev_active = nt.nodes.active
+    try:
+        for role, bake_type in todo:
+            res = CONFIG["bake_res"]
+            img = bpy.data.images.new("bake_%s_%s" % (base, role), res, res,
+                                      alpha=False, float_buffer=False)
+            if role != "rgb":
+                img.colorspace_settings.name = "Non-Color"
+            img_node.image = img
+            nt.nodes.active = img_node
+            kwargs = {"type": bake_type, "margin": 4}
+            if bake_type == "DIFFUSE":
+                kwargs["pass_filter"] = {"COLOR"}  # albedo only, no lighting
+            bpy.ops.object.bake(**kwargs)
+            fname = "%s_%s.png" % (base, role)
+            img.filepath_raw = os.path.join(assets_dir, fname)
+            img.file_format = "PNG"
+            img.save()
+            out[role] = "assets/" + fname
+            bpy.data.images.remove(img)
+    except RuntimeError as exc:
+        notes.append("bake %s FAILED: %s" % (base, exc))
+    finally:
+        nt.nodes.remove(img_node)
+        nt.nodes.active = prev_active
+        scene.render.engine = prev_engine
+    return out
+
+
 def export_root(root_name, out_dir, report):
     root = bpy.data.objects.get(root_name)
     if root is None:
@@ -408,6 +499,68 @@ def export_root(root_name, out_dir, report):
 
         fp = os.path.join(folder, "%s.fbx" % joined.name)
         export_fbx_static([joined] + coll_objs, fp)
+
+        # Part-local visual meshes for MJCF/USD: FBX is UE-only, MuJoCo wants
+        # OBJ/STL. One OBJ + one shared <material> PER Blender material — a
+        # joined CAD part carries several (hub vs rubber, metal vs paint) and
+        # a single-color visual loses them all. Same frame as the FBX (origin
+        # at the joint pivot), raw Blender axes (forward Y / up Z).
+        assets_dir = os.path.join(folder, "assets")
+        os.makedirs(assets_dir, exist_ok=True)
+
+        def material_rgba(mat):
+            if mat is None:
+                return [0.6, 0.6, 0.6, 1.0]
+            if mat.use_nodes:
+                for node in mat.node_tree.nodes:
+                    if node.type == "BSDF_PRINCIPLED":
+                        c = node.inputs["Base Color"].default_value
+                        return [round(float(c[i]), 4) for i in range(3)] + [1.0]
+            c = mat.diffuse_color
+            return [round(float(c[i]), 4) for i in range(3)] + [1.0]
+
+        bpy.ops.object.select_all(action="DESELECT")
+        joined.select_set(True)
+        bpy.context.view_layer.objects.active = joined
+        if len(joined.material_slots) > 1:
+            bpy.ops.object.mode_set(mode="EDIT")
+            bpy.ops.mesh.select_all(action="SELECT")
+            bpy.ops.mesh.separate(type="MATERIAL")
+            bpy.ops.object.mode_set(mode="OBJECT")
+        pieces = [o for o in bpy.context.selected_objects if o.type == "MESH"]
+
+        visuals = []
+        for piece in pieces:
+            mat = piece.material_slots[0].material if piece.material_slots else None
+            mat_name = safe_name(base_name(mat.name)) if mat else "default"
+            piece_base = "%s__%s" % (joined.name, mat_name)
+            # Bake BEFORE the OBJ export so a fresh smart-project unwrap
+            # (textured materials on UV-less CAD meshes) lands in the OBJ.
+            textures = bake_piece_textures(piece, mat, assets_dir, piece_base, notes) if mat else {}
+            piece_file = piece_base + ".obj"
+            bpy.ops.object.select_all(action="DESELECT")
+            piece.select_set(True)
+            bpy.context.view_layer.objects.active = piece
+            bpy.ops.wm.obj_export(
+                filepath=os.path.join(assets_dir, piece_file),
+                export_selected_objects=True,
+                export_materials=False,
+                apply_modifiers=True,
+                forward_axis="Y", up_axis="Z")
+            entry_v = {"mesh": "assets/" + piece_file,
+                       "material": mat_name,
+                       "rgba": material_rgba(mat)}
+            if textures:
+                entry_v["textures"] = textures
+            visuals.append(entry_v)
+        # rejoin so downstream cleanup sees one object
+        if len(pieces) > 1:
+            bpy.ops.object.select_all(action="DESELECT")
+            for piece in pieces:
+                piece.select_set(True)
+            bpy.context.view_layer.objects.active = pieces[0]
+            bpy.ops.object.join()
+
         for o in coll_objs:
             bpy.data.objects.remove(o, do_unlink=True)
 
@@ -427,6 +580,7 @@ def export_root(root_name, out_dir, report):
                             "ratio": p["mimic_ratio"]} if p["mimic"] else None)}
         manifest_parts[safe_name(pname)] = {
             "fbx": os.path.basename(fp),
+            "visuals": visuals,
             "origin": [round(float(v), 5) for v in origin],
             "mass": p["mass"] if p["mass"] > 0 else None,
             "joint": j,
@@ -487,31 +641,72 @@ def write_mjcf(nm, folder, entry):
     mj = ET.Element("mujoco", model=nm)
     ET.SubElement(mj, "compiler", angle="degree", autolimits="true")
     ET.SubElement(mj, "option", timestep="0.002")
+    asset = ET.SubElement(mj, "asset")
     world = ET.SubElement(mj, "worldbody")
     actuators = ET.SubElement(mj, "actuator")
     equality = ET.SubElement(mj, "equality")
 
+    # Meshes are per part+material. Flat-color materials are SHARED by
+    # Blender material name; baked (textured) materials are UNIQUE per piece
+    # — each piece has its own UV unwrap, so its bake doesn't transfer.
+    def mat_key(v):
+        if v.get("textures"):
+            return "mat_" + os.path.splitext(os.path.basename(v["mesh"]))[0]
+        return "mat_%s" % v["material"]
+
+    seen_materials = {}
+    for pn, pe in parts.items():
+        for v in pe.get("visuals", []):
+            ET.SubElement(asset, "mesh",
+                          name=os.path.splitext(os.path.basename(v["mesh"]))[0],
+                          file=v["mesh"])
+            mn = mat_key(v)
+            if mn in seen_materials:
+                continue
+            seen_materials[mn] = True
+            tex = v.get("textures") or {}
+            mat_el = ET.SubElement(asset, "material", name=mn,
+                                   rgba="%.4f %.4f %.4f %.4f" % tuple(v["rgba"]))
+            for role, rel in tex.items():
+                tn = "tex_%s_%s" % (mn, role)
+                ET.SubElement(asset, "texture", name=tn, type="2d", file=rel)
+                # MJCF 3.x layered form (exclusive with the legacy texture
+                # attribute); MuJoCo renders the rgb layer, URLab maps every
+                # role onto its PBR material slots.
+                ET.SubElement(mat_el, "layer", texture=tn, role=role)
+
     def geoms(body, pe):
+        # Menagerie convention: visual meshes non-colliding in group 2,
+        # collision primitives in group 3 (behavior-identical, viewers and
+        # the URLab importer use the groups to pick what to display).
+        for v in pe.get("visuals", []):
+            # density=0: purely visual — parts without an authored mass get
+            # their auto-mass from the collision primitives alone, not
+            # double-counted with the visual shell.
+            ET.SubElement(body, "geom", type="mesh",
+                          mesh=os.path.splitext(os.path.basename(v["mesh"]))[0],
+                          material=mat_key(v),
+                          contype="0", conaffinity="0", group="2", density="0")
         for s in pe["collision"]:
             if s["shape"] == "cylinder":
                 a = Vector(s["axis"])
                 q = a.to_track_quat("Z", "Y")
-                ET.SubElement(body, "geom", type="cylinder",
+                ET.SubElement(body, "geom", type="cylinder", group="3",
                               size="%.5f %.5f" % (s["radius"], s["height"] / 2),
                               pos="%.5f %.5f %.5f" % tuple(s["center"]),
                               quat="%.5f %.5f %.5f %.5f" % (q.w, q.x, q.y, q.z))
             elif s["shape"] == "box":
-                ET.SubElement(body, "geom", type="box",
+                ET.SubElement(body, "geom", type="box", group="3",
                               size="%.5f %.5f %.5f" % tuple(v / 2 for v in s["size"]),
                               pos="%.5f %.5f %.5f" % tuple(s["center"]))
             elif s["shape"] == "convex" and s.get("box_approx"):
                 ba = s["box_approx"]
-                ET.SubElement(body, "geom", type="box",
+                ET.SubElement(body, "geom", type="box", group="3",
                               size="%.5f %.5f %.5f" % tuple(v / 2 for v in ba["size"]),
                               pos="%.5f %.5f %.5f" % tuple(ba["center"]))
             else:
                 ET.SubElement(body, "geom", type="box", size="0.01 0.01 0.01",
-                              pos="0 0 0")    # authored convex: TODO obj export
+                              pos="0 0 0", group="3")  # authored convex: TODO obj export
 
     def emit(pn, parent_el, parent_origin):
         pe = parts[pn]
@@ -543,7 +738,8 @@ def write_mjcf(nm, folder, entry):
             if j.get("mimic"):
                 ET.SubElement(equality, "joint", joint1=pn,
                               joint2=j["mimic"]["of"],
-                              polycoef="0 %.5f 0 0 0" % j["mimic"]["ratio"])
+                              polycoef="0 %.5f 0 0 0" % j["mimic"]["ratio"],
+                              solref="0.005 1", solimp="0.95 0.99")
         if pe["mass"]:
             ET.SubElement(body, "inertial",
                           pos="0 0 0", mass="%.4f" % pe["mass"],
@@ -556,9 +752,18 @@ def write_mjcf(nm, folder, entry):
     for r in roots:
         emit(r, world, [0, 0, 0])
     for cl in entry["closures"]:
+        # MuJoCo <connect> anchor is in body1's LOCAL frame; the manifest
+        # pivot is root-local. Bodies are translation-only in this exporter,
+        # so local = pivot - body1 origin. STIFF solver params are required:
+        # at MuJoCo's default constraint softness a chain of closures
+        # absorbs the motion (observed: 4x attenuation per stage — the
+        # linkage moved, nothing downstream did).
+        a_org = parts[cl["body_a"]]["origin"]
+        anchor = [cl["pivot"][i] - a_org[i] for i in range(3)]
         ET.SubElement(equality, "connect", body1=cl["body_a"],
                       body2=cl["body_b"],
-                      anchor="%.5f %.5f %.5f" % tuple(cl["pivot"]))
+                      anchor="%.5f %.5f %.5f" % tuple(anchor),
+                      solref="0.005 1", solimp="0.95 0.99")
     ET.indent(mj)
     ET.ElementTree(mj).write(os.path.join(folder, nm + ".mjcf.xml"))
 

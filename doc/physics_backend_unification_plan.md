@@ -1,6 +1,46 @@
 # Physics backend unification plan
 
-> ## Hand-off state (2026-08-06) — read this first when picking up
+> ## Hand-off state (2026-08-07 PM) — read this first when picking up
+>
+> **Actuator-driven PIE validation DONE** (RTX 4090): the gen3_2f85
+> articulation BP (`/Game/Maps/URL/gen3_2f85` — the grasp map places no arm;
+> it normally arrives with the play-time pawn, which simulate never spawns)
+> was spawned in-level on `Map_GraspTestURL` and stepped **3+ minutes under
+> Newton (nq=64 nu=8 nmocap=1)** with live EE-IK ctrl forwarding, tendon
+> gripper actuation, and tracking-base mocap forwarding. Three real bugs
+> found and fixed in the worker/bridge (details in the plugin README's Known
+> issues): (1) URLab's mj_saveXML re-export re-compacts `solref*`/`solimp*`
+> and newton's importer passes partial `solimp` through unpadded →
+> divide-by-zero → scene-wide NaN in ≤3 GPU steps — worker now pads all six
+> attrs to canonical length (`normalize_sol_shorthand`); (2) SolverMuJoCo's
+> re-export appended a mocap body (nmocap 1→2) — worker now scatters
+> original-layout mocap through a name-matched index map; (3) mujoco-warp
+> sizes constraint buffers from the initial state and overflow is CUDA 700,
+> not an error — worker now defaults `nconmax`/`njmax` to worst-case sizes.
+> Plus: UE step handler refuses non-finite writeback (graceful deactivate),
+> and `RAMMS_NEWTON_DUMP_DIR` dumps every `load_model` payload for CLI
+> repro. **A scripted grasp does not hold yet**: free objects slide ~3 mm/s
+> at rest under Newton — the known upstream contact-set translation issue
+> (Milestone E blocker), now with in-editor measurements. **Next:** worker
+> `set_state`; MJCF/USD authoring for the MeBot base toward base+arm
+> integration under Newton; gen3_2f85 BP reimport from the fixed
+> `gen3_2f85_scene_ue.xml` (asset predates the 08-06 fidelity fixes).
+>
+> ## Hand-off state (2026-08-07 AM) — superseded by the above
+>
+> **UE PIE validation DONE on the original dev machine** (which is
+> exonerated — the warp crashes were old-mujoco-warp kernel TUs, gone since
+> the 3.11 bump; full gate passes there now). Simulate session on
+> `Map_GraspTestURL`: Newton bind ~16 s warm (GPU solver, nq=42),
+> `ResetSimulation()` → worker resync ~2 s → stepping resumes, clean
+> teardown with zero orphaned workers. The session flushed out a real bug,
+> now fixed: **worker stdout/stderr pipe backpressure deadlocked
+> `load_model`** (trimesh warning spam filled the un-drained pipe; worker
+> blocked mid-write). Client now drains the pipe in its recv poll loop +
+> READY wait + shutdown; worker quiets trimesh logging. **Next:** plugin
+> README pickup checklist — actuator-driven PIE scene, then `set_state`.
+>
+> ## Hand-off state (2026-08-06) — superseded by the above
 >
 > **Milestone B worker-side runtime validation is DONE** on a healthy
 > machine (Threadripper 9960X / RTX 5090, venv per plugin README): probe,
