@@ -401,6 +401,7 @@ def export_root(root_name, out_dir, report):
         p["pivot_w"] = Vector(piv) if piv else obj.matrix_world.translation.copy()
         p["axis"] = get_prop(obj, "axis", [0, 0, 1])
         p["limits"] = get_prop(obj, "limits")
+        p["ref"] = float(get_prop(obj, "ref", 0.0) or 0.0)
         p["mass"] = float(get_prop(obj, "mass", 0.0) or 0.0)
         p["motor"] = {"torque": float(get_prop(obj, "motor_torque", 0.0) or 0.0),
                       "velocity": float(get_prop(obj, "motor_velocity", 0.0) or 0.0)}
@@ -573,6 +574,7 @@ def export_root(root_name, out_dir, report):
                  "pivot": [round(float(v), 5) for v in origin],
                  "limits": ([round(float(v), 4) for v in p["limits"]]
                             if p["limits"] else None),
+                 "ref": round(p["ref"], 5),
                  "parent": safe_name(p["parent"]),
                  "motor": p["motor"], "spring": p["spring"],
                  "friction": p["friction"],
@@ -721,6 +723,11 @@ def write_mjcf(nm, folder, entry):
                          type="slide" if j["type"] == "prismatic" else "hinge")
             if j["limits"]:
                 attrs["range"] = "%.4f %.4f" % tuple(j["limits"])
+            if j.get("ref"):
+                # dojo_ref: the MODELED pose corresponds to joint value
+                # `ref` (deg for hinge under compiler angle="degree",
+                # metres for slide); limits are absolute coordinates.
+                attrs["ref"] = "%.5f" % j["ref"]
             sp = j["spring"]
             if sp["stiffness"]:
                 attrs["stiffness"] = "%.5f" % sp["stiffness"]
@@ -741,9 +748,34 @@ def write_mjcf(nm, folder, entry):
                               polycoef="0 %.5f 0 0 0" % j["mimic"]["ratio"],
                               solref="0.005 1", solimp="0.95 0.99")
         if pe["mass"]:
+            # Authored mass with an AABB-derived inertia tensor and CoM at
+            # the AABB centre (the old hardcoded diaginertia=0.01 at the
+            # PIVOT gave wildly wrong dynamics for any part with dojo_mass).
+            lo = [1e9] * 3
+            hi = [-1e9] * 3
+            for sh in pe["collision"]:
+                c = sh.get("center") or (sh.get("box_approx") or {}).get("center")
+                sz = sh.get("size") or (sh.get("box_approx") or {}).get("size")
+                if c is None or sz is None:
+                    if "radius" in sh:
+                        r, h = sh["radius"], sh.get("height", sh["radius"])
+                        c, sz = sh["center"], [2 * r, 2 * r, h]
+                    else:
+                        continue
+                for i in range(3):
+                    lo[i] = min(lo[i], c[i] - sz[i] / 2)
+                    hi[i] = max(hi[i], c[i] + sz[i] / 2)
+            if lo[0] > hi[0]:
+                lo, hi = [-0.05] * 3, [0.05] * 3
+            ctr = [(lo[i] + hi[i]) / 2 for i in range(3)]
+            ext = [max(hi[i] - lo[i], 1e-3) for i in range(3)]
+            mss = pe["mass"]
+            diag = [mss / 12.0 * (ext[(i + 1) % 3] ** 2 + ext[(i + 2) % 3] ** 2)
+                    for i in range(3)]
             ET.SubElement(body, "inertial",
-                          pos="0 0 0", mass="%.4f" % pe["mass"],
-                          diaginertia="0.01 0.01 0.01")
+                          pos="%.5f %.5f %.5f" % tuple(ctr),
+                          mass="%.4f" % mss,
+                          diaginertia="%.6f %.6f %.6f" % tuple(diag))
         geoms(body, pe)
         for c in sorted(kids.get(pn, [])):
             emit(c, body, org)

@@ -433,3 +433,263 @@ order of impact: `dojo_mass` per part >> gas-spring preload/rate
 (`dojo_motor_*`). The stand-in springs live in
 `mujoco/compose_mebot_scene.py` (marked `*`) and should be deleted once
 the real dampener values are authored.
+
+### User-specified topology applied (2026-08-12)
+
+The full mechanism topology (user-provided) is now in the blend:
+
+- **dw_main_plate_l/r are prismatic-X carriages** on the chassis (was
+  `fixed`/merged; travel limits +/-0.1 m are a placeholder). The Blender
+  hierarchy already parented each side's swing arm / elevator pivot /
+  dampener / dampener_link under its plate, so those now ride the carriage.
+  Compose locks the carriages (stiffness stand-in) until the real
+  adjustment lock is modeled.
+- **rear_caster_aux_linkage re-parented** chassis -> suspension_arm (its
+  origin was already at the susp-arm pin): floating two-pin link, closure
+  to motor_dampener_pivot closes the four-bar. No aux<->susp closure
+  needed (the tree hinge covers that pin).
+- **Elevator pivot couples via elevator_dampener_AUX_link** (closure
+  aux_link -> pivot), NOT dampener_link -> pivot (removed). This resolves
+  the earlier triangle/oscillation without losing the load path.
+- NOTE: the blend was found saved with ZERO closure empties (Aug 9 23:09
+  save); the full 12-closure set was rebuilt + ring-refined. Current
+  inventory matches the "Current closure inventory" section above plus the
+  aux_link->pivot pair, minus dampener_link->pivot.
+
+Validated (plain MuJoCo, `check_chains.py`): all three chains transmit
+end-to-end — front rod -> linkage -> arm -> aux -> aux_arm -> swing_arm;
+rear rod -> suspension_arm <-> aux_linkage four-bar -> dampener chain;
+elevator rod -> pivot -> swing arm (carriage-mounted). Settle calm
+(maxqvel 0.14), ride height held (rootZ 0.074), turn-in-place +77 deg/3 s.
+Small connecting links (rod_link) get damping 50 in compose to stop
+cosmetic windmilling. nq=48/nbody=43 now (two carriage DOF added);
+auto-mass 202 kg. Reimported in-editor at
+/Game/Maps/URL/NewtonTest/mebot_gen3.
+
+### Ramp explosion fix + Blender joint-viz addon (2026-08-12)
+
+- **Ramp-rolloff explosion (both engines) root-caused**: the rod position
+  servos at kp=1e6 have ~1.4 kHz dynamics on the light rods —
+  un-integrable at the 500 Hz timestep. Stable at rest, but any impact
+  transient (rolling off a ramp) rings them and the robot pogo-sticks
+  (reproduced in CLI: bouncing at rootZ ~0.5 forever). kp=5e4 / kv=5e3
+  rides the same ramp down and settles at ride height (rootZ 0.072,
+  peak |qvel| 14.5 in transit). Rule of thumb: keep
+  sqrt(kp/m_effective) * dt below ~0.5.
+- **Exporter inertial bug fixed**: parts with an authored `dojo_mass` used
+  to get `<inertial pos="0 0 0" diaginertia="0.01 0.01 0.01">` — CoM at
+  the JOINT PIVOT with an arbitrary tensor. Now: CoM at the collision-AABB
+  centre with a box-approximated tensor. (Dormant for the mebot — its
+  masses are auto — but live for any root with authored masses.)
+- **UE reimport gotcha**: `AssetImportTask(replace_existing=True)` on an
+  existing MJCF asset can silently no-op (`get_objects() == []` and stale
+  components). Delete the asset first, then import.
+- **Blender addon `Scripts/dojo_joint_viz.py`** (copy in `data\`):
+  install via Preferences > Add-ons > Install, or open in the Text Editor
+  and Run Script. 3D-viewport N-sidebar > "Dojo" tab:
+  - overlay draws every annotated part's joint axis (orange=revolute,
+    green=prismatic, grey=fixed), limit arcs/travel segments, and closure
+    empties (magenta cross + line to the connect target);
+  - select a part and drag the **Preview** slider to exercise the joint
+    through its limits about its annotated pivot+axis (children follow) —
+    a wrong axis/pivot/limit is immediately visible;
+  - **Solve Closures** (v1.1, default on): the rest of the closure-connected
+    mechanism is numerically posed to keep the pins mated, so the whole
+    four-bar moves together. The panel shows the RMS pin residual — a
+    residual that won't approach zero flags a wrong anchor/axis/limit, and
+    closure lines turn red when separated >5 mm. Start previews from the
+    rest pose (pin references are captured on first use).
+  - **Reset Previews** restores every posed part exactly.
+
+Elevator-drive follow-up (2026-08-12 eve): the elevator step-command is
+STABLE in CLI at the current model (peak 9.9, settles 0.28) — if driving an
+elevator still misbehaves in UE, the placed robot ACTOR likely predates the
+reimport and carries stale actuator components (kp=1e6): delete the placed
+actor and re-place from the fresh BP. Servo gains were margin-tuned anyway
+(kp 2e4 / kv 2e3 / 5 kN — 4x calmer transients, same tracking).
+
+### Joint-viz addon v1.2 (2026-08-12 night)
+
+- **Solve is now interactive**: ~15-25 ms per slider tick (was ~1.5 s).
+  Two fixes: the closure solver evaluates candidate poses with ANALYTIC
+  forward kinematics (pure matrix composition, zero depsgraph updates in
+  the descent loop), and the annotation graph (parts/closures/mechanisms)
+  is scanned once and cached — this blend carries thousands of raw-CAD
+  objects, so any per-solve or per-redraw `bpy.data.objects` scan is fatal.
+- **Mechanism visualization** ("Show Mechanism", default on): the active
+  part's closure-connected mechanism is drawn as a cyan graph — origin
+  markers on every member (yellow = the driven part) and tree edges toward
+  each member's parent — on top of the existing axis/limit/closure
+  overlay. The sidebar lists the mechanism: every member with its joint
+  kind and current solved value, plus every pin pair with its LIVE
+  separation in mm (the number to watch while sweeping).
+- **Debug Prints** toggle: per-sweep RMS residual and per-pin distances to
+  the system console.
+- **Updating the addon**: an installed addon lives at
+  `%APPDATA%\Blender Foundation\Blender.1\scriptsddons\` — a copy,
+  not a link. The installed copy is synced now, but after future edits to
+  `Scripts/dojo_joint_viz.py`, reinstall (or re-copy) AND restart Blender
+  (the enabled module stays loaded). This also silently poisoned a
+  benchmark: `import dojo_joint_viz` resolves to the ENABLED addon module,
+  not the repo file.
+
+### Joint-viz addon v2.0 — AUTHORING (2026-08-12)
+
+New **"Author" panel** (Dojo tab, below the viz panel) turns the addon into
+the full annotation editor — the dojo_* custom properties remain the
+exporter's source of truth; the panel is a typed, synced mirror:
+
+- **Joint type** dropdown (fixed / revolute / continuous / prismatic /
+  "not a part"), **axis** vector with X/Y/Z preset buttons (root frame),
+  **limits** with enable toggle (deg / m), **motor** force+velocity,
+  **spring** stiffness/damping/rest, **friction**, **mass** (0 = auto),
+  **collision** override, **mimic** with an object picker + ratio.
+  Every edit writes through to the dojo_* properties immediately (the
+  overlay updates live), and selecting a part loads its values.
+- **Pivot = 3D Cursor**: sets the part origin (= joint pivot) to the
+  cursor — pairs with Alt+Click bore edge loop -> Shift+S
+  Cursor-to-Selected for exact pin axes.
+- **Add Closure @ Cursor**: select the two parts to pin (active = host),
+  put the cursor on the pin axis, click — creates the closure empty with
+  the right parenting/props/naming. Selecting a closure empty shows its
+  target and a Delete button.
+- **Clear Dojo Data** strips all dojo_* props from the active object.
+- Authoring edits invalidate the viz/solve caches automatically.
+
+Remember the addon-update rule: re-copy to
+`%APPDATA%\Blender Foundation\Blender.1\scriptsddons\` (done) and
+restart Blender.
+
+### Joint-viz addon v2.1 — Gauss-Newton solver (2026-08-12 night)
+
+User observation confirmed and fixed: driving a MOTOR ROD let pins
+separate while driving a middle link looked right. Cause: coordinate
+descent moves one joint at a time and stalls when the driven joint needs
+COORDINATED multi-link motion (high mechanical advantage input = curved
+valley in joint space). The solver is now damped Gauss-Newton over all
+free joints simultaneously (finite-difference Jacobian on the analytic FK,
+tiny Gaussian elimination, Levenberg damping; 2 coordinate sweeps as warm
+start). ~20-40 ms per solve.
+
+Validation driving the rods themselves: elevator loop closes sub-mm across
+the FULL rod sweep; caster loops close sub-mm at mid-range. The residual
+that remains at rod-travel extremes is a REAL finding, not solver error:
+the follower values peg at 0.00/1.00 — the links hit their +/-30 deg
+limits while the annotated +/-0.08 m rod stroke keeps going. I.e. the
+annotated rod strokes exceed what the linkage geometry (and probably the
+hardware) allows. Fix in the Author panel: tighten each rod's limits until
+the residual stays ~0 across the whole slider — that consistent range IS
+the mechanism's true stroke. Interpretation guide: pegged follower value +
+rising mm = limit inconsistency; rising mm with NO pegged values = a
+misplaced anchor.
+
+### Joint-viz addon v2.2 — solver locks (2026-08-12)
+
+Per-part **solver lock** (padlock icon on each row of the mechanism list):
+a locked joint is excluded from the closure solve — for joints that are
+physically not back-drivable (the carriage plates, idle leadscrews). This
+stops the solver from "closing" a loop by dragging the whole carriage,
+which was masking the actual linkage/dampener geometry. Stored as the
+tooling-only `_dojo_locked` custom property (underscore prefix — the
+exporter only reads `dojo_*`, so locks never affect the export).
+`dw_main_plate_l/r` ship pre-locked in the blend. Verified: driving
+`motor_elevator_rod_l` with the plate locked keeps the carriage at
+0.00000 m while the loop closes at ~0.04 mm through the pivot/link chain.
+
+### Joint-viz addon v2.3 — in-Blender export (2026-08-13)
+
+New **Export panel** (Dojo tab):
+
+- **Exporter path** (defaults to `data
+obot_export.py`) and **Output dir**
+  (empty = the exporter's default `UE_VAULT_EXPORT
+ammp_parts`), **bake
+  resolution** and **force-bake** toggles — the same knobs as the
+  `ROBOT_*` env vars.
+- **Root selection**: with nothing relevant selected, the panel lists the
+  auto-detected assembly roots (topmost ancestors of annotated parts:
+  `mebot`, `base_link`, `base`, ...). Selecting any annotated object(s)
+  exports just those subtrees instead — i.e. SUBSYSTEM export of e.g. a
+  single caster assembly is "select it, click Export".
+- **Export Roots** runs `robot_export.py` in a BACKGROUND Blender process
+  against the saved .blend — the open session is never mutated. Requires a
+  saved file (the panel warns on unsaved changes); completion/failure is
+  reported in the status bar (~2-3 min for the mebot with bakes).
+
+Solver-lock note: `_dojo_locked` props live in the .blend — reloading the
+PLUGIN does not reload the FILE. If a session predates the lock save,
+click the padlocks in the mechanism list (immediate) or File > Revert.
+
+### Joint-viz addon v2.4 — Author-panel sync fix (2026-08-13)
+
+The Author panel always showed "(not a part)": the msgbus subscription on
+`LayerObjects.active` does not fire on plain viewport clicks in Blender
+4.x/5.x, so the typed mirror never loaded the selected part's values. The
+sync now also runs from a `depsgraph_update_post` handler (name-change
+guarded, so it terminates and cannot ping-pong). Additionally a
+`load_post` handler clears the addon's caches (annotation graph, closure
+pin refs, sync state) when a different .blend is opened in the same
+session — previously those held references into the old file.
+
+### `dojo_ref` — rest/modeled joint position (2026-08-13, addon v2.5)
+
+New schema property for parts modeled away from their neutral pose:
+
+- **`dojo_ref`** (deg for revolute, m for prismatic): the joint value the
+  MODELED geometry corresponds to. Limits become ABSOLUTE joint
+  coordinates — a linkage modeled sitting at its -30 deg stop gets
+  `dojo_ref = -30`, `dojo_limits = [-30, 30]` (instead of the old
+  relative-to-modeled `[0, 60]`).
+- **Export**: emits MJCF `<joint ref="...">` — MuJoCo-native; the sim's
+  initial qpos0 equals ref, i.e. it starts in the modeled pose, and
+  ranges/springref share the same absolute coordinates. (Verified:
+  compiles with qpos0 = ref.) USD ref emission is still TODO.
+- **Addon**: "Rest / ref" field in the Author panel; the Preview slider
+  now spans the absolute range with the modeled pose at slider position
+  (ref-lo)/(hi-lo) — shown as "modeled pose sits at slider X.XX".
+  Selecting a part parks the slider at its current/modeled value (no jump
+  on selection), and the closure solver initializes free joints at their
+  modeled values.
+
+### Addon v2.6 — ref-aware slider parking (2026-08-13)
+
+The Preview slider now parks correctly on the modeled/rest position:
+
+- selecting an UNPOSED part parks the slider at (ref-lo)/(hi-lo) — and
+  purges any stale `_dojo_preview` left in the .blend by older addon
+  versions (those were silently overriding the rest position, which is why
+  the slider always showed 0.5);
+- editing **Rest/ref** or the limits in the Author panel re-parks the
+  slider immediately;
+- **Reset Previews** parks at the active part's rest value and purges
+  stale preview props file-wide.
+
+### Addon v2.7 — solve-skip visibility (2026-08-13)
+
+Gripper "closure not enforced" report could NOT be reproduced: the finger
+four-bar (link_0_r drive -> link_1/2/3_r, pin link_2_3_r -> link_2_r)
+solves at 0.16 mm in BOTH gen3_6dof.blend and mebot_3_assembled.blend
+(duplicate-suffix connects are correct per copy). The failure mode that
+MATCHES the symptom is silent: if the mechanism's free joints are all
+LOCKED (padlocks persist in the .blend via _dojo_locked!), the solve
+silently skipped. v2.7 reports it: the panel now shows "SOLVE SKIPPED:
+all N mechanism joints are LOCKED" / "no closure pins in this mechanism"
+instead of silently doing nothing. Checklist when a pin seems dead:
+padlock states in the mechanism list, the residual line (skip reasons now
+explicit), and the per-pin mm readouts.
+
+### Addon v2.8 — `fixed` parts pass through the mechanism graph (2026-08-13)
+
+Root cause of the gripper "closure not enforced": a rigid link annotated
+`fixed` broke the solver's mechanism connectivity (tree edges and closure
+hosts stopped at fixed parts instead of passing through them). Now the
+addon treats `fixed` exactly like the exporter does — rigid with the
+parent: tree edges skip through fixed ancestors, closure empties hosted
+under fixed parts attribute their pin to the nearest movable ancestor, and
+closure targets that are fixed re-attribute likewise. Verified: gripper
+four-bar with link_1_r `fixed` solves at 0.12 mm.
+
+IMPORTANT: revert any `revolute +/-0` workarounds back to `fixed` —
+zero-width ranges export as `range="0 0"`, which MuJoCo rejects at compile
+(lo must be < hi), and even where tolerated they add a degenerate DOF.
+`fixed` merges the part into its parent body: correct and cheaper.
