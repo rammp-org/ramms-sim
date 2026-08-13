@@ -82,6 +82,14 @@ def main() -> None:
             j.set("damping", "0.5")
         elif j.get("stiffness") is not None:
             pass  # authored in the blend
+        elif "rod_link" in n:
+            # small connecting links windmill about their pins otherwise
+            j.set("damping", "50")
+        elif n.startswith("dw_main_plate"):
+            # * carriage-lock stand-in: the drive-wheel carriage slides in X
+            # for adjustment and is mechanically locked in operation.
+            j.set("stiffness", "100000")
+            j.set("damping", "2000")
         elif j.get("type") == "slide" and "dampener" not in n:
             j.set("damping", "500")
         elif "dampener" in n:
@@ -133,24 +141,18 @@ def main() -> None:
             # extension when idle (self-locking) and ctrl = target
             # extension in metres — the natural control API. Force capacity
             # Micro electro-hydraulic (user-confirmed): high-force class,
-            # provisional 15 kN capacity until measured specs land.
+            # provisional 15 kN capacity until measured specs land. Servo
+            # stiffness is dt-limited: kp=1e6 rings at ~1.4 kHz on the light
+            # rods (un-integrable at 500 Hz) and pogo-sticks the robot after
+            # any impact (the ramp-rolloff explosion); 5e4 is impact-stable.
             name = mtr.get("name")
             jnt = mtr.get("joint")
             parent = root.find("actuator")
             parent.remove(mtr)
             import xml.etree.ElementTree as _ET
             _ET.SubElement(parent, "position", name=name, joint=jnt,
-                           kp="1000000", kv="60000",
-                           ctrlrange="-0.08 0.08", forcerange="-15000 15000")
-
-    # The elevator dampener->pivot closures act through only a ~1.8 cm
-    # moment arm; modeled as compliant bushings so they don't become a
-    # load-bearing constraint fight (the observed limit cycle) — the
-    # preload stand-in springs carry statics until measured specs land.
-    for c in root.iter("connect"):
-        if "dampener_link" in (c.get("body1") or "") and "pivot" in (c.get("body2") or ""):
-            c.set("solref", "0.02 1")
-            c.set("solimp", "0.9 0.95")
+                           kp="20000", kv="2000",
+                           ctrlrange="-0.08 0.08", forcerange="-5000 5000")
 
     root.find("option").set("integrator", "implicitfast")
 
