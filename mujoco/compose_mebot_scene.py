@@ -78,8 +78,19 @@ def main() -> None:
     # authored (dojo_spring_*) — those are authoritative.
     for j in mebot.iter("joint"):
         n = j.get("name", "")
+        # Rest-state jitter (headless bench 2026-08-14): reflected rotor
+        # inertia on the linkage hinges kills the closure micro-oscillation
+        # (qvel RMS 0.085 -> 0.0018); damping+frictionloss stops the wheels
+        # rocking perpetually on their near-frictionless contacts.
+        if j.get("type") != "slide" and "wheel" not in n:
+            j.set("armature", "0.005")
         if "wheel" in n:
-            j.set("damping", "0.5")
+            if "drive_wheel" in n:
+                j.set("damping", "2")
+                j.set("frictionloss", "0.1")
+            else:
+                j.set("damping", "5")
+                j.set("frictionloss", "0.2")
         elif j.get("stiffness") is not None:
             pass  # authored in the blend
         elif "rod_link" in n:

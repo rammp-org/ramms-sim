@@ -516,3 +516,42 @@ Live mode first).
   achieved Hz), backend selector, ValidateRobot (dry-run worker load), export menu.
 - **E (~1 wk)**: fleet mirror script + env-picker; docs; RAMMS robots (gen3_2f85)
   running under Newton with the grasp test.
+
+### 6.5 Full-stack validation pass (2026-08-14, overnight)
+
+MuJoCo/Newton jitter (user report) fixed AT THE MODEL: headless bench showed
+rest qvel-RMS 0.099 dominated by (a) near-frictionless caster/drive wheels
+rocking and (b) the closure linkage micro-oscillating. compose_mebot_scene.py
+now sets wheel damping/frictionloss (casters 5/0.2, drive 2/0.1) and
+armature=0.005 on linkage hinges -> qvel-RMS 0.0018 (47x), all joint
+amplitudes <5e-5 rad. Newton worker: suite 31/31, parity vs plain MuJoCo on
+the retuned base scene PASSED (max qpos divergence ~7e-5). Round-trip
+compiles with all 14 actuators.
+
+Chaos arm free-fall fixed: URLab re-export flattens ALL actuators to
+<general> (class detection useless) and the gen3 arm actuators carry EMPTY
+gainprm/biasprm — their values live on actuator templates nested under
+<default class> nodes (parent-chain). Generator now resolves the default
+chain and maps position servos (biasprm[1] = -kp) to orientation-hold PD
+drives (x1e4 unit conversion). Result: pos_drives 11/13, robot upright
+(upz 1.00), arm holds pose (wrist steady at 150 cm), and SetJointCommand
+wheel drive produces straight locomotion at the commanded speed
+(3 rad/s -> ~55 cm/s over 6.6 m).
+
+Open: verify the armature attr survives URLab BP import for the IN-EDITOR
+MuJoCo path (worker path verified via XML directly); Map_Demo BSP contact
+still less forgiving than static-mesh floors; L/R mount asymmetry (6.2)
+still awaiting the Blender fix.
+
+### 6.6 In-editor armature fixup (2026-08-14)
+
+The URLab importer DROPS the MJCF `armature` and `frictionloss` joint attrs
+(templates land with armature=0, frictionloss=0, override flags unset), so
+the 6.5 jitter retuning reached the worker (XML path) but not the in-editor
+BP. Applied a template fixup on mebot_gen3: armature=0.005 + override on 26
+linkage hinges, damping/frictionloss + overrides on the 6 wheel joints; BP
+compiled and saved. Live PIE (Newton, unpaused): previously-jittery swing
+arms now hold within ~0.0006 rad between samples. Upstream note for URLab:
+import `armature`/`frictionloss` like the other codegen attrs — the fixup
+script is checked in at Scripts/fixup_mebot_import.py — run it after every
+re-import until then.
