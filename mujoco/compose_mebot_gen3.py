@@ -86,11 +86,43 @@ def main() -> None:
         f.write(base.to_xml())
     print(f"wrote {OUT} (with floor — standalone CLI/viewer)")
 
+    # MjSpec serializes <position dampratio="1"> as <general biasprm="0 -kp 1">.
+    # MuJoCo itself interprets the positive biasprm[2] as a damping RATIO at
+    # compile time (kv = 2*sqrt(kp/acc0), verified −374…−591 on load), but
+    # non-MuJoCo consumers (URLab's UE-side attribute parser) read biasprm as
+    # raw floats and would see kv=+1. Bake the explicit critical kv into the
+    # XML so every consumer sees the same numbers.
+    _fix_rod_kv(OUT_ROBOT)
+    _fix_rod_kv(OUT)
+
     # Round-trip check from the saved files.
     mujoco.MjModel.from_xml_path(OUT_ROBOT)
     m = mujoco.MjModel.from_xml_path(OUT)
     print(f"round-trip ok: nu={m.nu} actuators="
           f"{[mujoco.mj_id2name(m, mujoco.mjtObj.mjOBJ_ACTUATOR, i) for i in range(m.nu)]}")
+    for a in range(m.nu):
+        n = mujoco.mj_id2name(m, mujoco.mjtObj.mjOBJ_ACTUATOR, a) or ""
+        if "rod" in n:
+            assert m.actuator_biasprm[a][2] < 0, f"{n}: kv not fixed ({m.actuator_biasprm[a][2]})"
+
+
+def _fix_rod_kv(path: str) -> None:
+    import re
+
+    m = mujoco.MjModel.from_xml_path(path)
+    txt = open(path, encoding="utf-8").read()
+    for a in range(m.nu):
+        n = mujoco.mj_id2name(m, mujoco.mjtObj.mjOBJ_ACTUATOR, a) or ""
+        if "rod" not in n:
+            continue
+        kp = float(m.actuator_gainprm[a][0])
+        kv = float(m.actuator_biasprm[a][2])  # compile already resolved dampratio
+        assert kv < 0, f"{n}: compiled kv not negative ({kv})"
+        pat = re.compile(r'(name="%s"[^>]*biasprm="0 -%d )1"' % (re.escape(n), int(kp)))
+        txt, count = pat.subn(r'\g<1>%.6g"' % kv, txt)
+        assert count == 1, f"{n}: biasprm rewrite matched {count} times in {path}"
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(txt)
 
 
 if __name__ == "__main__":

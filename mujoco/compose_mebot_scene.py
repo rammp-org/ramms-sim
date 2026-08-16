@@ -47,7 +47,7 @@ OUT = Path(__file__).parent / "mebot" / "mebot_scene.xml"         # robot + floo
 DRIVE_GEAR = "60.0"          # * placeholder-upgrade; real motor spec TBD
 ROD_GEAR = "2500.0"          # * leadscrew linear actuators (kN-class); real spec TBD
 ROD_LEADSCREW_DAMPING = "20000"  # * leadscrew self-locking approximation
-CASTER_FRICTION = "0.05 0.001 0.0001"  # * omniwheel: rollers ≈ free lateral slip
+CASTER_FRICTION = "0.12 0.002 0.0002"  # * omniwheel: low but enough tangential force to ROLL (0.05 + 0.2 axle frictionloss left them skidding on ramps)
 SUSPENSION_STIFFNESS = "20000"        # * FILL-ME in blend; holds rest pose
 SUSPENSION_DAMPING = "500"
 
@@ -85,14 +85,29 @@ def main() -> None:
         if j.get("type") != "slide" and "wheel" not in n:
             j.set("armature", "0.005")
         if "wheel" in n:
+            # Anti-rock via ARMATURE (rotor inertia — no steady-state brake),
+            # tiny damping only. damping=5 on the casters sustained barely
+            # ~1 rad/s against the available contact torque: they skidded
+            # down ramps instead of rolling (rolled 0.4 m of a 4.9 m slide).
+            j.set("armature", "0.005")
             if "drive_wheel" in n:
-                j.set("damping", "2")
-                j.set("frictionloss", "0.1")
+                j.set("damping", "0.5")
+                j.set("frictionloss", "0.05")
             else:
-                j.set("damping", "5")
-                j.set("frictionloss", "0.2")
+                j.set("damping", "0.3")
+                j.set("frictionloss", "0.02")
         elif j.get("stiffness") is not None:
-            pass  # authored in the blend
+            # Authored dojo_spring values are kept. (2026-08-14: the rear
+            # strut was briefly softened to 300 because the chain "froze"
+            # with the authored 20000 — user then saw the soft strut absorb
+            # the whole rod stroke instead of rotating the swing arm. Root
+            # cause was ROD SERVO FORCE STARVATION: the rod drives the
+            # suspension arm through a ~1.1 cm anchor lever, so kp=6e4
+            # tops out at ~35 N.m vs the ~80 N.m needed to articulate the
+            # wheel-carrier swing arm against ground load. Strut stays
+            # authored-stiff; rod kp raised instead — see actuator block.)
+            if n in ("rear_caster_dampener", "rear_caster_dampener_rod"):
+                j.set("damping", "500")
         elif "rod_link" in n:
             # small connecting links windmill about their pins otherwise
             j.set("damping", "50")
@@ -104,18 +119,50 @@ def main() -> None:
         elif j.get("type") == "slide" and "dampener" not in n:
             j.set("damping", "500")
         elif "dampener" in n:
-            j.set("stiffness", SUSPENSION_STIFFNESS)
-            j.set("damping", SUSPENSION_DAMPING)
-        elif n in ("motor_elevator_l", "motor_elevator_r") or n.endswith("caster_motor"):
-            # Motor trunnion pivots: the motor+rod assembly pendulums at
-            # damping 5 (the residual settle ringer); 50 kills the mode
-            # without affecting drive.
+            if "pivot" in n:
+                # motor_dampener_pivot is a linkage PIVOT that merely
+                # carries the strut — name-matching "dampener" gave it the
+                # full 2e4 suspension spring and it became the 5.1 kN wall
+                # freezing the rear chain (eq11 force probe). Spring
+                # belongs in the strut, not the pivot. 2026-08-14: even the
+                # 200/200 stand-in was too much for the CHAOS side — its
+                # iterative solver leaks pin force, and a 200 N.m/rad hold
+                # on the bell crank froze the pivot (aux moved 16 deg,
+                # pivot 1 deg, swing arm dead). A bell crank needs no
+                # spring; light damping only.
+                j.set("stiffness", "20")
+                j.set("damping", "50")
+            elif j.get("type") == "slide":
+                # 2026-08-16 (user decision): model the gas dampeners as
+                # FIXED-LENGTH struts — a rigid link. (A 1e6 spring was
+                # tried first and is dt-unstable in MuJoCo: NaN in 1.7 s.)
+                # Removing the slide joint makes the dampener_rod body a
+                # rigid child of the dampener: MuJoCo welds jointless
+                # bodies; the Chaos generator emits a weld constraint for
+                # them. Marked for removal below (can't mutate while
+                # iterating).
+                j.set("dojo_remove", "1")
+            else:
+                # dampener HINGES are the strut's end pivots: a rigid strut
+                # still pivots there. No spring, light damping.
+                j.set("stiffness", "0")
+                j.set("damping", "50")
+        elif n in ("motor_elevator_l", "motor_elevator_r"):
+            # Elevator trunnions carry the robot's weight during lifts:
+            # damping 500 (bench: ringing RMS 2.96 -> 0.04; lighter rings
+            # and slides the base >1 m; 1500 raised REST jitter to 0.15 —
+            # the trunnions are on the closure loop and over-damping them
+            # fights the pins).
+            j.set("damping", "500")
+        elif n.endswith("caster_motor"):
+            # Caster trunnions carry no lift load — heavy damping froze the
+            # caster chains (mobility bench); 50 keeps them quick and quiet.
             j.set("damping", "50")
         elif n in ("front_caster_swing_arm", "rear_caster_swing_arm"):
             # * stand-in: the front caster has no dampener chain in the
             # export; the elevator/rear are held by their REAL dampener
             # closures (user-confirmed attachment, 2026-08-09).
-            j.set("stiffness", "5000")
+            j.set("stiffness", "200")
             j.set("damping", "200")
         elif n in ("motor_elevator_pivot_l", "motor_elevator_pivot_r"):
             # * gas-spring PRELOAD stand-in: the real dampener closure is
@@ -125,8 +172,19 @@ def main() -> None:
             # emulates until measured specs land.
             j.set("stiffness", "1000")
             j.set("damping", "200")
+        elif n in ("motor_swing_arm_l", "motor_swing_arm_r"):
+            # Load-path joint during lifts — 5 let the carriage bounce
+            # indefinitely (12 rad/s ringing); 150 with the kp=6e5 rods.
+            j.set("damping", "150")
         else:
             j.set("damping", "5")
+
+    # Remove joints marked above (dampener rod slides -> rigid struts).
+    for body in mebot.iter("body"):
+        for j in list(body.findall("joint")):
+            if j.get("dojo_remove") == "1":
+                body.remove(j)
+                print("  rigid strut: removed slide joint", j.get("name"))
 
     # The front/rear "caster" wheels are OMNIWHEELS, not swivel casters: one
     # roll axis (as exported), with the rollers letting the contact patch
@@ -153,17 +211,27 @@ def main() -> None:
             # extension in metres — the natural control API. Force capacity
             # Micro electro-hydraulic (user-confirmed): high-force class,
             # provisional 15 kN capacity until measured specs land. Servo
-            # stiffness is dt-limited: kp=1e6 rings at ~1.4 kHz on the light
-            # rods (un-integrable at 500 Hz) and pogo-sticks the robot after
-            # any impact (the ramp-rolloff explosion); 5e4 is impact-stable.
+            # stiffness is dt-limited: kp=1e6 (with kv=6e3) rang at ~1.4 kHz
+            # on the light rods and pogo-sticked the robot after impacts.
+            # BUT kp=6e4 force-starves the rear chain: the rod pin sits
+            # ~1.1 cm from the suspension-arm axis, so max servo torque
+            # there is kp*stroke*0.011 — not enough to move the wheel-
+            # carrier swing arm against ground load (bench 2026-08-14:
+            # swing arm 0.000 rad at any strut stiffness). kp=6e5 with
+            # PROPORTIONAL kv=6e4 (the old ring had kv 100x under kp)
+            # articulates the swing arm 0.30 rad with zero ring — but ONLY
+            # with dampratio=1 (critical kv from the REFLECTED inertia,
+            # which the tiny anchor levers make enormous; any fixed kv is
+            # orders under-damped and the whole robot rocks at rest,
+            # qvel RMS 1.36). Verified: rest 0.003 / drop / whack stable.
             name = mtr.get("name")
             jnt = mtr.get("joint")
             parent = root.find("actuator")
             parent.remove(mtr)
             import xml.etree.ElementTree as _ET
             _ET.SubElement(parent, "position", name=name, joint=jnt,
-                           kp="20000", kv="2000",
-                           ctrlrange="-0.08 0.08", forcerange="-5000 5000")
+                           kp="600000", dampratio="1",
+                           ctrlrange="-0.08 0.08", forcerange="-20000 20000")
 
     root.find("option").set("integrator", "implicitfast")
 
