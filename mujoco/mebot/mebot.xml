@@ -116,21 +116,20 @@
         <geom type="mesh" mesh="mebot__dw_main_plate_l__chassis_metal" material="mat_chassis_metal" contype="0" conaffinity="0" group="2" density="0" />
         <geom type="box" group="3" size="0.25074 0.05498 0.09649" pos="0.13019 0.03910 0.03940" contype="1" conaffinity="2" />
         <body name="elevator_dampener_l" pos="0.07620 0.05130 0.05715">
-          <joint name="elevator_dampener_l" pos="0 0 0" axis="0.00000 1.00000 0.00000" type="hinge" range="-30.0000 30.0000" armature="0.005" stiffness="20000" damping="500" />
+          <joint name="elevator_dampener_l" pos="0 0 0" axis="0.00000 1.00000 0.00000" type="hinge" range="-30.0000 30.0000" armature="0.005" stiffness="0" damping="50" />
           <geom type="mesh" mesh="mebot__elevator_dampener_l__elevator_dampener" material="mat_elevator_dampener" contype="0" conaffinity="0" group="2" density="0" />
           <geom type="box" group="3" size="0.06965 0.02741 0.03952" pos="0.06104 0.00445 0.02593" contype="1" conaffinity="2" />
           <body name="elevator_dampener_rod_l" pos="0.11522 0.00054 0.03967">
-            <joint name="elevator_dampener_rod_l" pos="0 0 0" axis="0.94550 0.00450 0.32550" type="slide" range="-0.0300 0.0300" stiffness="20000" damping="500" />
             <geom type="mesh" mesh="mebot__elevator_dampener_rod_l__elevator_dampener_rod" material="mat_elevator_dampener_rod" contype="0" conaffinity="0" group="2" density="0" />
             <geom type="box" group="3" size="0.04539 0.01506 0.02607" pos="0.04041 -0.00087 0.01183" contype="1" conaffinity="2" />
           </body>
         </body>
         <body name="elevator_dampener_link_l" pos="0.26126 0.06209 0.07641">
-          <joint name="elevator_dampener_link_l" pos="0 0 0" axis="0.00000 1.00000 0.00000" type="hinge" range="-30.0000 30.0000" armature="0.005" stiffness="20000" damping="500" />
+          <joint name="elevator_dampener_link_l" pos="0 0 0" axis="0.00000 1.00000 0.00000" type="hinge" range="-30.0000 30.0000" armature="0.005" stiffness="0" damping="50" />
           <geom type="mesh" mesh="mebot__elevator_dampener_link_l__link_metal" material="mat_link_metal" contype="0" conaffinity="0" group="2" density="0" />
           <geom type="box" group="3" size="0.01775 0.02758 0.04451" pos="0.00354 -0.01817 0.01245" contype="1" conaffinity="2" />
           <body name="elevator_dampener_aux_link_l" pos="0.01781 -0.00792 -0.01030">
-            <joint name="elevator_dampener_aux_link_l" pos="0 0 0" axis="0.00000 1.00000 0.00000" type="hinge" range="-30.0000 30.0000" armature="0.005" stiffness="20000" damping="500" />
+            <joint name="elevator_dampener_aux_link_l" pos="0 0 0" axis="0.00000 1.00000 0.00000" type="hinge" range="-30.0000 30.0000" armature="0.005" stiffness="0" damping="50" />
             <geom type="mesh" mesh="mebot__elevator_dampener_aux_link_l__link_metal" material="mat_link_metal" contype="0" conaffinity="0" group="2" density="0" />
             <geom type="box" group="3" size="0.03211 0.02758 0.02082" pos="0.00010 -0.01025 -0.00044" contype="1" conaffinity="2" />
           </body>
@@ -146,20 +145,20 @@
           </body>
         </body>
         <body name="motor_swing_arm_l" pos="0.00000 0.02189 0.00000">
-          <joint name="motor_swing_arm_l" pos="0 0 0" axis="0.00000 1.00000 0.00000" type="hinge" range="-30.0000 30.0000" armature="0.005" damping="5" />
+          <joint name="motor_swing_arm_l" pos="0 0 0" axis="0.00000 1.00000 0.00000" type="hinge" range="-30.0000 30.0000" armature="0.005" damping="150" />
           <geom type="mesh" mesh="mebot__motor_swing_arm_l__motor_body" material="mat_motor_body" contype="0" conaffinity="0" group="2" density="0" />
           <geom type="mesh" mesh="mebot__motor_swing_arm_l__swing_arm_metal" material="mat_swing_arm_metal" contype="0" conaffinity="0" group="2" density="0" />
           <geom type="mesh" mesh="mebot__motor_swing_arm_l__motor_gearbox" material="mat_motor_gearbox" contype="0" conaffinity="0" group="2" density="0" />
           <geom type="mesh" mesh="mebot__motor_swing_arm_l__motor_brake" material="mat_motor_brake" contype="0" conaffinity="0" group="2" density="0" />
           <geom type="box" group="3" size="0.25491 0.06175 0.13600" pos="0.12885 0.04078 0.00870" contype="1" conaffinity="2" />
           <body name="drive_wheel_l" pos="0.31877 0.11955 -0.01380">
-            <joint name="drive_wheel_l" pos="0 0 0" axis="0.00000 1.00000 0.00000" type="hinge" damping="2" frictionloss="0.1" />
+            <joint name="drive_wheel_l" pos="0 0 0" axis="0.00000 1.00000 0.00000" type="hinge" armature="0.005" damping="0.5" frictionloss="0.05" />
             <geom type="mesh" mesh="mebot__drive_wheel_l__rubber" material="mat_rubber" contype="0" conaffinity="0" group="2" density="0" />
             <geom type="mesh" mesh="mebot__drive_wheel_l__wheel_hub" material="mat_wheel_hub" contype="0" conaffinity="0" group="2" density="0" />
             <geom type="cylinder" group="3" size="0.18427 0.03809" pos="-0.00000 0.00000 0.00000" quat="-0.00000 0.00000 0.70711 0.70711" contype="1" conaffinity="2" />
           </body>
           <body name="motor_elevator_l" pos="-0.10372 0.02528 0.12668">
-            <joint name="motor_elevator_l" pos="0 0 0" axis="0.00000 1.00000 0.00000" type="hinge" range="-30.0000 30.0000" armature="0.005" damping="50" />
+            <joint name="motor_elevator_l" pos="0 0 0" axis="0.00000 1.00000 0.00000" type="hinge" range="-30.0000 30.0000" armature="0.005" damping="500" />
             <geom type="mesh" mesh="mebot__motor_elevator_l__elevator_body" material="mat_mebot__motor_elevator_l__elevator_body" contype="0" conaffinity="0" group="2" density="0" />
             <geom type="mesh" mesh="mebot__motor_elevator_l__motor_brake" material="mat_motor_brake" contype="0" conaffinity="0" group="2" density="0" />
             <geom type="box" group="3" size="0.15728 0.07928 0.05155" pos="0.13868 0.04086 0.01437" contype="1" conaffinity="2" />
@@ -177,21 +176,20 @@
         <geom type="mesh" mesh="mebot__dw_main_plate_r__chassis_metal" material="mat_chassis_metal" contype="0" conaffinity="0" group="2" density="0" />
         <geom type="box" group="3" size="0.25074 0.05498 0.09649" pos="0.13019 -0.03910 0.03940" contype="1" conaffinity="2" />
         <body name="elevator_dampener_link_r" pos="0.26126 -0.06208 0.07641">
-          <joint name="elevator_dampener_link_r" pos="0 0 0" axis="0.00000 1.00000 0.00000" type="hinge" range="-30.0000 30.0000" armature="0.005" stiffness="20000" damping="500" />
+          <joint name="elevator_dampener_link_r" pos="0 0 0" axis="0.00000 1.00000 0.00000" type="hinge" range="-30.0000 30.0000" armature="0.005" stiffness="0" damping="50" />
           <geom type="mesh" mesh="mebot__elevator_dampener_link_r__link_metal" material="mat_link_metal" contype="0" conaffinity="0" group="2" density="0" />
           <geom type="box" group="3" size="0.01775 0.02758 0.04451" pos="0.00354 0.01817 0.01245" contype="1" conaffinity="2" />
           <body name="elevator_dampener_aux_link_r" pos="0.01781 0.00792 -0.01030">
-            <joint name="elevator_dampener_aux_link_r" pos="0 0 0" axis="0.00000 1.00000 0.00000" type="hinge" range="-30.0000 30.0000" armature="0.005" stiffness="20000" damping="500" />
+            <joint name="elevator_dampener_aux_link_r" pos="0 0 0" axis="0.00000 1.00000 0.00000" type="hinge" range="-30.0000 30.0000" armature="0.005" stiffness="0" damping="50" />
             <geom type="mesh" mesh="mebot__elevator_dampener_aux_link_r__link_metal" material="mat_link_metal" contype="0" conaffinity="0" group="2" density="0" />
             <geom type="box" group="3" size="0.03211 0.02758 0.02082" pos="0.00010 0.01025 -0.00044" contype="1" conaffinity="2" />
           </body>
         </body>
         <body name="elevator_dampener_r" pos="0.07620 -0.04634 0.05715">
-          <joint name="elevator_dampener_r" pos="0 0 0" axis="0.00000 1.00000 0.00000" type="hinge" range="-30.0000 30.0000" armature="0.005" stiffness="20000" damping="500" />
+          <joint name="elevator_dampener_r" pos="0 0 0" axis="0.00000 1.00000 0.00000" type="hinge" range="-30.0000 30.0000" armature="0.005" stiffness="0" damping="50" />
           <geom type="mesh" mesh="mebot__elevator_dampener_r__elevator_dampener" material="mat_elevator_dampener" contype="0" conaffinity="0" group="2" density="0" />
           <geom type="box" group="3" size="0.06965 0.02741 0.03952" pos="0.06104 -0.00445 0.02593" contype="1" conaffinity="2" />
           <body name="elevator_dampener_rod_r" pos="0.11522 0.00066 0.03967">
-            <joint name="elevator_dampener_rod_r" pos="0 0 0" axis="0.94550 0.00540 0.32550" type="slide" range="-0.0300 0.0300" stiffness="20000" damping="500" />
             <geom type="mesh" mesh="mebot__elevator_dampener_rod_r__elevator_dampener_rod" material="mat_elevator_dampener_rod" contype="0" conaffinity="0" group="2" density="0" />
             <geom type="box" group="3" size="0.04539 0.01506 0.02607" pos="0.04041 -0.00087 0.01183" contype="1" conaffinity="2" />
           </body>
@@ -207,20 +205,20 @@
           </body>
         </body>
         <body name="motor_swing_arm_r" pos="0.00000 -0.02189 0.00000">
-          <joint name="motor_swing_arm_r" pos="0 0 0" axis="0.00000 1.00000 0.00000" type="hinge" range="-30.0000 30.0000" armature="0.005" damping="5" />
+          <joint name="motor_swing_arm_r" pos="0 0 0" axis="0.00000 1.00000 0.00000" type="hinge" range="-30.0000 30.0000" armature="0.005" damping="150" />
           <geom type="mesh" mesh="mebot__motor_swing_arm_r__motor_body" material="mat_motor_body" contype="0" conaffinity="0" group="2" density="0" />
           <geom type="mesh" mesh="mebot__motor_swing_arm_r__swing_arm_metal" material="mat_swing_arm_metal" contype="0" conaffinity="0" group="2" density="0" />
           <geom type="mesh" mesh="mebot__motor_swing_arm_r__motor_gearbox" material="mat_motor_gearbox" contype="0" conaffinity="0" group="2" density="0" />
           <geom type="mesh" mesh="mebot__motor_swing_arm_r__motor_brake" material="mat_motor_brake" contype="0" conaffinity="0" group="2" density="0" />
           <geom type="box" group="3" size="0.25491 0.06175 0.13600" pos="0.12885 -0.04078 0.00870" contype="1" conaffinity="2" />
           <body name="drive_wheel_r" pos="0.31877 -0.11954 -0.01380">
-            <joint name="drive_wheel_r" pos="0 0 0" axis="0.00000 1.00000 0.00000" type="hinge" damping="2" frictionloss="0.1" />
+            <joint name="drive_wheel_r" pos="0 0 0" axis="0.00000 1.00000 0.00000" type="hinge" armature="0.005" damping="0.5" frictionloss="0.05" />
             <geom type="mesh" mesh="mebot__drive_wheel_r__rubber" material="mat_rubber" contype="0" conaffinity="0" group="2" density="0" />
             <geom type="mesh" mesh="mebot__drive_wheel_r__wheel_hub" material="mat_wheel_hub" contype="0" conaffinity="0" group="2" density="0" />
             <geom type="cylinder" group="3" size="0.18427 0.03809" pos="-0.00000 0.00000 -0.00000" quat="-0.00000 0.00000 0.70711 0.70711" contype="1" conaffinity="2" />
           </body>
           <body name="motor_elevator_r" pos="-0.10372 -0.02527 0.12668">
-            <joint name="motor_elevator_r" pos="0 0 0" axis="0.00000 1.00000 0.00000" type="hinge" range="-30.0000 30.0000" armature="0.005" damping="50" />
+            <joint name="motor_elevator_r" pos="0 0 0" axis="0.00000 1.00000 0.00000" type="hinge" range="-30.0000 30.0000" armature="0.005" damping="500" />
             <geom type="mesh" mesh="mebot__motor_elevator_r__elevator_body" material="mat_mebot__motor_elevator_r__elevator_body" contype="0" conaffinity="0" group="2" density="0" />
             <geom type="mesh" mesh="mebot__motor_elevator_r__motor_brake" material="mat_motor_brake" contype="0" conaffinity="0" group="2" density="0" />
             <geom type="box" group="3" size="0.15728 0.07928 0.05155" pos="0.13868 -0.04086 0.01437" contype="1" conaffinity="2" />
@@ -263,22 +261,22 @@
         </body>
       </body>
       <body name="front_caster_swing_arm" pos="0.57785 0.00000 -0.01651">
-        <joint name="front_caster_swing_arm" pos="0 0 0" axis="0.00000 1.00000 0.00000" type="hinge" range="-30.0000 30.0000" armature="0.005" stiffness="5000" damping="200" />
+        <joint name="front_caster_swing_arm" pos="0 0 0" axis="0.00000 1.00000 0.00000" type="hinge" range="-30.0000 30.0000" armature="0.005" stiffness="200" damping="200" />
         <geom type="mesh" mesh="mebot__front_caster_swing_arm__caster_arm_metal" material="mat_caster_arm_metal" contype="0" conaffinity="0" group="2" density="0" />
         <geom type="box" group="3" size="0.12706 0.20638 0.02790" pos="0.10795 0.00000 -0.00028" contype="1" conaffinity="2" />
         <body name="front_caster_wheel_l" pos="0.20955 0.17939 0.01270">
-          <joint name="front_caster_wheel_l" pos="0 0 0" axis="0.00000 1.00000 0.00000" type="hinge" damping="5" frictionloss="0.2" />
+          <joint name="front_caster_wheel_l" pos="0 0 0" axis="0.00000 1.00000 0.00000" type="hinge" armature="0.005" damping="0.3" frictionloss="0.02" />
           <geom type="mesh" mesh="mebot__front_caster_wheel_l__caster_rubber" material="mat_caster_rubber" contype="0" conaffinity="0" group="2" density="0" />
           <geom type="mesh" mesh="mebot__front_caster_wheel_l__caster_metal" material="mat_caster_metal" contype="0" conaffinity="0" group="2" density="0" />
           <geom type="mesh" mesh="mebot__front_caster_wheel_l__caster_dampener_rod" material="mat_mebot__front_caster_wheel_l__caster_dampener_rod" contype="0" conaffinity="0" group="2" density="0" />
-          <geom type="cylinder" group="3" size="0.07659 0.01886" pos="-0.00000 0.00019 -0.00000" quat="-0.00000 0.00000 0.70711 0.70711" contype="1" conaffinity="2" friction="0.05 0.001 0.0001" priority="1" />
+          <geom type="cylinder" group="3" size="0.07659 0.01886" pos="-0.00000 0.00019 -0.00000" quat="-0.00000 0.00000 0.70711 0.70711" contype="1" conaffinity="2" friction="0.12 0.002 0.0002" priority="1" />
         </body>
         <body name="front_caster_wheel_r" pos="0.20955 -0.17939 0.01270">
-          <joint name="front_caster_wheel_r" pos="0 0 0" axis="0.00000 1.00000 0.00000" type="hinge" damping="5" frictionloss="0.2" />
+          <joint name="front_caster_wheel_r" pos="0 0 0" axis="0.00000 1.00000 0.00000" type="hinge" armature="0.005" damping="0.3" frictionloss="0.02" />
           <geom type="mesh" mesh="mebot__front_caster_wheel_r__caster_rubber" material="mat_caster_rubber" contype="0" conaffinity="0" group="2" density="0" />
           <geom type="mesh" mesh="mebot__front_caster_wheel_r__caster_metal" material="mat_caster_metal" contype="0" conaffinity="0" group="2" density="0" />
           <geom type="mesh" mesh="mebot__front_caster_wheel_r__caster_dampener_rod" material="mat_mebot__front_caster_wheel_r__caster_dampener_rod" contype="0" conaffinity="0" group="2" density="0" />
-          <geom type="cylinder" group="3" size="0.07659 0.01886" pos="-0.00000 -0.00019 -0.00000" quat="-0.00000 0.00000 0.70711 0.70711" contype="1" conaffinity="2" friction="0.05 0.001 0.0001" priority="1" />
+          <geom type="cylinder" group="3" size="0.07659 0.01886" pos="-0.00000 -0.00019 -0.00000" quat="-0.00000 0.00000 0.70711 0.70711" contype="1" conaffinity="2" friction="0.12 0.002 0.0002" priority="1" />
         </body>
       </body>
       <body name="rear_caster_motor" pos="0.08563 0.06520 0.04017">
@@ -292,15 +290,14 @@
         </body>
       </body>
       <body name="rear_caster_motor_dampener_pivot" pos="-0.03175 0.00256 0.20889">
-        <joint name="rear_caster_motor_dampener_pivot" pos="0 0 0" axis="0.00000 1.00000 0.00000" type="hinge" range="-30.0000 30.0000" armature="0.005" stiffness="20000" damping="500" />
+        <joint name="rear_caster_motor_dampener_pivot" pos="0 0 0" axis="0.00000 1.00000 0.00000" type="hinge" range="-30.0000 30.0000" armature="0.005" stiffness="20" damping="50" />
         <geom type="mesh" mesh="mebot__rear_caster_motor_dampener_pivot__caster_arm_metal" material="mat_caster_arm_metal" contype="0" conaffinity="0" group="2" density="0" />
         <geom type="box" group="3" size="0.04874 0.05425 0.02840" pos="-0.03586 -0.00587 0.01565" contype="1" conaffinity="2" />
         <body name="rear_caster_dampener" pos="-0.07112 -0.00248 0.00000">
-          <joint name="rear_caster_dampener" pos="0 0 0" axis="0.00000 1.00000 0.00000" type="hinge" range="-30.0000 30.0000" armature="0.005" stiffness="20000" damping="500" />
+          <joint name="rear_caster_dampener" pos="0 0 0" axis="0.00000 1.00000 0.00000" type="hinge" range="-30.0000 30.0000" armature="0.005" stiffness="0" damping="50" />
           <geom type="mesh" mesh="mebot__rear_caster_dampener__caster_dampener" material="mat_caster_dampener" contype="0" conaffinity="0" group="2" density="0" />
           <geom type="box" group="3" size="0.02294 0.04829 0.10207" pos="-0.00440 -0.00123 -0.10022" contype="1" conaffinity="2" />
           <body name="rear_caster_dampener_rod" pos="0.00000 0.00000 -0.12100">
-            <joint name="rear_caster_dampener_rod" pos="0 0 0" axis="-0.00000 0.00000 -1.00000" type="slide" range="-0.0500 0.0500" stiffness="20000" damping="500" />
             <geom type="mesh" mesh="mebot__rear_caster_dampener_rod__caster_dampener_rod" material="mat_mebot__rear_caster_dampener_rod__caster_dampener_rod" contype="0" conaffinity="0" group="2" density="0" />
             <geom type="box" group="3" size="0.01506 0.04164 0.04503" pos="0.00018 -0.00013 -0.04503" contype="1" conaffinity="2" />
           </body>
@@ -317,20 +314,20 @@
         </body>
       </body>
       <body name="rear_caster_swing_arm" pos="-0.03175 0.00011 0.00889">
-        <joint name="rear_caster_swing_arm" pos="0 0 0" axis="0.00000 1.00000 0.00000" type="hinge" range="-30.0000 30.0000" armature="0.005" stiffness="5000" damping="200" />
+        <joint name="rear_caster_swing_arm" pos="0 0 0" axis="0.00000 1.00000 0.00000" type="hinge" range="-30.0000 30.0000" armature="0.005" stiffness="200" damping="200" />
         <geom type="mesh" mesh="mebot__rear_caster_swing_arm__caster_arm_metal" material="mat_caster_arm_metal" contype="0" conaffinity="0" group="2" density="0" />
         <geom type="box" group="3" size="0.12702 0.14605 0.02719" pos="-0.10792 0.00000 -0.00094" contype="1" conaffinity="2" />
         <body name="rear_caster_wheel_l" pos="-0.20955 0.08427 0.01270">
-          <joint name="rear_caster_wheel_l" pos="0 0 0" axis="0.00000 1.00000 0.00000" type="hinge" damping="5" frictionloss="0.2" />
+          <joint name="rear_caster_wheel_l" pos="0 0 0" axis="0.00000 1.00000 0.00000" type="hinge" armature="0.005" damping="0.3" frictionloss="0.02" />
           <geom type="mesh" mesh="mebot__rear_caster_wheel_l__caster_rubber" material="mat_caster_rubber" contype="0" conaffinity="0" group="2" density="0" />
           <geom type="mesh" mesh="mebot__rear_caster_wheel_l__caster_metal" material="mat_caster_metal" contype="0" conaffinity="0" group="2" density="0" />
-          <geom type="cylinder" group="3" size="0.10107 0.03095" pos="-0.00000 0.02468 -0.00000" quat="-0.00000 0.00000 0.70711 0.70711" contype="1" conaffinity="2" friction="0.05 0.001 0.0001" priority="1" />
+          <geom type="cylinder" group="3" size="0.10107 0.03095" pos="-0.00000 0.02468 -0.00000" quat="-0.00000 0.00000 0.70711 0.70711" contype="1" conaffinity="2" friction="0.12 0.002 0.0002" priority="1" />
         </body>
         <body name="rear_caster_wheel_r" pos="-0.20955 -0.08426 0.01270">
-          <joint name="rear_caster_wheel_r" pos="0 0 0" axis="0.00000 1.00000 0.00000" type="hinge" damping="5" frictionloss="0.2" />
+          <joint name="rear_caster_wheel_r" pos="0 0 0" axis="0.00000 1.00000 0.00000" type="hinge" armature="0.005" damping="0.3" frictionloss="0.02" />
           <geom type="mesh" mesh="mebot__rear_caster_wheel_r__caster_rubber" material="mat_caster_rubber" contype="0" conaffinity="0" group="2" density="0" />
           <geom type="mesh" mesh="mebot__rear_caster_wheel_r__caster_metal" material="mat_caster_metal" contype="0" conaffinity="0" group="2" density="0" />
-          <geom type="cylinder" group="3" size="0.10107 0.03095" pos="-0.00000 -0.02469 0.00000" quat="-0.00000 0.00000 0.70711 0.70711" contype="1" conaffinity="2" friction="0.05 0.001 0.0001" priority="1" />
+          <geom type="cylinder" group="3" size="0.10107 0.03095" pos="-0.00000 -0.02469 0.00000" quat="-0.00000 0.00000 0.70711 0.70711" contype="1" conaffinity="2" friction="0.12 0.002 0.0002" priority="1" />
         </body>
       </body>
     </body>
@@ -338,7 +335,7 @@
   <actuator>
     <motor name="drive_wheel_l" joint="drive_wheel_l" ctrlrange="-1 1" gear="60.0" />
     <motor name="drive_wheel_r" joint="drive_wheel_r" ctrlrange="-1 1" gear="60.0" />
-    <position name="motor_elevator_rod_l" joint="motor_elevator_rod_l" kp="20000" kv="2000" ctrlrange="-0.08 0.08" forcerange="-5000 5000" /><position name="motor_elevator_rod_r" joint="motor_elevator_rod_r" kp="20000" kv="2000" ctrlrange="-0.08 0.08" forcerange="-5000 5000" /><position name="front_caster_motor_rod" joint="front_caster_motor_rod" kp="20000" kv="2000" ctrlrange="-0.08 0.08" forcerange="-5000 5000" /><position name="rear_caster_motor_rod" joint="rear_caster_motor_rod" kp="20000" kv="2000" ctrlrange="-0.08 0.08" forcerange="-5000 5000" /></actuator>
+    <position name="motor_elevator_rod_l" joint="motor_elevator_rod_l" kp="600000" dampratio="1" ctrlrange="-0.08 0.08" forcerange="-20000 20000" /><position name="motor_elevator_rod_r" joint="motor_elevator_rod_r" kp="600000" dampratio="1" ctrlrange="-0.08 0.08" forcerange="-20000 20000" /><position name="front_caster_motor_rod" joint="front_caster_motor_rod" kp="600000" dampratio="1" ctrlrange="-0.08 0.08" forcerange="-20000 20000" /><position name="rear_caster_motor_rod" joint="rear_caster_motor_rod" kp="600000" dampratio="1" ctrlrange="-0.08 0.08" forcerange="-20000 20000" /></actuator>
   <equality>
     <connect body1="elevator_dampener_rod_l" body2="elevator_dampener_link_l" anchor="0.07287 0.00470 0.02985" solref="0.005 1" solimp="0.95 0.99" />
     <connect body1="elevator_dampener_aux_link_l" body2="motor_elevator_pivot_l" anchor="0.01869 -0.01397 0.00799" solref="0.005 1" solimp="0.95 0.99" />

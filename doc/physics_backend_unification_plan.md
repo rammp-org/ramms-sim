@@ -555,3 +555,552 @@ arms now hold within ~0.0006 rad between samples. Upstream note for URLab:
 import `armature`/`frictionloss` like the other codegen attrs — the fixup
 script is checked in at Scripts/fixup_mebot_import.py — run it after every
 re-import until then.
+
+### 6.7 Feedback batch (2026-08-14, user's Chaos/Newton list)
+
+CHAOS fixes, all validated on the flat map (settle upz 1.00 / arm held /
+drove 6 m straight at commanded speed):
+- (0) sloppy multi-axis linkages + (4b) gripper limit fall-through: joint
+  templates are CLASS-based like the actuators (gripper range/axis/ref/
+  stiffness live under <default> nodes) — generator now resolves the
+  default chain for joints too. Gripper hinges went from ACM_Free to
+  correct 45.8-90 deg windows.
+- Activating those limits exposed a mass-ratio explosion: 12-22 g finger
+  links coupled to the 8 kg arm through limits+closures back-flipped the
+  robot at spawn (bisect: removing the 16 gripper constraints cured it).
+  Fixed with constraint projection (bEnableProjection on all rig
+  constraints) + a 0.15 kg Chaos-side mass floor.
+- Limit windows are SIGN-SAFE now (symmetric around ref covering the full
+  range) — AngularRotationOffset sign conventions kicked at spawn;
+  proper asymmetric windows are a phase-2 calibration item.
+- (2)/(3)+(5) wheels sliding, no actuation, sleep: sleeping bodies ignore
+  drive targets and SleepFamily Custom/0 does NOT prevent sleep —
+  bNeverSleep now runs a 0.5 s keep-awake tick, and SetJointCommand wakes
+  the rig. Runtime drive-PARAM changes never reach the live solver (only
+  target updates do), so wheels keep the full-strength always-on velocity
+  drive: braked at rest like a real powered wheelchair, casters roll free.
+  Manual actuation: console `Ramms.Joint <ActorLabel> <joint> <value>`.
+NEWTON:
+- (0) rest bounce: wheel anti-rock moved from damping to armature
+  (damping=5 on casters sustained ~1 rad/s and made them SKID down ramps).
+- (2) linear motors: rod servos kp 60000 / forcerange +-20000 N —
+  headless: elevator lifts the 200 kg robot 200 mm.
+- (3) casters now roll on ramps (60-70% of travel vs 8%).
+- (1) ~20 s reset + 1/10 speed DIAGNOSED: worker GPU-kernel compile takes
+  ~19 s, then the solver resets the sim to take over from t=0 (by design,
+  log: "Sim advanced during worker load"); the 1/10 speed is the 500 Hz
+  model pumped one step per ZMQ round-trip at ~60 fps. Fix = batch N steps
+  per tick through the bridge (design item; dt=0.004 was tested headless
+  and rejected - 100x jitter).
+
+### 6.8 Design sketch: fixing the Newton bridge 1/10-speed (needs sign-off)
+
+The bridge is strictly synchronous: one 0.002 s model step per ZMQ REQ/REP
+round-trip, ~60 round-trips/s from the editor tick -> 0.12x realtime.
+Options, in rough preference order:
+
+1. **One-step pipelining** — submit step N without blocking, write back
+   step N-1's result (already arrived). Hides the RTT; throughput becomes
+   worker-compute-bound (GPU steps the mebot scene far faster than 500 Hz).
+   Cost: ZMQ REQ/REP forbids pipelining, so the worker transport moves to
+   DEALER/ROUTER (protocol change: tag replies with step ids); writeback is
+   one substep stale (2 ms — physically negligible). Touches
+   RammsNewtonWorkerClient + newton_worker/transport.py + server.py.
+2. **Predictive batching** — first handler call per frame executes
+   Step(N_pred) (N_pred = last frame's substep count) and serves the rest
+   from cache. No protocol change, but a wrong prediction leaves the worker
+   ahead of mjData and trips the resync path — fragile with URLab's
+   accumulator.
+3. **Accept in-editor slowdown** — document that Newton-in-editor runs
+   ~0.1x and rely on headless/worker-native runs for realtime; cheapest,
+   no risk.
+
+Recommend (1). Also worth surfacing the worker GPU-compile takeover in the
+UI (the planned toolbar status pill) so the ~20 s "reset" reads as
+"Newton warming up", not a malfunction.
+
+### 6.9 Unified joint control panel (2026-08-14)
+
+`Ramms.Panel [ActorLabel]` (console) opens a Slate window with one slider
+per actuated joint (from the switch component's DriveJoints), routed
+through SetJointCommand — the SAME panel drives MuJoCo, Newton, and Chaos
+instances. Ranges come from the recorded MJCF ctrlrange (new
+DriveCtrlMin/Max arrays on the switch); velocity motors (wheels) get a
++-6 rad/s span. `Ramms.Joint <label> <joint> <value>` remains for
+scripted/console use. SetJointCommand's MuJoCo path now writes BOTH
+control slots (InternalValue + NetworkValue) so commands work regardless
+of the articulation's ControlSource (ZMQ maps silently ate SetControl
+before — root cause of "cannot actuate"). Teleop bindings (option C part
+2) are next.
+
+### 6.10 Teleop layer (2026-08-14)
+
+The Ramms.Panel window now doubles as a teleop surface (click the panel to
+focus it): W/S drive, A/D turn, Space stop (wheels +-3 rad/s), Q/E
+elevator rods (both), R/F front caster rod, T/G rear caster rod (rod
+targets ramp at 4 cm/s, clamped to +-8 cm). Same SetJointCommand routing,
+so identical on all three backends. KNOWN GAP: wheel semantics still
+diverge — Chaos interprets wheel commands as rad/s, MuJoCo motor
+actuators as torque-fraction clamped to ctrlrange (a 3.0 teleop command
+saturates to full torque). Proper unification = interpret wheel commands
+as rad/s everywhere and translate to torque via a velocity loop on the
+MuJoCo side (phase-2, ties into the IRammsRobotBackend seam).
+
+### 6.11 Chaos panel feedback round 2 (2026-08-14 evening)
+
+- Caster runaway on rod commands: caused by 6.10's wheel material being
+  applied to ALL "wheel" bodies — omniwheels need the OPPOSITE (near-zero
+  friction). Split: PM_RammsWheel (1.2, Max) on drive wheels only,
+  PM_RammsCaster (0.12, Min) on caster wheels. Rod commands no longer
+  propel the robot.
+- Arm collision vanished: 6.10's piece-asset collision strip hit SHARED
+  assets (arm links reuse one mesh as both body carrier and piece).
+  Strip now excludes any mesh in the body-carrier set. 51/57 arm-ish
+  meshes carry collision again (6 legit visual pieces).
+- Gripper fingers motorized: the fingers actuator targets TENDON
+  arm_2f85_split; the generator now maps tendon actuators onto their
+  Joint wraps (orientation-hold drives on both driver joints, one shared
+  drive name, wrap-coef sign via new DriveScale). Panel/console command
+  'arm_2f85_split' closes both fingers. Sign/limit calibration pending.
+- Command slew-limiting on position drives (5 cm/s / ~57 deg/s): slider
+  steps are no longer force impulses.
+- ELEVATOR-UNDER-LOAD DEBUGGING (the big one): instrumented lift runs
+  showed the chain articulating smoothly (swing arms to -23 deg, low
+  forces) and the robot then LAUNCHING (13 m/s) / falling through the
+  floor. Root cause: the exporter's +-30 deg linkage ranges are DEFAULTS,
+  not real travel — the mechanism sweeps past them and Chaos HARD limits
+  vs the stiff closures detonate (MuJoCo's limits are soft, so it never
+  showed there). Mebot linkage hinges now run twist-FREE under Chaos
+  (closures + geometry bound the motion); arm/gripper keep windows.
+  Result: elevator commands are fully stable (no explosion at any tested
+  gain). Remaining: loaded lift STALLS (chassis does not rise; unloaded
+  articulation works) — task #18, likely needs the real linkage travel /
+  lever math or higher-fidelity rod modeling. Also convex wheel cylinders
+  went contact-dead under load (cook failure?) — wheels are capsules +
+  high-friction material instead.
+
+### 6.12 Round-3 verification (2026-08-14 late)
+
+Controlled-run answers to the round-3 reports:
+- "Joints with too many DOF": swing slop measured 0.6 deg max across all
+  63 constraints — no off-axis freedom in the current BP. What reads as
+  extra DOF is (a) the deliberately twist-FREE mebot linkage hinges
+  (6.11) swinging on their REAL axis, and/or (b) a stale placed instance
+  (check the output log for the STALE ROBOT INSTANCE error).
+- "Gripper has no collision": all gripper body meshes carry collision
+  shapes on disk (missing=0). Finger-vs-gripper pass-through is the
+  robot-wide self-collision-off scheme (matches the MJCF); fingers DO
+  collide with world objects / graspable props.
+- "Fingers flop open": real — the closure-loop equilibrium overpowered
+  the tendon drives. Finger drive floor raised to 1e6 (100 N*m/rad):
+  fingers now hold spawn pose (+-3 deg) and track grip commands
+  symmetrically (mirror-aware DriveScale: L/R body frames flip the twist
+  sign; wrap coefs alone don't encode it).
+- "Robot rolls with no input": parked pose rests on the omniwheels whose
+  contact friction is intentionally ~0.12 (lateral slip for turning), so
+  the suspension's static push glides the robot at ~0.5 cm/s even with
+  caster wheel hinge damping (1e4). Inherent isotropic-friction
+  trade-off of the omniwheel approximation — tune PM_RammsCaster's
+  friction live in the editor, or it goes away for real when the rollers
+  are simulated (long-term goal). Drive wheels not spinning while parked
+  is correct: they are raised (parked pose) and velocity-braked.
+
+### 6.13 Ramms.Validate + Map_Demo verification (2026-08-14)
+
+New console command `Ramms.Validate [ActorLabel]`: prints per-robot rig
+health (BP class path, rig constraints recorded vs resolved with a STALE
+INSTANCE verdict, drive count incl. gripper tendon, collision counts) to
+log + screen. Healthy reference: mebot_gen3_C, 77/77, 15 drives (tendon
+yes), 148 meshes / 20 shapeless (visual pieces). Re-validated on
+Map_Demo's real floor with a fresh spawn: fingers hold, gripper collision
+present, 0.5 deg max slop, front-caster rod command stable. Divergent
+user reports should start from this command's output.
+
+### 6.14 The real round-3/4 root cause + arm axis fix (2026-08-14)
+
+The persistent "nothing works" divergence: the mebot_gen3 BLUEPRINT WAS
+DELETED ON DISK (git: D mebot_gen3.uasset) — consistent with a manual
+delete+reimport attempt in the editor, where the import silently FAILS
+because the Git source-control plugin cannot 'CheckOut' (same trap that
+ate scripted imports). All testing after that point ran against actors
+with a broken class. IMPORTANT WORKFLOW NOTE: to reimport the robot,
+either use the scripted pipeline (editor closed -> SC provider=None ->
+boot to /Engine/Maps/Entry -> import with pinned MujocoImportFactory ->
+Generate Chaos Rig -> Scripts/fixup_mebot_import.py) or temporarily set
+Editor Preferences > Source Control provider to None first.
+
+Two real fixes landed while diagnosing:
+- ARM JOINT AXES: an earlier parent-frame Unrotate transform silently
+  corrupted the constraint axis of every rotated body (all arm links) —
+  holds looked fine, commanded motion rotated wrong. MJCF axes are in the
+  joint's OWNING link frame; used directly now. Validated: shoulder
+  command produces a clean X-Z pitch arc. Per-joint sign calibration
+  remains (some joints track the negative of the command).
+- Tendon (finger) panel range now comes from the wrapped JOINT's travel
+  in radians — the actuator ctrlrange is tendon units (0..255 on the
+  2f85), which made panel slider drags command hundreds of radians into
+  the slew limiter, i.e. "the finger motors do nothing".
+
+BP restored (import + regen + fixup + save); mebot_gen3_scene.uasset
+restored from git.
+
+### 6.15 Crash recovery + clevis pins + MJ retune (2026-08-14 night)
+
+- EDITOR STARTUP CRASH (AssetRegistry array out of bounds): caused by
+  file-level .uasset deletion while CachedAssetRegistry_0.bin still
+  indexed the files. Fix: delete Intermediate/CachedAssetRegistry*.bin
+  (pure cache; slow next boot). RULE: asset deletions go through the
+  editor, or purge the registry cache after.
+- Import gotcha #3: AssetTools refuses imports while the editor is IN A
+  PLAY MODE (URLab's bridge auto-start can enter play on boot) — and
+  refuses SILENTLY from scripts. End play before importing.
+- MJ/Newton (user: springy oscillating elevators, frozen caster
+  linkages): headless bench confirmed the 2e4 stand-in springs freeze the
+  linkage against its own actuators, and the load-path joints
+  (motor_swing_arm damping 5!) ring at 12 rad/s after lifts. Baked:
+  load-path damping x10 (trunnions 500, swing arms 50), front swing-arm
+  stand-in 5000->1000, pivot preload 1000->200. Bench: ringing RMS
+  2.96 -> 0.037, articulation x2.5.
+- Chaos closures are now CLEVIS PINS (user insight: ball connects left a
+  free spin DOF about the anchor axis): twist free about the link's hinge
+  axis, swings limited 5 deg.
+- Battery on the new build: grip mirrored -24/+19 deg, rods stable
+  (still ~85 cm lateral push through low-friction casters), pins hold
+  (1.5 deg). REGRESSION: locomotion sluggish (~4 cm/s vs 45) — softened
+  stand-ins / pin swing-limits absorb drive torque; next tuning pass.
+
+### 6.16 Strict per-motor benches + the anchor-units discovery (2026-08-14)
+
+Adopted the user's strict-pass/fail methodology: Scripts/benches/ now has
+per-motor isolated tests (articulation of the CORRECT downstream joint,
+base translation <= 10 cm, yaw <= 10 deg, post-move ring <= 0.15), chain
+tracing, closure bisect and kinematic mobility tools. Run with the Newton
+venv python.
+
+MUJOCO/NEWTON: 4/4 PASS (front 0.36 rad, rear 0.42, elevators 0.33/0.35;
+<= 1 cm slide; no ring; rest RMS 0.0010). Fix chain: (1) test mapping —
+rear articulation is the SUSPENSION ARM (user topology), not swing_arm;
+(2) the rear freeze was motor_dampener_pivot name-matching "dampener" and
+receiving the 2e4 suspension spring (eq-force probe: 5.1 kN wall);
+(3) loaded direction matters (front passes in +stroke); (4) heavy load-
+path damping is per-chain: elevator trunnions 500, caster trunnions 50.
+Lift height is now only ~10 mm (soft preload stand-ins yield) — real
+gas-spring specs from Blender remain the fidelity fix.
+
+CHAOS — the big discovery and the honest state: closure pin ANCHORS are
+codegen attribute arrays = native MuJoCo METRES, RIGHT-handed. The rig
+read them as cm: every pin collapsed to its body origin -> ZERO lever arm
+-> loops cannot transmit torque -> rod force becomes rigid-body shoving
+(the user's "slides in circles"), while proximity audits still passed.
+With x100 + Y-negation applied the mechanisms TRANSMIT (rear suspension
+arm articulated 28 deg, first time ever under Chaos) but the loops sit
+pre-stressed at spawn and drift unstably — residual inconsistency,
+suspected in the runtime pin frame re-derivation (viz-chain conversion)
+or a per-pin sign case. REVERTED to origin-anchors for stability
+(TODO(anchor-units) in the generator marks the exact spot): current BP is
+fully stable — upright settle, 0.7 deg slop, fingers hold + grip, wheels
+drive — but linkage rods stall (zero lever arm), matching prior behavior.
+Finishing anchor-units is THE remaining structural Chaos item; with it
+done, restore the linkage windows (same commit reverts both).
+
+### 6.17 Anchor units CORRECTED + soft-pin closure design (2026-08-14)
+
+Supersedes the 6.16 anchor diagnosis. Template probe (BP value 7.287 vs
+XML 0.07287 m) proves MjEquality.anchor carries the MjUnit="cm" codegen
+annotation: the importer ALREADY converts equality anchors to cm — only
+the Y handedness flip is missing. Geom sizes / slide ranges have no such
+annotation and stay native metres, which is why the x100 rule is right
+for them and wrong for anchors. Last session's "x100 transmits torque"
+result was running 100x lever arms (pins up to 20 m out) — spectacular
+articulation, spectacular instability, all artifact.
+
+New closure design (generator): anchor = (x, -y, z) of the template cm
+values; pin twist axis Y-negated; NO projection on pins; linear
+LCM_Limited 0.2 cm with SOFT limit (stiffness 5e4, damping 2e3)
+emulating MuJoCo solref compliance so mm-scale closure error lives in a
+spring, not a solver fight; swing windows 30 deg SOFT (5e3/5e2).
+Runtime (switch component): MJCF linkage joint damping never reached
+Chaos — linkage/rod/pivot/dampener/swing_arm/suspension bodies (not
+wheels, not arm_) now get AngularDamping 10 / LinearDamping 1 at
+ApplyChaos to stop the free-linkage windmilling the user reported.
+
+MuJoCo side same session: rear strut restored to authored 20000 (the
+"too soft" 300 made the strut absorb the rod stroke — user report);
+root cause of the original freeze was ROD SERVO FORCE STARVATION
+(kp=6e4 through ~1.1 cm anchor levers), not the strut. Rod servos now
+kp=6e5 with dampratio=1 critical kv (fixed kv=6e4 was 100x OVER
+critical for the reflected inertia and rocked the whole robot at rest).
+compose_mebot_gen3 bakes explicit negative kv into the XML because
+MjSpec serializes dampratio as raw positive biasprm[2]=1 (MuJoCo
+reinterprets it correctly; URLab's raw-float parser would not).
+Strict suite (Scripts/benches/combined_suite.py): 4/4 motors PASS incl.
+new rear swing-arm criterion (0.25 rad), rest 0.003, drop + whack PASS.
+Elevator lift now ~2-3 cm (was ~1 cm); real gas-spring specs still the
+fidelity item.
+
+### 6.18 Chaos closure campaign — landed state (2026-08-14, session 2)
+
+Fix chain, each step verified by the per-motor fresh-PIE bench
+(tmp cycle3: one PIE session per stroke — a tipped robot contaminates
+every later test; that masking cost several earlier misdiagnoses):
+
+1. Anchors: importer-cm + Y-negation (6.17); placement audit 0 outliers.
+2. Slide RANGES are native metres (unannotated): read raw, the rod
+   travel limit was +-0.08 CM -> rod welded, 20 kN drive fought its own
+   limit, reaction flipped the chassis. x100.
+3. Rod command SIGN: UE linear position target moves the child along
+   -X of the constraint frame; every Chaos rod test had been running
+   the mirror-opposite (loaded) stroke. DriveScale = -1.
+4. Pin free play: soft LCM_Limited(0.2) = 2 mm slack per pin; the
+   3-pin front loop's fold mode lived entirely inside the slack
+   (linkage counter-rotated 20 deg, pins carried single-digit N).
+   Pins are now HARD-locked linear; placement verified to 0.01 cm vs
+   the MuJoCo model (hinges AND pins), so no spawn stress.
+5. Solver convergence: front pins still stretched 0.8-1.3 cm under
+   load (both-body anchor projection probe). Per-body iterations 32/4
+   + 3 kg mass floor on linkage pieces + body damping 10/1 = the
+   stable calibration. Global iteration cvars (30-50) and pin
+   projection both made loaded strokes MORE violent (stored loop force
+   releases dynamically); joint-level velocity dampers destabilized
+   rear strokes. All three reverted with code comments.
+6. Rod targets slewed at 3 cm/s (safe at kp 6e5; the old starvation
+   was a kp 6e4 artifact) + force cap 8 kN (20 kN vaults the chassis).
+
+Bench state (fresh PIE per stroke): front+ PASS (mechanism moves,
+upright), rear- PASS (+23 deg suspension), elev+/- PASS (+-26 deg both
+arms, ZERO robot propulsion — solver iterations also fixed the
+13 m elevator-slide), wheels PASS. front-/rear+ (chassis-lift
+directions) articulate first (rear +28 deg) then TIP the robot
+(upz -0.5..-0.7, settles, no fly-off) — remaining calibration item:
+MuJoCo reaches force equilibrium quasistatically where Chaos
+overshoots once the wheels unload. Candidate next steps: direction-
+aware force cap, or accept + require the elevator-first posture the
+real robot uses. Front swing arm still under-driven vs MuJoCo
+(aux-branch pin leak at the solver level) — front casters lift less
+than MuJoCo's 15 deg.
+
+### 6.19 Wheels, rear strut, gripper pose (2026-08-15, session 3)
+
+WHEELS: "duplicate colliders" = URLab's per-geom VisualizerMesh
+components each carry a QUERY_ONLY collision element (visible in the
+collision view next to our capsule); under Chaos ApplyChaos's non-rig
+sweep disables them, so cosmetic only. Slip/free-rolling fixed: wheel
+velocity-hold 2e5 -> 2e6 (200 N*m per rad/s — a powered chair brakes
+hard at zero command) + AngularDamping 0.5 on wheel bodies. Rest creep
+now ~1.7 cm/10 s.
+
+REAR STRUT: still the open item. MuJoCo mode shape: pivot follows aux
+at ratio 0.6, strut swings 3-4 deg + compresses 1.4-2.5 cm, swing arm
+moves 7-14 deg. Chaos: pivot ratio 0.067 (aux -16.6 -> pivot -1.0),
+strut and swing arm dead — the eq11 pin leaks force at the solver level
+even after the pivot stand-in spring was cut to 20/50 in the MJCF
+(MuJoCo suite still 4/4 after that change; a bell crank needs no
+spring). Suspension arm over-rotates (+23 vs MuJoCo +8.6) because the
+strut path doesn't resist. Same solver-leak class as the front aux
+branch.
+
+GRIPPER (the big win): rest pose now matches MuJoCo (spring_links -1.2
+deg, followers +5..9, drivers ~0 — was followers +51 at the window
+edge, couplers -15, springs -20). Three stacked causes:
+1. The 0.15 kg mass floor breaks spring equilibria tuned for 12-22 g
+   links — spring drives now scale by the per-body inflation
+   (SpringMassScale) PLUS a 5e4 floor for arm_ bodies (the spring_link
+   spring restrains the WHOLE floored chain, ~8x the real mass).
+2. Name-resolution hardening: exact-FName match BEFORE suffix-tolerant
+   everywhere (gripper viz components share asset-derived names
+   "Viz_arm_2f85_follower1..3" across left/right and cross-matched).
+3. The "_right_" tendon DriveScale mirror (calibrated in the broken-pin
+   era) drove the right four-bar into slack — removed; MuJoCo closes
+   both drivers with the same sign, Chaos now does too (close is
+   symmetric: both drivers -27, both followers move together).
+Remaining finger item: a close over-curls (follower to its -50 window
+edge vs MuJoCo -26) — the 100 N*m/rad driver partly tears the leaky
+follower-coupler pin instead of dragging the loop; softening drives
+lets the loop WALK into contortion at rest (tried 2e5/2e4, reverted).
+Designed next step: derive pin frames from the MjBody component
+transforms at ApplyChaos init instead of the viz SCS chain (arm viz
+meshes are offset from body nodes), then soften drives.
+
+INFRA: the boot crash (AssetRegistry "index 504496128 into 73568") is
+RECURRING — the registry cache is corrupted at editor shutdown after
+content churn (same index every time). Purging
+Intermediate/CachedAssetRegistry*.bin + Saved/AssetRegistryCache fixes
+it; the purge is now a standard step in every editor cycle script.
+
+### 6.20 Rear-chain fold: knob space exhausted (2026-08-15, session 3b)
+
+The rear caster rod stroke still topples the robot. Every mitigation
+was tried and measured this session:
+- Rod force caps 20/8/3/1 kN: at ANY force able to articulate, the
+  unresisted rear lifts and the robot topples (1 kN > the rear's ~500 N
+  weight share). Lower caps = nothing moves.
+- Suspension-arm 15-deg soft window as a strut stand-in: DETONATED
+  (limits-vs-loops energy pump; robot launched at v=4300).
+- Soft-from-zero pins: Chaos ignores soft params on a radius-0 limited
+  linear constraint (1e6 vs 1e9 identical to the decimal) — pins have
+  effectively been HARD throughout.
+- Virtual strut (direct pivot<->swing-arm axial spring, 2e4/cm,
+  bypassing the 3-body chain): NO effect — the leak is UPSTREAM: the
+  suspension+aux pair counter-rotate as a near-perfect fold (ratio
+  0.885, tip ~stationary), which satisfies a rigid eq11 pin WITHOUT
+  moving the pivot. MuJoCo's fold ratio (0.88) leaves a residual that
+  drives the pivot at ratio 0.6; Chaos's residual reaches the pivot
+  40x weaker. With geometry verified exact to 0.01 cm, the discrepancy
+  needs OFFLINE KINEMATIC ANALYSIS (solve the loop positions
+  numerically from the verified geometry vs commanded rod extension;
+  compare against mjData trajectories) — not more constraint knobs.
+Gripper status: rest pose good, symmetric close (correct direction,
+panel deduped); spring_link non-participation and follower over-curl
+are the same fold phenomenon in the finger four-bar.
+Current shipped state: fingers usable, elevators/wheels/drive good,
+rear+front rod strokes articulate partially and can topple the robot
+if driven hard — user-visible and documented.
+
+### 6.15 Front-caster fly-apart: root cause chain and fix (2026-08-15)
+
+Systematic bisect on the current build (all with the user's place-then-flip
+flow, flat map):
+- NOT the closure type (ball vs clevis: identical), NOT the swing-arm hold
+  (flipped with hold 0 / 1e5 / 2e6 alike; with the hinge broken live it
+  still didn't move), NOT self-collision (all RobotSelf/ignore).
+- Chain force probe: rod 6 kN -> linkage crank 18 deg -> force decays
+  ~40%/pin -> swing arm 0 deg. Chaos's iterative solver leaks force through
+  the 4-bar; MuJoCo drives the same stroke to -0.24 rad and then SOFT-
+  saturates (the mechanism's range is exhausted at ~-2 cm rod travel: any
+  further command is a stall by design). Chaos stalled into a 6 kN hammer.
+- Two contributing regressions found+fixed on the way: slide-limit x100
+  (rods were free-sliding at +-800 cm; range IS cm on templates) and rod
+  servo damping (kv from MJCF dampratio ~591 is MuJoCo's reflected-inertia
+  critical value, meaningless vs Chaos kp 6e5 -> ratio 0.003; now k/10).
+- FIX: virtual coupler (generic runtime mechanism, generator-emitted):
+  follower twist = ratio x leader twist enforced by a strong orientation
+  drive on the follower each tick, bypassing the leaky pins — the same idea
+  as the rear virtual strut. Front: swing_arm = -0.667 x linkage (ratio
+  from MuJoCo joint-space fit, sign flipped for constraint frame handedness).
+  Result: full -0.06 retract stable (upz 1.00), swing arm follows to its
+  saturation angle (-14 deg, same as MuJoCo's -13.7), front wheels lift
+  1 cm, rod force 1.4 kN. Rear rod and elevator commands: stable/upright
+  but under-transmitting (loads don't visibly move) — candidates for the
+  same coupler treatment with MuJoCo-fitted ratios.
+- Stand-in park holds must stay at FULL converted strength (settle fails
+  at 0 and at 1/10: robot slides 10 m at spawn).
+
+### 6.16 Rear caster fly-apart (2026-08-15)
+
+Fine-step probe with the chain force tool: rear extend articulates
+correctly (suspension arm -4/-6/-8/-10 deg at +0.01/.02/.03/.04, swing arm
+following, wheels lifting, upright) with the arm hinge force rising
+linearly (1.7 -> 8.4 kN) — the servo stalling the mechanism at its
+saturation, exactly what MuJoCo also does at these strokes. The flip only
+happens between +0.04 and +0.06: MuJoCo's own rod STALLS at ~2.2 cm (the
+linkage physically cannot go further); Chaos slews the target all the way
+to 6 cm and the stalled full-force servo's 13 kN reaction tips the robot.
+Tried and rejected on the way: rear pivot coupler (moved the pivot, strut
+path still leaked, 20 kN), rear end-coupler suspension->swing (slammed the
+near-saturated swing arm into its stop, 24 kN), rear rod force cap (no
+effect: the reaction is leverage-multiplied), suspension-arm 12 deg soft
+limit (100 N*m/rad can't hold it). The bell-crank pivots are now damping-
+only (holds there halved the pivot hinge force but weren't the trigger).
+FIX: publish the mechanism-realizable travel as the drive range (caster
+rods +-4 cm) and clamp SetJointCommand to it — panel sliders, teleop and
+scripts can no longer command past what the linkage can do. Validated: all
+three rods, both directions, deliberately over-range +-0.08 inputs, robot
+upright throughout, rear suspension arm -10/+6 deg (MuJoCo-matched), front
+swing arm +-12-14 deg (saturation), clean return to zero.
+Note: one opaque editor access-violation crash during rapid end-play/
+respawn cycling (not reproduced on relaunch) — treat as harness stress.
+
+### 6.17 Elevator range check (2026-08-15)
+
+MuJoCo realizes nearly the full +-8 cm elevator stroke (rod -7.9/+7.0), so
+NO clamp there (unlike the caster rods). MuJoCo full retract lifts the
+chassis only 3.7 -> 8.6 cm — the parked robot rests on its BELLY, so the
+elevator has ~5 cm of lift available by design; Chaos matches in kind
+(stable, upright, full range) with a smaller delta because its chassis
+already rests ~3 cm higher (capsule contact vs MuJoCo's belly mesh). The
+"elevator doesn't lift" observation is the parked-pose geometry, not the
+sim: real lift needs the drive wheels lowered past the belly plane, i.e.
+the dojo_ref parked pose or the linkage travel — a model question.
+
+### 6.18 Rest bounce / creep + finger oscillation root causes (2026-08-16)
+
+Measured with VELOCITY probes (position sampling had hidden it):
+- Gripper fingers oscillating at rest (driver bodies 73 deg/s): the tendon
+  drive at 1e6 on a 0.15 kg link is a ~137 Hz spring the 60 Hz solver
+  aliases. dt-limited to 1e4 with heavy damping 5e3 -> spin 55 deg/s and
+  falling; fingers park at +-25 deg (the known closure-loop sag). Panel:
+  slider knobs are now bound to the shared value (Zero-all moves them),
+  and one slider per drive name (tendon registers two entries).
+- Base creep 3-10 cm/s at rest with NO input: BISECTED — the base-only BP
+  bounces (v_z +-3, pitch 10-13 deg/s) but does NOT creep; the arm/gripper
+  converts the bounce into lateral drift on the low-friction casters.
+- The bounce is the MODEL: in the authored parked pose the front caster
+  wheel centers sit 4.6 cm above the chassis floor plane with a 7.66 cm
+  radius (rear: 7.2 cm vs 10.1 cm radius) — the wheels are authored ~3 cm
+  INTO the ground. MuJoCo absorbs that in soft contact + strut springs
+  (chassis settles LIFTED to 3.7 cm); Chaos's hard contacts see-saw on the
+  front swing arm being ground into the floor (measured z=2.7 < chassis
+  6.4). Strut-hinge stand-in holds (elevator_dampener/link, rear dampener)
+  are now damping-only, correct in itself, but not the bounce driver.
+  FIX BELONGS IN BLENDER: raise the casters in the parked dojo_ref pose
+  (or lower the chassis) so wheel bottoms are AT the floor plane, then
+  re-export. Everything downstream (rest bounce, creep, some of the
+  rod-stroke stall margins) follows from that geometry.
+
+Addendum (6.18 check): lifting the casters at runtime (rods +0.03) raises
+the front swing arm off the floor (2.7 -> 7.1 cm) and cuts the linear
+bounce (v 3 -> ~1 cm/s) but the chassis still PITCHES 26-36 deg/s on its
+belly/rear-caster contact — the belly-resting parked pose is itself a
+see-saw. Confirms the fix is the parked-pose geometry as a whole (wheels
+carrying the robot with the belly clear), not a per-joint tweak.
+
+### 6.19 Rigid struts + real fixes (2026-08-16)
+
+User corrections taken: the parked pose IS correct (wheels below the
+chassis floor); the sim was failing to HOLD it, and the arm was absent
+from several of my validation runs (base-only BP) — those gripper claims
+are void. 6.18's "parked pose is wrong" is RETRACTED: the visual-mesh
+bounds probe (tread geometry) misled it; the collision capsules put all
+six wheels on the floor with the belly ~4 cm clear, as authored.
+
+Changes (all validated on the full mebot_gen3 WITH the arm, velocity
+probes, place-then-flip flow):
+- Dampeners modeled as FIXED struts (user decision): compose removes the
+  dampener_rod slide joints (a 1e6 spring was dt-unstable in MuJoCo).
+  MuJoCo now rests the chassis at 6.65 cm on its wheels (was 3.7 sagging)
+  and the elevator lifts +45 mm (was ~5) — confirms the soft struts were
+  what let the base sag. Chaos rear virtual strut obsolete (disabled).
+- Physical materials WERE NEVER SAVED: LoadObject can't see an in-memory
+  package next session, the materials were silently recreated each run and
+  every wheel ran on default friction (0.7) for days. Now saved on creation
+  (+ synced when values change). Casters 0.35/Average (0.12/Min skated:
+  wheels not turning / turning against travel), drive wheels 1.2/Max,
+  chassis belly 1.0/Max.
+- Finger tendon drive dt-limited (1e6 -> 1e4, damping 5e3): the 137 Hz
+  spring aliased into wild rest oscillation. Panel: bound sliders (Zero-all
+  moves knobs), one slider per drive name.
+- Elevator: coupler rod SLIDE -> TRUNNION (leader value = rod extension
+  cm; -2.56 deg/cm from MuJoCo). Without it the rod's 1.8 kN took the easy
+  path and pushed the free-rolling carriage sideways (robot rolled 90 cm,
+  trunnion 0 deg); couplers on the WHEEL CARRIER were rejected (drove the
+  robot off at 45-55 cm/s). Result: chassis lifts 7.3 -> 9.7 cm, trunnion
+  -10.6 deg (MuJoCo -17), residual roll ~7 cm/s decaying.
+- Rear rod range +-3 cm (saturates earlier with the rigid strut; +0.04
+  launched). Drive-wheel brake 2e6 -> 2e5 (hard brake made carriage
+  strokes propulsive).
+- Slide-leader coupler support (4-arg GetConstrainedComponents).
+Process lessons: assert "Result: Succeeded" — a crashed compiler left an
+old DLL in place twice and I validated stale binaries; the compiler
+crashes intermittently on this machine (cl.exe), just rerun.
+Current honest state (flat map, full robot): rest creep 1-3 cm/s (fingers
+park at +-25 deg sag), elevator lifts and returns, front rod lifts, rear
+rod stable through over-range, gripper command moves both fingers.
+Remaining: elevator residual roll, finger sag/curl (needs the MjBody-frame
+pin re-derivation the other session noted), per-joint L/R asymmetry from
+the two 5 mm Blender mount offsets.
+
+Addendum (6.19): reimported BP re-fixed-up (armature/frictionloss). Newton
+worker suite 31/31; parity vs plain MuJoCo on the rigid-strut base PASSES
+but with max divergence 0.083 rad (was 7e-5 with soft struts) — the
+rigid closure loop is stiffer and the two solvers' contact handling
+diverges more. Within tolerance; watch it if the strut model changes again.
