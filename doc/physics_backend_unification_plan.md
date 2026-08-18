@@ -1,6 +1,64 @@
 # Physics backend unification plan
 
-> ## Hand-off state (2026-08-07 PM) — read this first when picking up
+> ## Hand-off state (2026-08-18) — read this first when picking up
+>
+> **The Chaos "pin leak" is root-caused and fixed.** It was never a solver
+> convergence problem: `UPhysicsConstraintComponent::UpdateConstraintFrames`
+> DIVIDES the computed body-local frame positions by the constraint
+> component's scale (`GetConstraintScale`, "used for limits"), and the
+> gripper chain carries the imported-asset compensating scales — so the
+> coupler-side pin frame shrank ~1000x and every gripper closure initialized
+> AT THE COUPLER ORIGIN, permanently torn 4.79 cm. Three runtime/generator
+> fixes landed in RammsMujocoSupport (see §6.21 for the full evidence
+> chain): (1) `ApplyChaos` re-derives every constraint frame from the
+> **MjBody component transform** (unique names, no template-chain drift) and
+> **normalizes the constraint's world scale to 1** before
+> Term/UpdateConstraintFrames/Init; (2) closure pins run **without
+> projection** (measured: with projection the locked pin stays torn 4.8 cm;
+> without it it holds 0.00–0.03 cm through free-flop and load); (3) the
+> generator **reuses** the `ChaosRig_BackendSwitch` SCS node across
+> regenerations (recreating it orphaned placed instances' `Backend=Chaos`
+> overrides). Acceptance (new `Ramms.Probe` console command, headless
+> `-game` + spectator-only): all 14 closure pins ≤0.03 cm at rest, upZ 1.00,
+> zero base drift.
+>
+> **Open, well-characterized:** on the gripper's floored-mass links the
+> ANGULAR constraint DOFs are inert in the live solver — twist limits
+> (hard or soft) don't cap and twist drives (1e4, profile-verified on the
+> live instance) contribute nothing, while the SAME constraints' linear
+> locks and the pins enforce exactly. Fingers gravity-fall to ±81° through
+> a 45.8° window. Bisects eliminated: frames (init sep 0.000), scale,
+> projection, soft twist limits, soft swing cones, drive params, BP crud
+> (reproduced on a clean regen of the pulled BP). Prime suspect: angular
+> inertia conditioning (cm²-scale link inertias vs the 8 kg arm, ~1e4:1) —
+> `Ramms.Debug.ArmInertiaScale` cvar exists for the experiment. After the
+> mechanism holds, the real rest-pose fidelity items are asymmetric limit
+> windows (driver [0°,45.8°], coupler [−90°,0°] — MuJoCo rests ON the
+> stops) and spring targets honoring `springref` (spring_link preloads at
+> +150°, not the spawn pose).
+>
+> **Workflow this session validated** (all headless, no editor UI):
+> rig regen via `UnrealEditor-Cmd -ExecutePythonScript` +
+> `unreal.RammsRigLibrary.generate_chaos_rig`; acceptance via `-game` on
+> `Map_ChaosSmoke?game=/Script/Engine.GameMode?SpectatorOnly=1` with
+> `-ExecCmds="Ramms.Validate ChaosBot, Ramms.Probe ChaosBot 15"` (probe
+> report also lands in `Saved/RammsProbe.txt`). Spectator-only matters: the
+> default game mode spawns a colliding pawn. Python `unreal.log` output is
+> NOT reliably surfaced by headless runs — scripts should write a result
+> file (see scratchpad `set_chaosbot_backend.py` pattern). Also fixed:
+> `Ramms.Validate` no longer reports MuJoCo-mode instances as stale (their
+> rig constraints are destroyed at BeginPlay by design).
+>
+> **Newton**: worker-side `set_state` landed earlier (commit 8b87538, e2e
+> tests); the UE bridge still deactivates on snapshot restore — wiring it
+> is the next Newton item. The 1/10-speed fix (§6.8, DEALER/ROUTER
+> pipelining) still needs sign-off. **URLab beta** (v0.6.0-beta, 992 files:
+> ProtoSpec components-are-the-model, deletes the XML compile path, MuJoCo
+> 3.11.1, breaks existing MjArticulation assets) fixes several things we
+> work around (class-inherited gains, geom defaults) but is a deliberate
+> multi-day migration — evaluated, not taken.
+
+> ## Hand-off state (2026-08-07 PM) — superseded by the above
 >
 > **Actuator-driven PIE validation DONE** (RTX 4090): the gen3_2f85
 > articulation BP (`/Game/Maps/URL/gen3_2f85` — the grasp map places no arm;
@@ -1104,3 +1162,64 @@ worker suite 31/31; parity vs plain MuJoCo on the rigid-strut base PASSES
 but with max divergence 0.083 rad (was 7e-5 with soft struts) — the
 rigid closure loop is stiffer and the two solvers' contact handling
 diverges more. Within tolerance; watch it if the strut model changes again.
+
+### 6.21 The pin leak was a FRAME-SCALE bug, not a solver leak (2026-08-18)
+
+Evidence chain, all measured headlessly with the new `Ramms.Probe` command
+(`-game` on Map_ChaosSmoke, spectator-only game mode so no pawn collides):
+
+1. **Symptom quantified**: both gripper follower↔coupler pins sat torn at
+   EXACTLY 4.794 cm from the first physics tick, immutable for 12 s, while
+   all 12 mebot pins held ≤0.2 cm. Constraint bound, both bodies
+   simulating, not broken — enforcement simply absent.
+2. **Frames at init**: logging the two ref-frame anchors right after
+   `InitComponentConstraint` showed frame1 at the constraint position
+   (follower origin — correct, offset 0 is scale-invariant) and frame2 at
+   the COUPLER ORIGIN + ~5 mm — i.e. the true 4.79 cm coupler-side offset
+   divided by ~1000.
+3. **Root cause** (`PhysicsConstraintComponent.cpp:578`):
+   `UpdateConstraintFrames` divides `Pos1/Pos2` by
+   `GetConstraintScale() = GetComponentScale().GetAbsMin()`. The generated
+   constraint nodes inherit the gripper chain's imported-asset
+   compensating scales; the mebot chain is unit-scale, which is why only
+   gripper pins died. This also retro-explains 6.19's "leaky
+   follower-coupler pin" and every soft/hard/projection knob failing.
+4. **Fixes** (RammsMujocoSupport): runtime `ApplyChaos` re-derives every
+   rig constraint frame from the owning **MjBody component transform**
+   (generator now records `ConstraintBodyFrames`/`ConstraintBodyComponents`;
+   MjBody names are unique so no shared-asset ambiguity) and **forces the
+   constraint's world scale to 1** before `TermComponentConstraint` →
+   `UpdateConstraintFrames` → `InitComponentConstraint`. Note
+   `InitComponentConstraint` alone does NOT pick up a moved component —
+   `UpdateConstraintFrames` must run against the corrected pose.
+5. **Projection must be OFF on pins**: with frames fixed, a
+   projection-enabled locked pin STILL sat torn 4.79 cm; disabling
+   projection made it hold 0.000→0.03 cm (12 s, under free-flop and drive
+   load). Generator no longer emits projection on any pin; the runtime
+   also clears it defensively for stale rigs.
+6. **Regen no longer bricks placed instances**: recreating the
+   ChaosRig_BackendSwitch node orphaned per-instance `Backend=Chaos`
+   overrides (placed robot silently reverted to MuJoCo → "0 resolved").
+   The node is now REUSED (suffix-tolerant) and only its generator-owned
+   arrays are reset.
+7. **Ramms.Probe** (RammsJointPanel.cpp): samples base
+   settle/creep/upright, every drive constraint's twist (or slide
+   extension), and every pin's ref-frame separation computed against
+   scale-free BODY transforms (component transforms carry the 0.001
+   compensating scales and corrupt the metric). Report to log +
+   `Saved/RammsProbe.txt`. Gotcha for future tools: `ClearTimer` from
+   inside a repeating timer lambda destroys the delegate — and its
+   captures — IMMEDIATELY; take strong local copies first.
+
+REMAINING (the honest finger state): with the loop finally closed the
+four-bar gravity-falls to ±81° — its ANGULAR limits and drives are inert
+in the live solver on these floored-mass links (hard windows, soft
+windows, cone hardness, 1e4 drives: no measurable effect; linear locks and
+pins on the SAME constraints enforce exactly; drives verified present in
+the live profile). Reproduced identically on a clean regen of the pulled
+BP — not asset crud. Prime suspect: angular inertia conditioning
+(~1e4:1 link-vs-arm inertia ratio); `Ramms.Debug.ArmInertiaScale N` is in
+place to test (and `Ramms.Debug.DisableGripperDrives` for drive bisects).
+After the mechanism holds: asymmetric windows (driver [0°,45.8°], coupler
+[−90°,0°] — MuJoCo rests ON its stops) and springref-aware spring targets
+(spring_link preloads toward +150°, not spawn) are the fidelity items.
