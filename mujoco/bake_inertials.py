@@ -31,22 +31,36 @@ TARGETS = [
 ]
 
 
-def restore_objs_from_glb(xml_path: str) -> int:
-    """Recreate missing .obj mesh files from .glb sidecars."""
+def restore_objs_from_glb(xml_path: str, force: bool = False) -> int:
+    """Recreate missing .obj mesh files from .glb sidecars.
+
+    The sidecars were produced by URLab's clean_meshes.py, which applies a
+    -90 deg X rotation ("GLTF Y-up -> Unreal Z-up") before GLB export, and
+    trimesh's GLB-load/OBJ-export chain adds its own convention rotation.
+    Empirically (verified against the parts' collision AABBs in the body
+    frame): a +180 deg X rotation on the loaded mesh makes the round trip
+    land in the original MuJoCo body frame. Without it every restored
+    visual came back rotated out of its body frame (observed: the whole
+    mebot base's visuals misaligned with collision while the arm, whose
+    original meshes survived, was fine).
+    """
+    import numpy as np
     import trimesh
 
     xml_dir = os.path.dirname(xml_path)
     text = open(xml_path, encoding="utf-8").read()
     restored = 0
+    undo_gltf = trimesh.transformations.rotation_matrix(np.radians(180), [1, 0, 0])
     for ref in set(re.findall(r'file="([^"]+\.obj)"', text)):
         obj_path = os.path.normpath(os.path.join(xml_dir, ref))
-        if os.path.exists(obj_path):
+        if os.path.exists(obj_path) and not force:
             continue
         glb_path = os.path.splitext(obj_path)[0] + ".glb"
         if not os.path.exists(glb_path):
             print(f"  MISSING with no sidecar: {ref}")
             continue
         mesh = trimesh.load(glb_path, force="mesh")
+        mesh.apply_transform(undo_gltf)
         mesh.export(obj_path)
         restored += 1
     return restored

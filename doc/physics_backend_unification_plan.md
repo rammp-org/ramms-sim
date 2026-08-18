@@ -103,6 +103,33 @@
 > save_asset runs after the last C++ log line (a mid-save kill silently
 > discarded one regen).
 >
+> **2026-08-18 EVE (visual-frame fix + import-pipeline lessons)**: the
+> base visuals were rotated out of frame because my GLB→OBJ mesh restore
+> skipped the pipeline's axis convention — empirically a **+180° X
+> rotation** on the trimesh-loaded GLB lands the round-trip back in the
+> body frame (verified per-part against collision AABBs; the −90°X in
+> URLab's clean_meshes composes with trimesh's own glTF conventions).
+> `bake_inertials.py` now applies it and can also regenerate the GLB
+> sidecars in pipeline convention. **The fix was applied SURGICALLY**:
+> per-asset in-place `AssetImportTask` reimport of the 60 base static
+> meshes from their corrected GLB sources + one rig regen — the BP, map
+> and placed actors were never recreated. Validated: meanV 10.6 cm/s,
+> pins ≤0.05 cm, drivers in-window, asset bounds match collision truth.
+> **Hard-won pipeline lessons**: (1) full BP reimports via the factory
+> produced physically-broken content in several attempted flows
+> (component scales inconsistent with mesh assets, placement shifts) —
+> when a validated BP exists, prefer surgical mesh reimport + regen over
+> re-import; (2) deleting an asset then importing the same name IN THE
+> SAME editor session fails silently ("Failed to create asset" — the
+> deleted object lingers); import in a fresh session; (3) the mesh
+> assets are SHARED MUTABLE STATE (generator writes AggGeom + BuildScale
+> into them) — a "restore the committed BP" control is only valid if the
+> mesh asset folder is restored too; (4) respawning actors from
+> broken-class instances reads garbage transforms — two overlapping
+> robots produce a violent depenetration explosion (meanV thousands)
+> with upZ=1.00 and zero drift, i.e. it looks like "vibration in place";
+> keep the MuJoCo-mode twin far from the Chaos instance.
+>
 > **Newton**: worker-side `set_state` landed earlier (commit 8b87538, e2e
 > tests); the UE bridge still deactivates on snapshot restore — wiring it
 > is the next Newton item. The 1/10-speed fix (§6.8, DEALER/ROUTER
