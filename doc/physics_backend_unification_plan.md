@@ -66,17 +66,31 @@
 > `.glb` sidecars (trimesh). (c) **Wheels** — undriven drive wheels rolled
 > too freely: zero-command velocity-hold 2e5→8e5 (2e6 was propulsive
 > during carriage strokes) + wheel body AngularDamping 0.5→2.0.
-> (d) **Fingers** — major progress, one open item. The gripper bodies
-> simulated at component scale 0.001 (1000x meshes + compensating scale);
-> the generator now has a **unit-scale pre-pass** (bakes the scale into
-> the mesh assets' BuildScale, resets 24 components to scale 1 —
-> render-identical, physics in world units). With that + the reimport,
-> the follower limits catch exactly at their ±50° stops and pins hold
-> 0.004 cm — but the tendon-driven DRIVER hinges still ignore their hard
-> 45.8° window AND their drives (any gain, drives on or off), so the
-> four-bar rests follower-on-stop at driver ≈83°. Handed to a focused
-> debug agent with the full harness + experiment queue (reading-error
-> check, ±5° window override, minimal two-body repro).
+> (d) **Fingers — RESOLVED (drivable)**, three stacked fixes:
+> unit-scale pre-pass (gripper bodies simulated at component scale 0.001
+> — 1000x meshes + compensating scale; the generator now bakes the scale
+> into the mesh assets' BuildScale and resets the components to 1), then
+> plugin commit dc7ffb4: the symmetric "sign-safe" twist windows let the
+> four-bar fall ~46° into its nonphysical open region where the toggle
+> singularity + hard pin linear rows overpower every angular row —
+> gripper hinges now get their TRUE asymmetric MJCF windows (recorded
+> twist centers, UE twist = −MJCF; parent ref frame rotated by the center
+> at re-init, drive targets shifted) — plus `ProjectionAngularAlpha=0.25`
+> on gripper joints (the UE default is 0.0: "projection on" never
+> projected angular error; 1.0 tears the pins, 0.25 gives crisp windows
+> AND pins ≤0.04 cm). Validated: rest in-window (drivers −4.1/+21.8°),
+> commanded close moves both fingers (`Ramms.Joint ChaosBot
+> arm_2f85_split 0.5`: right driver 21.8→12.8°, left follower off its
+> stop −50.2→−28.7°), pins 0.007–0.037 cm, upZ 1.00. Remaining fidelity
+> item: `springref` preload emulation (spring_link tensions toward +150°)
+> so the gravity-side finger doesn't rest on its −50° follower stop.
+> **HARNESS GOTCHA (burned a whole bisect campaign): `-ExecCmds` cvars
+> apply AFTER the first world tick, i.e. after ApplyChaos** — every
+> earlier drives-off / drive-scale / inertia-scale "no effect" result was
+> testing nothing. ApplyChaos now parses `-Ramms*` COMMAND-LINE overrides
+> for bisects; also the `arm_` name-prefix tests never matched the actual
+> `Viz_arm_...` component names (mass floor de-facto 0.15 everywhere —
+> kept, flagged in dc7ffb4).
 > (e) **Headless MJCF reimport now works**: URLab's import factory pops an
 > interactive Python-setup dialog unless
 > `Plugins/unreal-robotics-lab/Config/LocalUnrealRoboticsLab.ini` (local,
