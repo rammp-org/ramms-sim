@@ -84,3 +84,7 @@ Content/CitySampleCrowd/
 Content/CitySampleVehicles/
 __pycache__
 Packaged/
+
+# MuJoCo crash logs and double-preprocessed pipeline intermediates
+MUJOCO_LOG.TXT
+*_ue_ue.xml
