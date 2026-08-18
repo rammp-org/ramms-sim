@@ -49,6 +49,46 @@
 > `Ramms.Validate` no longer reports MuJoCo-mode instances as stale (their
 > rig constraints are destroyed at BeginPlay by design).
 >
+> **2026-08-18 PM round (user feedback)**: (a) **Masses** — the tipping
+> ("arm moves tip the base") was a data gap: only the 20 arm bodies carry
+> authored `<inertial>`; MuJoCo auto-computes the base's ~202 kg but Chaos
+> fell back to crude volume estimates. New `mujoco/bake_inertials.py`
+> bakes MuJoCo's computed inertials into every body of the three
+> `mebot_gen3*.xml` files (identity for MuJoCo, verified per-body; base
+> now explicit at 202.3 kg vs the user's ~136 kg real-world estimate —
+> real per-part `dojo_mass` remains the Blender FILL-ME) and
+> `compose_mebot_gen3.py` bakes automatically on future regens.
+> **Requires a BP reimport** from the baked `mebot_gen3_ue.xml`
+> (scripted: scratchpad `reimport_mebot.py`). (b) **Repo landmine**:
+> `.gitignore`'s `*.obj` ("compiled object files") has been eating the
+> exporter's mesh OBJs — fresh clones cannot compile the mebot MJCFs with
+> plain MuJoCo; `bake_inertials.py` regenerates them from the committed
+> `.glb` sidecars (trimesh). (c) **Wheels** — undriven drive wheels rolled
+> too freely: zero-command velocity-hold 2e5→8e5 (2e6 was propulsive
+> during carriage strokes) + wheel body AngularDamping 0.5→2.0.
+> (d) **Fingers** — major progress, one open item. The gripper bodies
+> simulated at component scale 0.001 (1000x meshes + compensating scale);
+> the generator now has a **unit-scale pre-pass** (bakes the scale into
+> the mesh assets' BuildScale, resets 24 components to scale 1 —
+> render-identical, physics in world units). With that + the reimport,
+> the follower limits catch exactly at their ±50° stops and pins hold
+> 0.004 cm — but the tendon-driven DRIVER hinges still ignore their hard
+> 45.8° window AND their drives (any gain, drives on or off), so the
+> four-bar rests follower-on-stop at driver ≈83°. Handed to a focused
+> debug agent with the full harness + experiment queue (reading-error
+> check, ±5° window override, minimal two-body repro).
+> (e) **Headless MJCF reimport now works**: URLab's import factory pops an
+> interactive Python-setup dialog unless
+> `Plugins/unreal-robotics-lab/Config/LocalUnrealRoboticsLab.ini` (local,
+> untracked) stores `[PythonSettings] PythonPath=` pointing at a python
+> with trimesh+numpy+scipy+Pillow — the Newton venv qualifies (scipy and
+> Pillow were added to it). Scripted flow: delete BP → AssetImportTask on
+> `mebot_gen3_ue.xml` (destination_name=mebot_gen3) → generate_chaos_rig →
+> `Scripts/fixup_mebot_import.py` → re-place ChaosBot. Do NOT kill an
+> UnrealEditor-Cmd process after its log looks done — the python
+> save_asset runs after the last C++ log line (a mid-save kill silently
+> discarded one regen).
+>
 > **Newton**: worker-side `set_state` landed earlier (commit 8b87538, e2e
 > tests); the UE bridge still deactivates on snapshot restore — wiring it
 > is the next Newton item. The 1/10-speed fix (§6.8, DEALER/ROUTER

@@ -68,6 +68,37 @@ def main() -> None:
     print(f"compiled: nq={model.nq} nv={model.nv} nu={model.nu} "
           f"nbody={model.nbody} mass={sum(model.body_mass):.1f}kg")
 
+    # BAKE explicit <inertial> into every body from the compiled model.
+    # Identity for MuJoCo (it computed these), but essential for every other
+    # consumer: only the 20 arm bodies carried authored inertials, so the
+    # Chaos rig generator fell back to crude volume estimates for the whole
+    # base — the ~190 kg chassis simulated far too light and a 9 kg arm
+    # motion could tip it (user report, 2026-08-18). Same lesson as the
+    # 2f85_base_mount fix: author explicit inertials for every body that
+    # more than one importer consumes.
+    pre_mass = {model.body(i).name: float(model.body_mass[i])
+                for i in range(model.nbody)}
+    baked = 0
+    for body in base.bodies:
+        if not body.name:  # worldbody
+            continue
+        bid = model.body(body.name).id
+        if model.body_mass[bid] <= 0:
+            continue
+        body.mass = float(model.body_mass[bid])
+        body.ipos = model.body_ipos[bid].copy()
+        body.iquat = model.body_iquat[bid].copy()
+        body.inertia = model.body_inertia[bid].copy()
+        body.explicitinertial = True
+        baked += 1
+    model = base.compile()
+    for i in range(model.nbody):
+        name = model.body(i).name
+        assert abs(float(model.body_mass[i]) - pre_mass[name]) < 1e-9, \
+            f"bake changed mass of {name}: {pre_mass[name]} -> {model.body_mass[i]}"
+    print(f"baked explicit inertials into {baked} bodies "
+          f"(recompiled mass={sum(model.body_mass):.1f}kg, per-body verified unchanged)")
+
     with open(OUT_ROBOT, "w", encoding="utf-8") as f:
         f.write(base.to_xml())
     print(f"wrote {OUT_ROBOT} (robot only — use for UE import)")
