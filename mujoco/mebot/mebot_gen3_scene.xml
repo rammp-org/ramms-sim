@@ -1,0 +1,623 @@
+<mujoco model="mebot">
+  <compiler angle="radian" />
+  <option impratio="10" integrator="implicitfast" cone="elliptic" />
+  <default>
+    <default class="arm_main">
+      <site size="0.001 0.005 0.005" group="4" rgba="0.5 0.5 0.5 0.3" />
+      <default class="arm_visual">
+        <geom type="mesh" contype="0" conaffinity="0" group="2" rgba="0.75294 0.75294 0.75294 1" />
+      </default>
+      <default class="arm_collision">
+        <geom type="mesh" group="3" />
+      </default>
+      <default class="arm_large_actuator">
+        <general forcerange="-105 105" biastype="affine" gainprm="2000" biasprm="0 -2000 -100" />
+      </default>
+      <default class="arm_small_actuator">
+        <general forcerange="-52 52" biastype="affine" gainprm="500" biasprm="0 -500 -50" />
+      </default>
+      <default class="arm_2f85_main">
+        <site size="0.005 0.005 0.005" group="0" rgba="0.5 0.5 0.5 1" />
+        <default class="arm_2f85_2f85">
+          <mesh scale="0.001 0.001 0.001" />
+          <general biastype="affine" />
+          <default class="arm_2f85_driver">
+            <joint solreflimit="0.005" solimplimit="0.95 0.99" range="0 0.8" armature="0.005" damping="0.1" />
+          </default>
+          <default class="arm_2f85_follower">
+            <joint solreflimit="0.005" solimplimit="0.95 0.99" range="-0.872664 0.872664" armature="0.001" />
+          </default>
+          <default class="arm_2f85_spring_link">
+            <joint springref="2.62" stiffness="0.05" range="-0.296706 0.8" armature="0.001" damping="0.00125" />
+          </default>
+          <default class="arm_2f85_coupler">
+            <joint solreflimit="0.005" solimplimit="0.95 0.99" range="-1.57 0" armature="0.001" />
+          </default>
+          <default class="arm_2f85_visual">
+            <geom type="mesh" contype="0" conaffinity="0" group="2" />
+          </default>
+          <default class="arm_2f85_collision">
+            <geom type="mesh" group="3" />
+            <default class="arm_2f85_pad_box1">
+              <geom size="0.011 0.004 0.009375" type="box" priority="1" friction="0.7" solref="0.004" solimp="0.95 0.99" rgba="0.55 0.55 0.55 1" />
+            </default>
+            <default class="arm_2f85_pad_box2">
+              <geom size="0.011 0.004 0.009375" type="box" priority="1" friction="0.6" solref="0.004" solimp="0.95 0.99" rgba="0.45 0.45 0.45 1" />
+            </default>
+          </default>
+        </default>
+      </default>
+    </default>
+  </default>
+  <asset>
+    <texture type="2d" colorspace="sRGB" name="tex_mat_mebot__front_caster_motor__elevator_body_normal" file="assets/mebot__front_caster_motor__elevator_body_normal.png" />
+    <texture type="2d" colorspace="sRGB" name="tex_mat_mebot__front_caster_wheel_l__caster_dampener_rod_normal" file="assets/mebot__front_caster_wheel_l__caster_dampener_rod_normal.png" />
+    <texture type="2d" colorspace="sRGB" name="tex_mat_mebot__front_caster_wheel_r__caster_dampener_rod_normal" file="assets/mebot__front_caster_wheel_r__caster_dampener_rod_normal.png" />
+    <texture type="2d" colorspace="sRGB" name="tex_mat_mebot__motor_elevator_l__elevator_body_normal" file="assets/mebot__motor_elevator_l__elevator_body_normal.png" />
+    <texture type="2d" colorspace="sRGB" name="tex_mat_mebot__motor_elevator_r__elevator_body_normal" file="assets/mebot__motor_elevator_r__elevator_body_normal.png" />
+    <texture type="2d" colorspace="sRGB" name="tex_mat_mebot__rear_caster_dampener_rod__caster_dampener_rod_normal" file="assets/mebot__rear_caster_dampener_rod__caster_dampener_rod_normal.png" />
+    <texture type="2d" colorspace="sRGB" name="tex_mat_mebot__rear_caster_motor__elevator_body_normal" file="assets/mebot__rear_caster_motor__elevator_body_normal.png" />
+    <material name="mat_rubber" rgba="0.0402 0.0402 0.0402 1" />
+    <material name="mat_wheel_hub" rgba="0.2983 0.2983 0.2983 1" />
+    <material name="mat_link_metal" rgba="0.0993 0.0993 0.0993 1" />
+    <material name="mat_chassis_metal" rgba="0.1806 0.1806 0.1806 1" />
+    <material name="mat_elevator_dampener" rgba="0.5413 0.4565 0.8 1" />
+    <material name="mat_elevator_dampener_rod" rgba="0.3654 0.8 0.4447 1" />
+    <material name="mat_caster_arm_metal" rgba="0.2912 0.2912 0.2912 1" />
+    <material name="mat_mebot__front_caster_motor__elevator_body" rgba="0.0714 0.1262 0.1364 1">
+      <layer texture="tex_mat_mebot__front_caster_motor__elevator_body_normal" role="normal" />
+    </material>
+    <material name="mat_elevator_rod" rgba="0.8 0.3559 0.3559 1" />
+    <material name="mat_caster_rubber" rgba="0.0548 0.0548 0.0548 1" />
+    <material name="mat_caster_metal" rgba="0.8 0.8 0.8 1" />
+    <material name="mat_mebot__front_caster_wheel_l__caster_dampener_rod" rgba="0.7922 0.8196 0.9333 1">
+      <layer texture="tex_mat_mebot__front_caster_wheel_l__caster_dampener_rod_normal" role="normal" />
+    </material>
+    <material name="mat_mebot__front_caster_wheel_r__caster_dampener_rod" rgba="0.7922 0.8196 0.9333 1">
+      <layer texture="tex_mat_mebot__front_caster_wheel_r__caster_dampener_rod_normal" role="normal" />
+    </material>
+    <material name="mat_mebot__motor_elevator_l__elevator_body" rgba="0.0714 0.1262 0.1364 1">
+      <layer texture="tex_mat_mebot__motor_elevator_l__elevator_body_normal" role="normal" />
+    </material>
+    <material name="mat_motor_brake" rgba="0.141 0.141 0.141 1" />
+    <material name="mat_mebot__motor_elevator_r__elevator_body" rgba="0.0714 0.1262 0.1364 1">
+      <layer texture="tex_mat_mebot__motor_elevator_r__elevator_body_normal" role="normal" />
+    </material>
+    <material name="mat_motor_body" rgba="0.1579 0.4167 0.8 1" />
+    <material name="mat_swing_arm_metal" rgba="0.3415 0.8 0.7783 1" />
+    <material name="mat_motor_gearbox" rgba="0.1932 0.2198 0.8 1" />
+    <material name="mat_caster_dampener" rgba="0.016 0.3968 1 1" />
+    <material name="mat_mebot__rear_caster_dampener_rod__caster_dampener_rod" rgba="0.0753 0.8101 0.9333 1">
+      <layer texture="tex_mat_mebot__rear_caster_dampener_rod__caster_dampener_rod_normal" role="normal" />
+    </material>
+    <material name="mat_mebot__rear_caster_motor__elevator_body" rgba="0.0714 0.1262 0.1364 1">
+      <layer texture="tex_mat_mebot__rear_caster_motor__elevator_body_normal" role="normal" />
+    </material>
+    <material name="arm_2f85_metal" rgba="0.58 0.58 0.58 1" />
+    <material name="arm_2f85_silicone" rgba="0.1882 0.1882 0.1882 1" />
+    <material name="arm_2f85_gray" rgba="0.4627 0.4627 0.4627 1" />
+    <material name="arm_2f85_black" rgba="0.149 0.149 0.149 1" />
+    <mesh name="mebot__drive_wheel_l__rubber" file="assets/mebot__drive_wheel_l__rubber.obj" />
+    <mesh name="mebot__drive_wheel_l__wheel_hub" file="assets/mebot__drive_wheel_l__wheel_hub.obj" />
+    <mesh name="mebot__drive_wheel_r__rubber" file="assets/mebot__drive_wheel_r__rubber.obj" />
+    <mesh name="mebot__drive_wheel_r__wheel_hub" file="assets/mebot__drive_wheel_r__wheel_hub.obj" />
+    <mesh name="mebot__dw_main_plate_l__link_metal" file="assets/mebot__dw_main_plate_l__link_metal.obj" />
+    <mesh name="mebot__dw_main_plate_l__chassis_metal" file="assets/mebot__dw_main_plate_l__chassis_metal.obj" />
+    <mesh name="mebot__dw_main_plate_r__link_metal" file="assets/mebot__dw_main_plate_r__link_metal.obj" />
+    <mesh name="mebot__dw_main_plate_r__chassis_metal" file="assets/mebot__dw_main_plate_r__chassis_metal.obj" />
+    <mesh name="mebot__elevator_dampener_aux_link_l__link_metal" file="assets/mebot__elevator_dampener_aux_link_l__link_metal.obj" />
+    <mesh name="mebot__elevator_dampener_aux_link_r__link_metal" file="assets/mebot__elevator_dampener_aux_link_r__link_metal.obj" />
+    <mesh name="mebot__elevator_dampener_l__elevator_dampener" file="assets/mebot__elevator_dampener_l__elevator_dampener.obj" />
+    <mesh name="mebot__elevator_dampener_link_l__link_metal" file="assets/mebot__elevator_dampener_link_l__link_metal.obj" />
+    <mesh name="mebot__elevator_dampener_link_r__link_metal" file="assets/mebot__elevator_dampener_link_r__link_metal.obj" />
+    <mesh name="mebot__elevator_dampener_r__elevator_dampener" file="assets/mebot__elevator_dampener_r__elevator_dampener.obj" />
+    <mesh name="mebot__elevator_dampener_rod_l__elevator_dampener_rod" file="assets/mebot__elevator_dampener_rod_l__elevator_dampener_rod.obj" />
+    <mesh name="mebot__elevator_dampener_rod_r__elevator_dampener_rod" file="assets/mebot__elevator_dampener_rod_r__elevator_dampener_rod.obj" />
+    <mesh name="mebot__front_caster_linkage__caster_arm_metal" file="assets/mebot__front_caster_linkage__caster_arm_metal.obj" />
+    <mesh name="mebot__front_caster_linkage_arm__caster_arm_metal" file="assets/mebot__front_caster_linkage_arm__caster_arm_metal.obj" />
+    <mesh name="mebot__front_caster_linkage_aux__caster_arm_metal" file="assets/mebot__front_caster_linkage_aux__caster_arm_metal.obj" />
+    <mesh name="mebot__front_caster_linkage_aux_arm__caster_arm_metal" file="assets/mebot__front_caster_linkage_aux_arm__caster_arm_metal.obj" />
+    <mesh name="mebot__front_caster_motor__elevator_body" file="assets/mebot__front_caster_motor__elevator_body.obj" />
+    <mesh name="mebot__front_caster_motor_rod__elevator_rod" file="assets/mebot__front_caster_motor_rod__elevator_rod.obj" />
+    <mesh name="mebot__front_caster_swing_arm__caster_arm_metal" file="assets/mebot__front_caster_swing_arm__caster_arm_metal.obj" />
+    <mesh name="mebot__front_caster_wheel_l__caster_rubber" file="assets/mebot__front_caster_wheel_l__caster_rubber.obj" />
+    <mesh name="mebot__front_caster_wheel_l__caster_metal" file="assets/mebot__front_caster_wheel_l__caster_metal.obj" />
+    <mesh name="mebot__front_caster_wheel_l__caster_dampener_rod" file="assets/mebot__front_caster_wheel_l__caster_dampener_rod.obj" />
+    <mesh name="mebot__front_caster_wheel_r__caster_rubber" file="assets/mebot__front_caster_wheel_r__caster_rubber.obj" />
+    <mesh name="mebot__front_caster_wheel_r__caster_metal" file="assets/mebot__front_caster_wheel_r__caster_metal.obj" />
+    <mesh name="mebot__front_caster_wheel_r__caster_dampener_rod" file="assets/mebot__front_caster_wheel_r__caster_dampener_rod.obj" />
+    <mesh name="mebot__mebot__chassis_metal" file="assets/mebot__mebot__chassis_metal.obj" />
+    <mesh name="mebot__motor_elevator_l__elevator_body" file="assets/mebot__motor_elevator_l__elevator_body.obj" />
+    <mesh name="mebot__motor_elevator_l__motor_brake" file="assets/mebot__motor_elevator_l__motor_brake.obj" />
+    <mesh name="mebot__motor_elevator_pivot_l__link_metal" file="assets/mebot__motor_elevator_pivot_l__link_metal.obj" />
+    <mesh name="mebot__motor_elevator_pivot_r__link_metal" file="assets/mebot__motor_elevator_pivot_r__link_metal.obj" />
+    <mesh name="mebot__motor_elevator_r__elevator_body" file="assets/mebot__motor_elevator_r__elevator_body.obj" />
+    <mesh name="mebot__motor_elevator_r__motor_brake" file="assets/mebot__motor_elevator_r__motor_brake.obj" />
+    <mesh name="mebot__motor_elevator_rod_l__elevator_rod" file="assets/mebot__motor_elevator_rod_l__elevator_rod.obj" />
+    <mesh name="mebot__motor_elevator_rod_link_l__link_metal" file="assets/mebot__motor_elevator_rod_link_l__link_metal.obj" />
+    <mesh name="mebot__motor_elevator_rod_link_r__link_metal" file="assets/mebot__motor_elevator_rod_link_r__link_metal.obj" />
+    <mesh name="mebot__motor_elevator_rod_r__elevator_rod" file="assets/mebot__motor_elevator_rod_r__elevator_rod.obj" />
+    <mesh name="mebot__motor_swing_arm_l__motor_body" file="assets/mebot__motor_swing_arm_l__motor_body.obj" />
+    <mesh name="mebot__motor_swing_arm_l__swing_arm_metal" file="assets/mebot__motor_swing_arm_l__swing_arm_metal.obj" />
+    <mesh name="mebot__motor_swing_arm_l__motor_gearbox" file="assets/mebot__motor_swing_arm_l__motor_gearbox.obj" />
+    <mesh name="mebot__motor_swing_arm_l__motor_brake" file="assets/mebot__motor_swing_arm_l__motor_brake.obj" />
+    <mesh name="mebot__motor_swing_arm_r__motor_body" file="assets/mebot__motor_swing_arm_r__motor_body.obj" />
+    <mesh name="mebot__motor_swing_arm_r__swing_arm_metal" file="assets/mebot__motor_swing_arm_r__swing_arm_metal.obj" />
+    <mesh name="mebot__motor_swing_arm_r__motor_gearbox" file="assets/mebot__motor_swing_arm_r__motor_gearbox.obj" />
+    <mesh name="mebot__motor_swing_arm_r__motor_brake" file="assets/mebot__motor_swing_arm_r__motor_brake.obj" />
+    <mesh name="mebot__rear_caster_aux_linkage__caster_arm_metal" file="assets/mebot__rear_caster_aux_linkage__caster_arm_metal.obj" />
+    <mesh name="mebot__rear_caster_dampener__caster_dampener" file="assets/mebot__rear_caster_dampener__caster_dampener.obj" />
+    <mesh name="mebot__rear_caster_dampener_rod__caster_dampener_rod" file="assets/mebot__rear_caster_dampener_rod__caster_dampener_rod.obj" />
+    <mesh name="mebot__rear_caster_motor__elevator_body" file="assets/mebot__rear_caster_motor__elevator_body.obj" />
+    <mesh name="mebot__rear_caster_motor_dampener_pivot__caster_arm_metal" file="assets/mebot__rear_caster_motor_dampener_pivot__caster_arm_metal.obj" />
+    <mesh name="mebot__rear_caster_motor_rod__elevator_rod" file="assets/mebot__rear_caster_motor_rod__elevator_rod.obj" />
+    <mesh name="mebot__rear_caster_suspension_arm__caster_arm_metal" file="assets/mebot__rear_caster_suspension_arm__caster_arm_metal.obj" />
+    <mesh name="mebot__rear_caster_swing_arm__caster_arm_metal" file="assets/mebot__rear_caster_swing_arm__caster_arm_metal.obj" />
+    <mesh name="mebot__rear_caster_wheel_l__caster_rubber" file="assets/mebot__rear_caster_wheel_l__caster_rubber.obj" />
+    <mesh name="mebot__rear_caster_wheel_l__caster_metal" file="assets/mebot__rear_caster_wheel_l__caster_metal.obj" />
+    <mesh name="mebot__rear_caster_wheel_r__caster_rubber" file="assets/mebot__rear_caster_wheel_r__caster_rubber.obj" />
+    <mesh name="mebot__rear_caster_wheel_r__caster_metal" file="assets/mebot__rear_caster_wheel_r__caster_metal.obj" />
+    <mesh name="arm_base_link" file="../gen3_2f85/assets/base_link.stl" />
+    <mesh name="arm_shoulder_link" file="../gen3_2f85/assets/shoulder_link.stl" />
+    <mesh name="arm_half_arm_1_link" file="../gen3_2f85/assets/half_arm_1_link.stl" />
+    <mesh name="arm_half_arm_2_link" file="../gen3_2f85/assets/half_arm_2_link.stl" />
+    <mesh name="arm_forearm_link" file="../gen3_2f85/assets/forearm_link.stl" />
+    <mesh name="arm_spherical_wrist_1_link" file="../gen3_2f85/assets/spherical_wrist_1_link.stl" />
+    <mesh name="arm_spherical_wrist_2_link" file="../gen3_2f85/assets/spherical_wrist_2_link.stl" />
+    <mesh name="arm_bracelet_with_vision_link" file="../gen3_2f85/assets/bracelet_with_vision_link.stl" />
+    <mesh name="arm_2f85_base_mount" class="arm_2f85_2f85" file="../gen3_2f85/assets/base_mount.stl" />
+    <mesh name="arm_2f85_base" class="arm_2f85_2f85" file="../gen3_2f85/assets/base.stl" />
+    <mesh name="arm_2f85_driver" class="arm_2f85_2f85" file="../gen3_2f85/assets/driver.stl" />
+    <mesh name="arm_2f85_coupler" class="arm_2f85_2f85" file="../gen3_2f85/assets/coupler.stl" />
+    <mesh name="arm_2f85_follower" class="arm_2f85_2f85" file="../gen3_2f85/assets/follower.stl" />
+    <mesh name="arm_2f85_pad" class="arm_2f85_2f85" file="../gen3_2f85/assets/pad.stl" />
+    <mesh name="arm_2f85_silicone_pad" class="arm_2f85_2f85" file="../gen3_2f85/assets/silicone_pad.stl" />
+    <mesh name="arm_2f85_spring_link" class="arm_2f85_2f85" file="../gen3_2f85/assets/spring_link.stl" />
+  </asset>
+  <worldbody>
+    <geom name="floor" size="20 20 0.1" type="plane" />
+    <body name="mebot" pos="0 0 0.05">
+      <inertial pos="0.27305 0 0.14488" quat="1 0 0 0" mass="75.019855" diaginertia="1.4585869 3.3971882 3.2711556" />
+      <joint name="mebot_root" type="free" />
+      <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_chassis_metal" mesh="mebot__mebot__chassis_metal" />
+      <geom size="0.32275 0.16323 0.178" pos="0.27305 0 0.14488" type="box" conaffinity="2" group="3" />
+      <site name="arm_mount" pos="0.4 0.18 0.33" />
+      <body name="dw_main_plate_l" pos="0.16682 0.16011 0.11342">
+        <inertial pos="0.13019 0.0391 0.0394" quat="1 0 0 0" mass="10.641446" diaginertia="0.043747412 0.25603627 0.2337335" />
+        <joint name="dw_main_plate_l" pos="0 0 0" axis="1 0 0" type="slide" stiffness="100000" range="-0.1 0.1" damping="2000" />
+        <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_link_metal" mesh="mebot__dw_main_plate_l__link_metal" />
+        <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_chassis_metal" mesh="mebot__dw_main_plate_l__chassis_metal" />
+        <geom size="0.25074 0.05498 0.09649" pos="0.13019 0.0391 0.0394" type="box" conaffinity="2" group="3" />
+        <body name="elevator_dampener_l" pos="0.0762 0.0513 0.05715">
+          <inertial pos="0.06104 0.00445 0.02593" quat="1 0 0 0" mass="0.60358311" diaginertia="0.00046539044 0.00129025 0.0011271775" />
+          <joint name="elevator_dampener_l" pos="0 0 0" axis="0 1 0" range="-0.523599 0.523599" armature="0.005" damping="50" />
+          <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_elevator_dampener" mesh="mebot__elevator_dampener_l__elevator_dampener" />
+          <geom size="0.06965 0.02741 0.03952" pos="0.06104 0.00445 0.02593" type="box" conaffinity="2" group="3" />
+          <body name="elevator_dampener_rod_l" pos="0.11522 0.00054 0.03967">
+            <inertial pos="0.04041 -0.00087 0.01183" quat="1 0 0 0" mass="0.14256607" diaginertia="4.3076266e-05 0.00013020545 0.00010868551" />
+            <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_elevator_dampener_rod" mesh="mebot__elevator_dampener_rod_l__elevator_dampener_rod" />
+            <geom size="0.04539 0.01506 0.02607" pos="0.04041 -0.00087 0.01183" type="box" conaffinity="2" group="3" />
+          </body>
+        </body>
+        <body name="elevator_dampener_link_l" pos="0.26126 0.06209 0.07641">
+          <inertial pos="0.00354 -0.01817 0.01245" quat="1 0 0 0" mass="0.17431718" diaginertia="0.00015931408 0.00013342252 6.250543e-05" />
+          <joint name="elevator_dampener_link_l" pos="0 0 0" axis="0 1 0" range="-0.523599 0.523599" armature="0.005" damping="50" />
+          <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_link_metal" mesh="mebot__elevator_dampener_link_l__link_metal" />
+          <geom size="0.01775 0.02758 0.04451" pos="0.00354 -0.01817 0.01245" type="box" conaffinity="2" group="3" />
+          <body name="elevator_dampener_aux_link_l" pos="0.01781 -0.00792 -0.0103">
+            <inertial pos="0.0001 -0.01025 -0.00044" quat="1 0 0 0" mass="0.1475045" diaginertia="5.8713125e-05 7.2007986e-05 8.8095024e-05" />
+            <joint name="elevator_dampener_aux_link_l" pos="0 0 0" axis="0 1 0" range="-0.523599 0.523599" armature="0.005" damping="50" />
+            <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_link_metal" mesh="mebot__elevator_dampener_aux_link_l__link_metal" />
+            <geom size="0.03211 0.02758 0.02082" pos="0.0001 -0.01025 -0.00044" type="box" conaffinity="2" group="3" />
+          </body>
+        </body>
+        <body name="motor_elevator_pivot_l" pos="0.29885 0.04717 0.10969">
+          <inertial pos="0.00014 -0.00325 0.00776" quat="1 0 0 0" mass="0.21362329" diaginertia="0.00027875006 0.00024574962 7.5328843e-05" />
+          <joint name="motor_elevator_pivot_l" pos="0 0 0" axis="0 1 0" stiffness="1000" range="-0.523599 0.523599" armature="0.005" damping="200" />
+          <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_link_metal" mesh="mebot__motor_elevator_pivot_l__link_metal" />
+          <geom size="0.01724 0.02758 0.05616" pos="0.00014 -0.00325 0.00776" type="box" conaffinity="2" group="3" />
+          <body name="motor_elevator_rod_link_l" pos="0 -0.0127 0.0508">
+            <inertial pos="-0.01561 0.01502 -0.00168" quat="1 0 0 0" mass="0.060796114" diaginertia="1.1725483e-05 1.9616825e-05 2.3477524e-05" />
+            <joint name="motor_elevator_rod_link_l" pos="0 0 0" axis="0 1 0" range="-0.523599 0.523599" armature="0.005" damping="50" />
+            <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_link_metal" mesh="mebot__motor_elevator_rod_link_l__link_metal" />
+            <geom size="0.02782 0.01961 0.01393" pos="-0.01561 0.01502 -0.00168" type="box" conaffinity="2" group="3" />
+          </body>
+        </body>
+        <body name="motor_swing_arm_l" pos="0 0.02189 0">
+          <inertial pos="0.12885 0.04078 0.0087" quat="1 0 0 0" mass="17.125873" diaginertia="0.12735406 0.47652805 0.39270867" />
+          <joint name="motor_swing_arm_l" pos="0 0 0" axis="0 1 0" range="-0.523599 0.523599" armature="0.005" damping="150" />
+          <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_motor_body" mesh="mebot__motor_swing_arm_l__motor_body" />
+          <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_swing_arm_metal" mesh="mebot__motor_swing_arm_l__swing_arm_metal" />
+          <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_motor_gearbox" mesh="mebot__motor_swing_arm_l__motor_gearbox" />
+          <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_motor_brake" mesh="mebot__motor_swing_arm_l__motor_brake" />
+          <geom size="0.25491 0.06175 0.136" pos="0.12885 0.04078 0.0087" type="box" conaffinity="2" group="3" />
+          <body name="drive_wheel_l" pos="0.31877 0.11955 -0.0138">
+            <inertial pos="0 0 0" quat="0 0 0.70710678 0.70710678" mass="8.1264359" diaginertia="0.072914237 0.072914237 0.13796832" />
+            <joint name="drive_wheel_l" pos="0 0 0" axis="0 1 0" armature="0.005" damping="0.5" frictionloss="0.05" />
+            <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_rubber" mesh="mebot__drive_wheel_l__rubber" />
+            <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_wheel_hub" mesh="mebot__drive_wheel_l__wheel_hub" />
+            <geom size="0.18427 0.03809" quat="0 0 0.707107 0.707107" type="cylinder" conaffinity="2" group="3" />
+          </body>
+          <body name="motor_elevator_l" pos="-0.10372 0.02528 0.12668">
+            <inertial pos="0.13868 0.04086 0.01437" quat="1 0 0 0" mass="5.1422809" diaginertia="0.015328661 0.046956568 0.053175156" />
+            <joint name="motor_elevator_l" pos="0 0 0" axis="0 1 0" range="-0.523599 0.523599" armature="0.005" damping="500" />
+            <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_mebot__motor_elevator_l__elevator_body" mesh="mebot__motor_elevator_l__elevator_body" />
+            <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_motor_brake" mesh="mebot__motor_elevator_l__motor_brake" />
+            <geom size="0.15728 0.07928 0.05155" pos="0.13868 0.04086 0.01437" type="box" conaffinity="2" group="3" />
+            <body name="motor_elevator_rod_l" pos="0.37865 0 0.0318">
+              <inertial pos="-0.07604 0 -0.00589" quat="1 0 0 0" mass="0.05830153" diaginertia="4.3627462e-06 0.00011667545 0.00011437829" />
+              <joint name="motor_elevator_rod_l" pos="0 0 0" axis="0.996491 0 0.0836992" type="slide" range="-0.05 0.05" damping="500" />
+              <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_elevator_rod" mesh="mebot__motor_elevator_rod_l__elevator_rod" />
+              <geom size="0.07637 0.00729 0.01309" pos="-0.07604 0 -0.00589" type="box" conaffinity="2" group="3" />
+            </body>
+          </body>
+        </body>
+      </body>
+      <body name="dw_main_plate_r" pos="0.16682 -0.16523 0.11342">
+        <inertial pos="0.13019 -0.0391 0.0394" quat="1 0 0 0" mass="10.641446" diaginertia="0.043747412 0.25603627 0.2337335" />
+        <joint name="dw_main_plate_r" pos="0 0 0" axis="1 0 0" type="slide" stiffness="100000" range="-0.1 0.1" damping="2000" />
+        <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_link_metal" mesh="mebot__dw_main_plate_r__link_metal" />
+        <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_chassis_metal" mesh="mebot__dw_main_plate_r__chassis_metal" />
+        <geom size="0.25074 0.05498 0.09649" pos="0.13019 -0.0391 0.0394" type="box" conaffinity="2" group="3" />
+        <body name="elevator_dampener_link_r" pos="0.26126 -0.06208 0.07641">
+          <inertial pos="0.00354 0.01817 0.01245" quat="1 0 0 0" mass="0.17431718" diaginertia="0.00015931408 0.00013342252 6.250543e-05" />
+          <joint name="elevator_dampener_link_r" pos="0 0 0" axis="0 1 0" range="-0.523599 0.523599" armature="0.005" damping="50" />
+          <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_link_metal" mesh="mebot__elevator_dampener_link_r__link_metal" />
+          <geom size="0.01775 0.02758 0.04451" pos="0.00354 0.01817 0.01245" type="box" conaffinity="2" group="3" />
+          <body name="elevator_dampener_aux_link_r" pos="0.01781 0.00792 -0.0103">
+            <inertial pos="0.0001 0.01025 -0.00044" quat="1 0 0 0" mass="0.1475045" diaginertia="5.8713125e-05 7.2007986e-05 8.8095024e-05" />
+            <joint name="elevator_dampener_aux_link_r" pos="0 0 0" axis="0 1 0" range="-0.523599 0.523599" armature="0.005" damping="50" />
+            <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_link_metal" mesh="mebot__elevator_dampener_aux_link_r__link_metal" />
+            <geom size="0.03211 0.02758 0.02082" pos="0.0001 0.01025 -0.00044" type="box" conaffinity="2" group="3" />
+          </body>
+        </body>
+        <body name="elevator_dampener_r" pos="0.0762 -0.04634 0.05715">
+          <inertial pos="0.06104 -0.00445 0.02593" quat="1 0 0 0" mass="0.60358311" diaginertia="0.00046539044 0.00129025 0.0011271775" />
+          <joint name="elevator_dampener_r" pos="0 0 0" axis="0 1 0" range="-0.523599 0.523599" armature="0.005" damping="50" />
+          <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_elevator_dampener" mesh="mebot__elevator_dampener_r__elevator_dampener" />
+          <geom size="0.06965 0.02741 0.03952" pos="0.06104 -0.00445 0.02593" type="box" conaffinity="2" group="3" />
+          <body name="elevator_dampener_rod_r" pos="0.11522 0.00066 0.03967">
+            <inertial pos="0.04041 -0.00087 0.01183" quat="1 0 0 0" mass="0.14256607" diaginertia="4.3076266e-05 0.00013020545 0.00010868551" />
+            <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_elevator_dampener_rod" mesh="mebot__elevator_dampener_rod_r__elevator_dampener_rod" />
+            <geom size="0.04539 0.01506 0.02607" pos="0.04041 -0.00087 0.01183" type="box" conaffinity="2" group="3" />
+          </body>
+        </body>
+        <body name="motor_elevator_pivot_r" pos="0.29885 -0.04716 0.10969">
+          <inertial pos="0.00014 0.00325 0.00776" quat="1 0 0 0" mass="0.21362329" diaginertia="0.00027875006 0.00024574962 7.5328843e-05" />
+          <joint name="motor_elevator_pivot_r" pos="0 0 0" axis="0 1 0" stiffness="1000" range="-0.523599 0.523599" armature="0.005" damping="200" />
+          <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_link_metal" mesh="mebot__motor_elevator_pivot_r__link_metal" />
+          <geom size="0.01724 0.02758 0.05616" pos="0.00014 0.00325 0.00776" type="box" conaffinity="2" group="3" />
+          <body name="motor_elevator_rod_link_r" pos="0 0.0127 0.0508">
+            <inertial pos="-0.01561 -0.01502 -0.00168" quat="1 0 0 0" mass="0.060796114" diaginertia="1.1725483e-05 1.9616825e-05 2.3477524e-05" />
+            <joint name="motor_elevator_rod_link_r" pos="0 0 0" axis="0 1 0" range="-0.523599 0.523599" armature="0.005" damping="50" />
+            <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_link_metal" mesh="mebot__motor_elevator_rod_link_r__link_metal" />
+            <geom size="0.02782 0.01961 0.01393" pos="-0.01561 -0.01502 -0.00168" type="box" conaffinity="2" group="3" />
+          </body>
+        </body>
+        <body name="motor_swing_arm_r" pos="0 -0.02189 0">
+          <inertial pos="0.12885 -0.04078 0.0087" quat="1 0 0 0" mass="17.125873" diaginertia="0.12735406 0.47652805 0.39270867" />
+          <joint name="motor_swing_arm_r" pos="0 0 0" axis="0 1 0" range="-0.523599 0.523599" armature="0.005" damping="150" />
+          <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_motor_body" mesh="mebot__motor_swing_arm_r__motor_body" />
+          <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_swing_arm_metal" mesh="mebot__motor_swing_arm_r__swing_arm_metal" />
+          <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_motor_gearbox" mesh="mebot__motor_swing_arm_r__motor_gearbox" />
+          <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_motor_brake" mesh="mebot__motor_swing_arm_r__motor_brake" />
+          <geom size="0.25491 0.06175 0.136" pos="0.12885 -0.04078 0.0087" type="box" conaffinity="2" group="3" />
+          <body name="drive_wheel_r" pos="0.31877 -0.11954 -0.0138">
+            <inertial pos="0 0 0" quat="0 0 0.70710678 0.70710678" mass="8.1264359" diaginertia="0.072914237 0.072914237 0.13796832" />
+            <joint name="drive_wheel_r" pos="0 0 0" axis="0 1 0" armature="0.005" damping="0.5" frictionloss="0.05" />
+            <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_rubber" mesh="mebot__drive_wheel_r__rubber" />
+            <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_wheel_hub" mesh="mebot__drive_wheel_r__wheel_hub" />
+            <geom size="0.18427 0.03809" quat="0 0 0.707107 0.707107" type="cylinder" conaffinity="2" group="3" />
+          </body>
+          <body name="motor_elevator_r" pos="-0.10372 -0.02527 0.12668">
+            <inertial pos="0.13868 -0.04086 0.01437" quat="1 0 0 0" mass="5.1422809" diaginertia="0.015328661 0.046956568 0.053175156" />
+            <joint name="motor_elevator_r" pos="0 0 0" axis="0 1 0" range="-0.523599 0.523599" armature="0.005" damping="500" />
+            <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_mebot__motor_elevator_r__elevator_body" mesh="mebot__motor_elevator_r__elevator_body" />
+            <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_motor_brake" mesh="mebot__motor_elevator_r__motor_brake" />
+            <geom size="0.15728 0.07928 0.05155" pos="0.13868 -0.04086 0.01437" type="box" conaffinity="2" group="3" />
+            <body name="motor_elevator_rod_r" pos="0.37865 0 0.0318">
+              <inertial pos="-0.07604 0 -0.00589" quat="1 0 0 0" mass="0.05830153" diaginertia="4.3627462e-06 0.00011667545 0.00011437829" />
+              <joint name="motor_elevator_rod_r" pos="0 0 0" axis="0.996491 0 0.0836992" type="slide" range="-0.05 0.05" damping="500" />
+              <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_elevator_rod" mesh="mebot__motor_elevator_rod_r__elevator_rod" />
+              <geom size="0.07637 0.00729 0.01309" pos="-0.07604 0 -0.00589" type="box" conaffinity="2" group="3" />
+            </body>
+          </body>
+        </body>
+      </body>
+      <body name="front_caster_linkage" pos="0.55245 -0.03254 0.28194">
+        <inertial pos="0.0173 0.00281 -0.13454" quat="1 0 0 0" mass="9.5363386" diaginertia="0.11653101 0.12822131 0.044246302" />
+        <joint name="front_caster_linkage" pos="0 0 0" axis="0 1 0" range="-0.349066 0.349066" armature="0.005" damping="5" />
+        <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_caster_arm_metal" mesh="mebot__front_caster_linkage__caster_arm_metal" />
+        <geom size="0.0938 0.07156 0.17759" pos="0.0173 0.00281 -0.13454" type="box" conaffinity="2" group="3" />
+        <body name="front_caster_linkage_arm" pos="0.03848 0.02974 0.02455">
+          <inertial pos="0.02189 0.00317 -0.04977" quat="1 0 0 0" mass="0.16135336" diaginertia="0.00021377187 0.00027091573 6.6913373e-05" />
+          <joint name="front_caster_linkage_arm" pos="0 0 0" axis="0 1 0" range="-0.523599 0.523599" armature="0.005" damping="5" />
+          <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_caster_arm_metal" mesh="mebot__front_caster_linkage_arm__caster_arm_metal" />
+          <geom size="0.03396 0.00953 0.06232" pos="0.02189 0.00317 -0.04977" type="box" conaffinity="2" group="3" />
+        </body>
+      </body>
+      <body name="front_caster_linkage_aux" pos="0.57785 0 0.18349">
+        <inertial pos="0.03591 0.00331 0.01347" quat="1 0 0 0" mass="0.48657615" diaginertia="0.0004798354 0.00049593142 0.00075292659" />
+        <joint name="front_caster_linkage_aux" pos="0 0 0" axis="0 1 0" range="-0.523599 0.523599" armature="0.005" damping="5" />
+        <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_caster_arm_metal" mesh="mebot__front_caster_linkage_aux__caster_arm_metal" />
+        <geom size="0.04869 0.04766 0.02621" pos="0.03591 0.00331 0.01347" type="box" conaffinity="2" group="3" />
+        <body name="front_caster_linkage_aux_arm" pos="0.07112 0.00159 0">
+          <inertial pos="0 -0.00159 -0.09962" quat="1 0 0 0" mass="0.38899758" diaginertia="0.0018511032 0.0017270412 0.000165758" />
+          <joint name="front_caster_linkage_aux_arm" pos="0 0 0" axis="0 1 0" range="-0.523599 0.523599" armature="0.005" damping="5" />
+          <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_caster_arm_metal" mesh="mebot__front_caster_linkage_aux_arm__caster_arm_metal" />
+          <geom size="0.01268 0.03343 0.11471" pos="0 -0.00159 -0.09962" type="box" conaffinity="2" group="3" />
+        </body>
+      </body>
+      <body name="front_caster_motor" pos="0.40677 -0.06509 0.03439">
+        <inertial pos="0.03738 0.04103 0.09368" quat="1 0 0 0" mass="7.5656603" diaginertia="0.069292139 0.070515561 0.032765398" />
+        <joint name="front_caster_motor" pos="0 0 0" axis="0 1 0" range="-0.523599 0.523599" armature="0.005" damping="50" />
+        <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_mebot__front_caster_motor__elevator_body" mesh="mebot__front_caster_motor__elevator_body" />
+        <geom size="0.08209 0.07908 0.14568" pos="0.03738 0.04103 0.09368" type="box" conaffinity="2" group="3" />
+        <body name="front_caster_motor_rod" pos="0.08552 0 0.21774">
+          <inertial pos="-0.02746 0 -0.07093" quat="1 0 0 0" mass="0.14566119" diaginertia="0.00026366777 0.00031741381 5.8906729e-05" />
+          <joint name="front_caster_motor_rod" pos="0 0 0" axis="0.36559 0 0.930776" type="slide" range="-0.08 0.08" damping="500" />
+          <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_elevator_rod" mesh="mebot__front_caster_motor_rod__elevator_rod" />
+          <geom size="0.03406 0.00729 0.07333" pos="-0.02746 0 -0.07093" type="box" conaffinity="2" group="3" />
+        </body>
+      </body>
+      <body name="front_caster_swing_arm" pos="0.57785 0 -0.01651">
+        <inertial pos="0.10795 0 -0.00028" quat="1 0 0 0" mass="5.8528939" diaginertia="0.08461551 0.033015499 0.11459371" />
+        <joint name="front_caster_swing_arm" pos="0 0 0" axis="0 1 0" stiffness="200" range="-0.523599 0.523599" armature="0.005" damping="200" />
+        <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_caster_arm_metal" mesh="mebot__front_caster_swing_arm__caster_arm_metal" />
+        <geom size="0.12706 0.20638 0.0279" pos="0.10795 0 -0.00028" type="box" conaffinity="2" group="3" />
+        <body name="front_caster_wheel_l" pos="0.20955 0.17939 0.0127">
+          <inertial pos="0 0.00019 0" quat="0 0 0.70710678 0.70710678" mass="0.69512946" diaginertia="0.0011018313 0.0011018313 0.0020388245" />
+          <joint name="front_caster_wheel_l" pos="0 0 0" axis="0 1 0" armature="0.005" damping="0.3" frictionloss="0.02" />
+          <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_caster_rubber" mesh="mebot__front_caster_wheel_l__caster_rubber" />
+          <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_caster_metal" mesh="mebot__front_caster_wheel_l__caster_metal" />
+          <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_mebot__front_caster_wheel_l__caster_dampener_rod" mesh="mebot__front_caster_wheel_l__caster_dampener_rod" />
+          <geom size="0.07659 0.01886" pos="0 0.00019 0" quat="0 0 0.707107 0.707107" type="cylinder" conaffinity="2" group="3" priority="1" friction="0.12 0.002 0.0002" />
+        </body>
+        <body name="front_caster_wheel_r" pos="0.20955 -0.17939 0.0127">
+          <inertial pos="0 -0.00019 0" quat="0 0 0.70710678 0.70710678" mass="0.69512946" diaginertia="0.0011018313 0.0011018313 0.0020388245" />
+          <joint name="front_caster_wheel_r" pos="0 0 0" axis="0 1 0" armature="0.005" damping="0.3" frictionloss="0.02" />
+          <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_caster_rubber" mesh="mebot__front_caster_wheel_r__caster_rubber" />
+          <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_caster_metal" mesh="mebot__front_caster_wheel_r__caster_metal" />
+          <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_mebot__front_caster_wheel_r__caster_dampener_rod" mesh="mebot__front_caster_wheel_r__caster_dampener_rod" />
+          <geom size="0.07659 0.01886" pos="0 -0.00019 0" quat="0 0 0.707107 0.707107" type="cylinder" conaffinity="2" group="3" priority="1" friction="0.12 0.002 0.0002" />
+        </body>
+      </body>
+      <body name="rear_caster_motor" pos="0.08563 0.0652 0.04017">
+        <inertial pos="-0.01305 -0.04103 0.09846" quat="1 0 0 0" mass="5.2477608" diaginertia="0.051625627 0.045861182 0.016113981" />
+        <joint name="rear_caster_motor" pos="0 0 0" axis="0 1 0" range="-0.523599 0.523599" armature="0.005" damping="50" />
+        <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_mebot__rear_caster_motor__elevator_body" mesh="mebot__rear_caster_motor__elevator_body" />
+        <geom size="0.05439 0.07908 0.15251" pos="-0.01305 -0.04103 0.09846" type="box" conaffinity="2" group="3" />
+        <body name="rear_caster_motor_rod" pos="-0.0339 0 0.23146">
+          <inertial pos="0.01057 0 -0.07548" quat="1 0 0 0" mass="0.078675978" diaginertia="0.0001539094 0.00016072253 9.6005726e-06" />
+          <joint name="rear_caster_motor_rod" pos="0 0 0" axis="-0.144907 0 0.989445" type="slide" range="-0.08 0.08" damping="500" />
+          <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_elevator_rod" mesh="mebot__rear_caster_motor_rod__elevator_rod" />
+          <geom size="0.01769 0.00729 0.07626" pos="0.01057 0 -0.07548" type="box" conaffinity="2" group="3" />
+        </body>
+      </body>
+      <body name="rear_caster_motor_dampener_pivot" pos="-0.03175 0.00256 0.20889">
+        <inertial pos="-0.03586 -0.00587 0.01565" quat="1 0 0 0" mass="0.60074974" diaginertia="0.00075086159 0.00063722479 0.0010650592" />
+        <joint name="rear_caster_motor_dampener_pivot" pos="0 0 0" axis="0 1 0" stiffness="20" range="-0.523599 0.523599" armature="0.005" damping="50" />
+        <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_caster_arm_metal" mesh="mebot__rear_caster_motor_dampener_pivot__caster_arm_metal" />
+        <geom size="0.04874 0.05425 0.0284" pos="-0.03586 -0.00587 0.01565" type="box" conaffinity="2" group="3" />
+        <body name="rear_caster_dampener" pos="-0.07112 -0.00248 0">
+          <inertial pos="-0.0044 -0.00123 -0.10022" quat="1 0 0 0" mass="0.90456279" diaginertia="0.0038444549 0.0033000044 0.00086179739" />
+          <joint name="rear_caster_dampener" pos="0 0 0" axis="0 1 0" range="-0.523599 0.523599" armature="0.005" damping="50" />
+          <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_caster_dampener" mesh="mebot__rear_caster_dampener__caster_dampener" />
+          <geom size="0.02294 0.04829 0.10207" pos="-0.0044 -0.00123 -0.10022" type="box" conaffinity="2" group="3" />
+          <body name="rear_caster_dampener_rod" pos="0 0 -0.121">
+            <inertial pos="0.00018 -0.00013 -0.04503" quat="1 0 0 0" mass="0.22590593" diaginertia="0.0002832552 0.00016976864 0.00014764407" />
+            <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_mebot__rear_caster_dampener_rod__caster_dampener_rod" mesh="mebot__rear_caster_dampener_rod__caster_dampener_rod" />
+            <geom size="0.01506 0.04164 0.04503" pos="0.00018 -0.00013 -0.04503" type="box" conaffinity="2" group="3" />
+          </body>
+        </body>
+      </body>
+      <body name="rear_caster_suspension_arm" pos="-0.00635 0.03266 0.30734">
+        <inertial pos="0.01195 0.00338 -0.0093" quat="1 0 0 0" mass="1.6822938" diaginertia="0.0045558414 0.0031384943 0.0051564218" />
+        <joint name="rear_caster_suspension_arm" pos="0 0 0" axis="0 1 0" range="-0.523599 0.523599" armature="0.005" damping="5" />
+        <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_caster_arm_metal" mesh="mebot__rear_caster_suspension_arm__caster_arm_metal" />
+        <geom size="0.05774 0.07656 0.04757" pos="0.01195 0.00338 -0.0093" type="box" conaffinity="2" group="3" />
+        <body name="rear_caster_aux_linkage" pos="-0.03586 -0.02937 0.02836">
+          <inertial pos="-0.02229 -0.00318 -0.04963" quat="1 0 0 0" mass="0.16259284" diaginertia="0.00021419983 0.00027311489 6.8759607e-05" />
+          <joint name="rear_caster_aux_linkage" pos="0 0 0" axis="0 1 0" range="-0.523599 0.523599" armature="0.005" damping="5" />
+          <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_caster_arm_metal" mesh="mebot__rear_caster_aux_linkage__caster_arm_metal" />
+          <geom size="0.03432 0.00953 0.06214" pos="-0.02229 -0.00318 -0.04963" type="box" conaffinity="2" group="3" />
+        </body>
+      </body>
+      <body name="rear_caster_swing_arm" pos="-0.03175 0.00011 0.00889">
+        <inertial pos="-0.10792 0 -0.00094" quat="1 0 0 0" mass="4.0352725" diaginertia="0.029686018 0.022696224 0.050393401" />
+        <joint name="rear_caster_swing_arm" pos="0 0 0" axis="0 1 0" stiffness="200" range="-0.523599 0.523599" armature="0.005" damping="200" />
+        <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_caster_arm_metal" mesh="mebot__rear_caster_swing_arm__caster_arm_metal" />
+        <geom size="0.12702 0.14605 0.02719" pos="-0.10792 0 -0.00094" type="box" conaffinity="2" group="3" />
+        <body name="rear_caster_wheel_l" pos="-0.20955 0.08427 0.0127">
+          <inertial pos="0 0.02468 0" quat="0 0 0.70710678 0.70710678" mass="1.9864839" diaginertia="0.0057073412 0.0057073412 0.010146111" />
+          <joint name="rear_caster_wheel_l" pos="0 0 0" axis="0 1 0" armature="0.005" damping="0.3" frictionloss="0.02" />
+          <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_caster_rubber" mesh="mebot__rear_caster_wheel_l__caster_rubber" />
+          <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_caster_metal" mesh="mebot__rear_caster_wheel_l__caster_metal" />
+          <geom size="0.10107 0.03095" pos="0 0.02468 0" quat="0 0 0.707107 0.707107" type="cylinder" conaffinity="2" group="3" priority="1" friction="0.12 0.002 0.0002" />
+        </body>
+        <body name="rear_caster_wheel_r" pos="-0.20955 -0.08426 0.0127">
+          <inertial pos="0 -0.02469 0" quat="0 0 0.70710678 0.70710678" mass="1.9864839" diaginertia="0.0057073412 0.0057073412 0.010146111" />
+          <joint name="rear_caster_wheel_r" pos="0 0 0" axis="0 1 0" armature="0.005" damping="0.3" frictionloss="0.02" />
+          <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_caster_rubber" mesh="mebot__rear_caster_wheel_r__caster_rubber" />
+          <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="mat_caster_metal" mesh="mebot__rear_caster_wheel_r__caster_metal" />
+          <geom size="0.10107 0.03095" pos="0 -0.02469 0" quat="0 0 0.707107 0.707107" type="cylinder" conaffinity="2" group="3" priority="1" friction="0.12 0.002 0.0002" />
+        </body>
+      </body>
+      <body name="arm_base_link" pos="0.4 0.18 0.33">
+        <inertial pos="-0.000648 -0.000166 0.084487" quat="0.999294 0.00139618 -0.0118387 0.035636" mass="1.697" diaginertia="0.00462407 0.00449437 0.00207755" />
+        <geom class="arm_visual" mesh="arm_base_link" />
+        <geom class="arm_collision" mesh="arm_base_link" />
+        <body name="arm_shoulder_link" pos="0 0 0.15643" quat="0 1 0 0">
+          <inertial pos="-2.3e-05 -0.010364 -0.07336" quat="0.707051 0.0451246 -0.0453544 0.704263" mass="1.3773" diaginertia="0.00488868 0.00457 0.00135132" />
+          <joint name="arm_joint_1" pos="0 0 0" axis="0 0 1" />
+          <geom class="arm_visual" mesh="arm_shoulder_link" />
+          <geom class="arm_collision" mesh="arm_shoulder_link" />
+          <body name="arm_half_arm_1_link" pos="0 0.005375 -0.12838" quat="0.707107 0.707107 0 0">
+            <inertial pos="-4.4e-05 -0.09958 -0.013278" quat="0.482348 0.516286 -0.516862 0.483366" mass="1.1636" diaginertia="0.0113017 0.011088 0.00102532" />
+            <joint name="arm_joint_2" pos="0 0 0" axis="0 0 1" range="-2.24 2.24" />
+            <geom class="arm_visual" mesh="arm_half_arm_1_link" />
+            <geom class="arm_collision" mesh="arm_half_arm_1_link" />
+            <body name="arm_half_arm_2_link" pos="0 -0.21038 -0.006375" quat="0.707107 -0.707107 0 0">
+              <inertial pos="-4.4e-05 -0.006641 -0.117892" quat="0.706144 0.0213722 -0.0209128 0.707437" mass="1.1636" diaginertia="0.0111633 0.010932 0.00100671" />
+              <joint name="arm_joint_3" pos="0 0 0" axis="0 0 1" />
+              <geom class="arm_visual" mesh="arm_half_arm_2_link" />
+              <geom class="arm_collision" mesh="arm_half_arm_2_link" />
+              <body name="arm_forearm_link" pos="0 0.006375 -0.21038" quat="0.707107 0.707107 0 0">
+                <inertial pos="-1.8e-05 -0.075478 -0.015006" quat="0.483678 0.515961 -0.515859 0.483455" mass="0.9302" diaginertia="0.00834839 0.008147 0.000598606" />
+                <joint name="arm_joint_4" pos="0 0 0" axis="0 0 1" range="-2.57 2.57" />
+                <geom class="arm_visual" mesh="arm_forearm_link" />
+                <geom class="arm_collision" mesh="arm_forearm_link" />
+                <body name="arm_spherical_wrist_1_link" pos="0 -0.20843 -0.006375" quat="0.707107 -0.707107 0 0">
+                  <inertial pos="1e-06 -0.009432 -0.063883" quat="0.703558 0.0707492 -0.0707492 0.703558" mass="0.6781" diaginertia="0.00165901 0.001596 0.000346988" />
+                  <joint name="arm_joint_5" pos="0 0 0" axis="0 0 1" />
+                  <geom class="arm_visual" mesh="arm_spherical_wrist_1_link" />
+                  <geom class="arm_collision" mesh="arm_spherical_wrist_1_link" />
+                  <body name="arm_spherical_wrist_2_link" pos="0 0.00017505 -0.10593" quat="0.707107 0.707107 0 0">
+                    <inertial pos="1e-06 -0.045483 -0.00965" quat="0.44426 0.550121 -0.550121 0.44426" mass="0.6781" diaginertia="0.00170087 0.001641 0.00035013" />
+                    <joint name="arm_joint_6" pos="0 0 0" axis="0 0 1" range="-2.09 2.09" />
+                    <geom class="arm_visual" mesh="arm_spherical_wrist_2_link" />
+                    <geom class="arm_collision" mesh="arm_spherical_wrist_2_link" />
+                    <body name="arm_bracelet_link" pos="0 -0.10593 -0.00017505" quat="0.707107 -0.707107 0 0">
+                      <inertial pos="0.000281 0.011402 -0.029798" quat="0.394358 0.596779 -0.577293 0.393789" mass="0.5" diaginertia="0.000657336 0.000587019 0.000320645" />
+                      <joint name="arm_joint_7" pos="0 0 0" axis="0 0 1" />
+                      <geom class="arm_visual" mesh="arm_bracelet_with_vision_link" />
+                      <geom class="arm_collision" mesh="arm_bracelet_with_vision_link" />
+                      <site name="arm_pinch_site" pos="0 0 -0.061525" quat="0 1 0 0" size="0.001" group="4" rgba="0.5 0.5 0.5 0.3" />
+                      <camera name="arm_wrist" pos="0 -0.05639 -0.058475" quat="0 0 0 1" resolution="640 480" fovy="41.8379" />
+                      <body name="arm_2f85_base_mount" childclass="arm_2f85_2f85" pos="0 0 -0.068525" quat="0 1 0 0">
+                        <inertial pos="-0.00036058 8.5363e-05 -5.9199e-05" quat="-0.00052222 0.7061 0.00052371 0.708112" mass="0.150003" diaginertia="0.00010235 5.36e-05 5.2172e-05" />
+                        <geom class="arm_2f85_visual" material="arm_2f85_black" mesh="arm_2f85_base_mount" />
+                        <geom class="arm_2f85_collision" mesh="arm_2f85_base_mount" />
+                        <body name="arm_2f85_base" pos="0 0 0.0038" quat="0.707107 0 0 -0.707107">
+                          <inertial pos="0 -2.70394e-05 0.0354675" quat="0.999999 -0.00152849 0 0" mass="0.777441" diaginertia="0.000260285 0.000225381 0.000152708" />
+                          <geom class="arm_2f85_visual" material="arm_2f85_black" mesh="arm_2f85_base" />
+                          <geom class="arm_2f85_collision" mesh="arm_2f85_base" />
+                          <site name="arm_2f85_pinch" pos="0 0 0.145" group="5" rgba="0.9 0.9 0.9 1" />
+                          <body name="arm_2f85_right_driver" pos="0 0.0306011 0.054904">
+                            <inertial pos="2.96931e-12 0.0177547 0.00107314" quat="0.681301 0.732003 0 0" mass="0.00899563" diaginertia="1.72352e-06 1.60906e-06 3.22006e-07" />
+                            <joint name="arm_2f85_right_driver_joint" class="arm_2f85_driver" pos="0 0 0" axis="1 0 0" />
+                            <geom class="arm_2f85_visual" material="arm_2f85_gray" mesh="arm_2f85_driver" />
+                            <geom class="arm_2f85_collision" mesh="arm_2f85_driver" />
+                            <body name="arm_2f85_right_coupler" pos="0 0.0315 -0.0041">
+                              <inertial pos="0 0.00301209 0.0232175" quat="0.705636 -0.0455904 0.0455904 0.705636" mass="0.0140974" diaginertia="4.16206e-06 3.52216e-06 8.88131e-07" />
+                              <joint name="arm_2f85_right_coupler_joint" class="arm_2f85_coupler" pos="0 0 0" axis="1 0 0" />
+                              <geom class="arm_2f85_visual" material="arm_2f85_black" mesh="arm_2f85_coupler" />
+                              <geom class="arm_2f85_collision" mesh="arm_2f85_coupler" />
+                            </body>
+                          </body>
+                          <body name="arm_2f85_right_spring_link" pos="0 0.0132 0.0609">
+                            <inertial pos="-8.65005e-09 0.0181624 0.0212658" quat="0.663403 -0.244737 0.244737 0.663403" mass="0.0221642" diaginertia="8.96853e-06 6.71733e-06 2.63931e-06" />
+                            <joint name="arm_2f85_right_spring_link_joint" class="arm_2f85_spring_link" pos="0 0 0" axis="1 0 0" springref="2.62" />
+                            <geom class="arm_2f85_visual" material="arm_2f85_black" mesh="arm_2f85_spring_link" />
+                            <geom class="arm_2f85_collision" mesh="arm_2f85_spring_link" />
+                            <body name="arm_2f85_right_follower" pos="0 0.055 0.0375">
+                              <inertial pos="0 -0.011046 0.0124786" quat="0.986437 0.164143 0 0" mass="0.0125222" diaginertia="2.67415e-06 2.4559e-06 6.02031e-07" />
+                              <joint name="arm_2f85_right_follower_joint" class="arm_2f85_follower" pos="0 -0.018 0.0065" axis="1 0 0" />
+                              <geom class="arm_2f85_visual" material="arm_2f85_black" mesh="arm_2f85_follower" />
+                              <geom class="arm_2f85_collision" mesh="arm_2f85_follower" />
+                              <body name="arm_2f85_right_pad" pos="0 -0.0189 0.01352">
+                                <inertial pos="0 -0.0025 0.0185" quat="0.707107 0 0 0.707107" mass="0.0035" diaginertia="4.73958e-07 3.64583e-07 1.23958e-07" />
+                                <geom name="arm_2f85_right_pad1" class="arm_2f85_pad_box1" pos="0 -0.0026 0.028125" mass="0" />
+                                <geom name="arm_2f85_right_pad2" class="arm_2f85_pad_box2" pos="0 -0.0026 0.009375" mass="0" />
+                                <geom class="arm_2f85_visual" mesh="arm_2f85_pad" />
+                                <body name="arm_2f85_right_silicone_pad">
+                                  <inertial pos="-4.7618961e-19 -0.0058 0.018517375" quat="0.70710678 0 0 0.70710678" mass="0.0013028118" diaginertia="2.0080432e-07 1.4953601e-07 5.1824181e-08" />
+                                  <geom class="arm_2f85_visual" material="arm_2f85_black" mesh="arm_2f85_silicone_pad" />
+                                </body>
+                              </body>
+                            </body>
+                          </body>
+                          <body name="arm_2f85_left_driver" pos="0 -0.0306011 0.054904" quat="0 0 0 1">
+                            <inertial pos="0 0.0177547 0.00107314" quat="0.681301 0.732003 0 0" mass="0.00899563" diaginertia="1.72352e-06 1.60906e-06 3.22006e-07" />
+                            <joint name="arm_2f85_left_driver_joint" class="arm_2f85_driver" pos="0 0 0" axis="1 0 0" />
+                            <geom class="arm_2f85_visual" material="arm_2f85_gray" mesh="arm_2f85_driver" />
+                            <geom class="arm_2f85_collision" mesh="arm_2f85_driver" />
+                            <body name="arm_2f85_left_coupler" pos="0 0.0315 -0.0041">
+                              <inertial pos="0 0.00301209 0.0232175" quat="0.705636 -0.0455904 0.0455904 0.705636" mass="0.0140974" diaginertia="4.16206e-06 3.52216e-06 8.88131e-07" />
+                              <joint name="arm_2f85_left_coupler_joint" class="arm_2f85_coupler" pos="0 0 0" axis="1 0 0" />
+                              <geom class="arm_2f85_visual" material="arm_2f85_black" mesh="arm_2f85_coupler" />
+                              <geom class="arm_2f85_collision" mesh="arm_2f85_coupler" />
+                            </body>
+                          </body>
+                          <body name="arm_2f85_left_spring_link" pos="0 -0.0132 0.0609" quat="0 0 0 1">
+                            <inertial pos="-8.65005e-09 0.0181624 0.0212658" quat="0.663403 -0.244737 0.244737 0.663403" mass="0.0221642" diaginertia="8.96853e-06 6.71733e-06 2.63931e-06" />
+                            <joint name="arm_2f85_left_spring_link_joint" class="arm_2f85_spring_link" pos="0 0 0" axis="1 0 0" springref="2.62" />
+                            <geom class="arm_2f85_visual" material="arm_2f85_black" mesh="arm_2f85_spring_link" />
+                            <geom class="arm_2f85_collision" mesh="arm_2f85_spring_link" />
+                            <body name="arm_2f85_left_follower" pos="0 0.055 0.0375">
+                              <inertial pos="0 -0.011046 0.0124786" quat="0.986437 0.164143 0 0" mass="0.0125222" diaginertia="2.67415e-06 2.4559e-06 6.02031e-07" />
+                              <joint name="arm_2f85_left_follower_joint" class="arm_2f85_follower" pos="0 -0.018 0.0065" axis="1 0 0" />
+                              <geom class="arm_2f85_visual" material="arm_2f85_black" mesh="arm_2f85_follower" />
+                              <geom class="arm_2f85_collision" mesh="arm_2f85_follower" />
+                              <body name="arm_2f85_left_pad" pos="0 -0.0189 0.01352">
+                                <inertial pos="0 -0.0025 0.0185" quat="0.707107 0 0 0.707107" mass="0.0035" diaginertia="4.73958e-07 3.64583e-07 1.23958e-07" />
+                                <geom name="arm_2f85_left_pad1" class="arm_2f85_pad_box1" pos="0 -0.0026 0.028125" mass="0" />
+                                <geom name="arm_2f85_left_pad2" class="arm_2f85_pad_box2" pos="0 -0.0026 0.009375" mass="0" />
+                                <geom class="arm_2f85_visual" mesh="arm_2f85_pad" />
+                                <body name="arm_2f85_left_silicone_pad">
+                                  <inertial pos="-4.7618961e-19 -0.0058 0.018517375" quat="0.70710678 0 0 0.70710678" mass="0.0013028118" diaginertia="2.0080432e-07 1.4953601e-07 5.1824181e-08" />
+                                  <geom class="arm_2f85_visual" material="arm_2f85_black" mesh="arm_2f85_silicone_pad" />
+                                </body>
+                              </body>
+                            </body>
+                          </body>
+                        </body>
+                      </body>
+                    </body>
+                  </body>
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+  <contact>
+    <exclude body1="arm_2f85_base" body2="arm_2f85_right_driver" />
+    <exclude body1="arm_2f85_base" body2="arm_2f85_right_spring_link" />
+    <exclude body1="arm_2f85_base" body2="arm_2f85_left_driver" />
+    <exclude body1="arm_2f85_base" body2="arm_2f85_left_spring_link" />
+    <exclude body1="arm_2f85_right_coupler" body2="arm_2f85_right_follower" />
+    <exclude body1="arm_2f85_left_coupler" body2="arm_2f85_left_follower" />
+  </contact>
+  <equality>
+    <connect body1="elevator_dampener_rod_l" body2="elevator_dampener_link_l" anchor="0.07287 0.0047 0.02985" solref="0.005" solimp="0.95 0.99" />
+    <connect body1="elevator_dampener_aux_link_l" body2="motor_elevator_pivot_l" anchor="0.01869 -0.01397 0.00799" solref="0.005" solimp="0.95 0.99" />
+    <connect body1="motor_elevator_rod_l" body2="motor_elevator_rod_link_l" anchor="-0.008 -0.00257 0.00016" solref="0.005" solimp="0.95 0.99" />
+    <connect body1="elevator_dampener_aux_link_r" body2="motor_elevator_pivot_r" anchor="0.01869 0.01397 0.00799" solref="0.005" solimp="0.95 0.99" />
+    <connect body1="elevator_dampener_rod_r" body2="elevator_dampener_link_r" anchor="0.07695 0.00113 0.02734" solref="0.005" solimp="0.95 0.99" />
+    <connect body1="motor_elevator_rod_r" body2="motor_elevator_rod_link_r" anchor="-0.008 0.00256 0.00016" solref="0.005" solimp="0.95 0.99" />
+    <connect body1="front_caster_linkage_arm" body2="front_caster_linkage_aux" anchor="0.04376 0.00136 -0.09761" solref="0.005" solimp="0.95 0.99" />
+    <connect body1="front_caster_linkage_aux_arm" body2="front_caster_swing_arm" anchor="0.00023 0.02777 -0.20209" solref="0.005" solimp="0.95 0.99" />
+    <connect body1="front_caster_motor_rod" body2="front_caster_linkage" anchor="-0.00337 -0.00096 -0.01162" solref="0.005" solimp="0.95 0.99" />
+    <connect body1="rear_caster_motor_rod" body2="rear_caster_suspension_arm" anchor="0.00074 0.00087 -0.01128" solref="0.005" solimp="0.95 0.99" />
+    <connect body1="rear_caster_dampener_rod" body2="rear_caster_swing_arm" anchor="0.00123 0.03018 -0.0795" solref="0.005" solimp="0.95 0.99" />
+    <connect body1="rear_caster_aux_linkage" body2="rear_caster_motor_dampener_pivot" anchor="-0.04488 -0.00083 -0.10228" solref="0.005" solimp="0.95 0.99" />
+    <connect body1="arm_2f85_right_follower" body2="arm_2f85_right_coupler" anchor="0 0 0" solref="0.005" solimp="0.95 0.99" />
+    <connect body1="arm_2f85_left_follower" body2="arm_2f85_left_coupler" anchor="0 0 0" solref="0.005" solimp="0.95 0.99" />
+    <joint joint1="arm_2f85_right_driver_joint" joint2="arm_2f85_left_driver_joint" polycoef="0 1 0 0 0" solref="0.005" solimp="0.95 0.99" />
+  </equality>
+  <tendon>
+    <fixed name="arm_2f85_split">
+      <joint joint="arm_2f85_right_driver_joint" coef="0.5" />
+      <joint joint="arm_2f85_left_driver_joint" coef="0.5" />
+    </fixed>
+  </tendon>
+  <actuator>
+    <general name="drive_wheel_l" joint="drive_wheel_l" ctrlrange="-1 1" gear="60 0 0 0 0 0" />
+    <general name="drive_wheel_r" joint="drive_wheel_r" ctrlrange="-1 1" gear="60 0 0 0 0 0" />
+    <general name="motor_elevator_rod_l" joint="motor_elevator_rod_l" ctrlrange="-0.08 0.08" forcerange="-20000 20000" biastype="affine" gainprm="600000" biasprm="0 -600000 -374.064" />
+    <general name="motor_elevator_rod_r" joint="motor_elevator_rod_r" ctrlrange="-0.08 0.08" forcerange="-20000 20000" biastype="affine" gainprm="600000" biasprm="0 -600000 -374.064" />
+    <general name="front_caster_motor_rod" joint="front_caster_motor_rod" ctrlrange="-0.08 0.08" forcerange="-20000 20000" biastype="affine" gainprm="600000" biasprm="0 -600000 -591.259" />
+    <general name="rear_caster_motor_rod" joint="rear_caster_motor_rod" ctrlrange="-0.08 0.08" forcerange="-20000 20000" biastype="affine" gainprm="600000" biasprm="0 -600000 -434.537" />
+    <general name="arm_joint_1" class="arm_large_actuator" joint="arm_joint_1" />
+    <general name="arm_joint_2" class="arm_large_actuator" joint="arm_joint_2" ctrlrange="-2.24973 2.24973" />
+    <general name="arm_joint_3" class="arm_large_actuator" joint="arm_joint_3" />
+    <general name="arm_joint_4" class="arm_large_actuator" joint="arm_joint_4" ctrlrange="-2.5796 2.5796" />
+    <general name="arm_joint_5" class="arm_small_actuator" joint="arm_joint_5" />
+    <general name="arm_joint_6" class="arm_small_actuator" joint="arm_joint_6" ctrlrange="-2.09963 2.09963" />
+    <general name="arm_joint_7" class="arm_small_actuator" joint="arm_joint_7" />
+    <general name="arm_2f85_fingers_actuator" class="arm_2f85_2f85" tendon="arm_2f85_split" ctrlrange="0 255" forcerange="-5 5" gainprm="0.313725" biasprm="0 -100 -10" />
+  </actuator>
+</mujoco>
