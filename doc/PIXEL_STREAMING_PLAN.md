@@ -161,9 +161,13 @@ platform. Minimizing the toast window makes video appear within a second;
 restoring it kills video again.
 
 Consequences and fixes:
-- The 2026-08-04 "Mac limitation" conclusion is almost certainly this same
-  bug (the toast appears on Mac too) — **retest Mac after removing the
-  guideline** before writing Mac off. The VP8-on-Mac advice is moot.
+- The 2026-08-04 "Mac limitation" conclusion WAS this same bug — CONFIRMED
+  2026-08-19: with the viewport-producer swap in place, a Mac `-game` run
+  (VP8) delivered 1207 video RTP packets / 1.27 MB in a 10 s probe window
+  (`Scripts/ps_probe`). Mac `-game` streaming works; only PACKAGED Mac runs
+  remain blocked, and that's the unrelated M1/SM6 cook gate (see
+  doc/PIXEL_STREAMING.md packaged-build gotchas). VP8 is still required on
+  Mac (no H264 hardware encode path there).
 - Immediate fix: in an editor session (or on the toast itself), click
   **"Remove Guideline"** to strip the AssetGuideline from the CitySample
   assets and commit the change; "Dismiss" works per-session. Do NOT flip
