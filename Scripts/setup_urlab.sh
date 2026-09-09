@@ -74,22 +74,11 @@ else
 	exit 1
 fi
 
-# --- 1b. apply port-override patch (idempotent) ---
-# Adds -URLabStepPort= / -URLabStatePort= / -URLabCtrlPort= / -URLabInfoPort= /
-# -URLabCamPort= command-line switches so multiple sim instances can share a
-# host (cluster / parallel training — see doc/PARALLEL_SIM_PLAN.md). Kept as
-# a separate patch so it can be dropped once upstreamed.
-PORTS_PATCH="$REPO_ROOT/Scripts/patches/urlab-port-overrides.patch"
-if git -C "$SUBMODULE" apply --reverse --check "$PORTS_PATCH" 2>/dev/null; then
-	log "port-override patch already applied — skipping"
-elif git -C "$SUBMODULE" apply --check "$PORTS_PATCH" 2>/dev/null; then
-	git -C "$SUBMODULE" apply "$PORTS_PATCH"
-	log "port-override patch applied"
-else
-	log "ERROR: port-override patch no longer applies cleanly — upstream has drifted."
-	log "Fix by hand and regenerate (see the header of $PORTS_PATCH)."
-	exit 1
-fi
+# (The former 1b port-override patch was absorbed upstream in URLab
+# v0.6.0-beta: -URLabInstanceIndex/-URLabPortBase/-URLabPortStride/
+# -URLabStepPort/-URLabStatePort/-URLabCamBasePort are native switches now.
+# The legacy subscriber's -URLabCtrlPort/-URLabInfoPort live on in the
+# local-fixes patch above.)
 
 # --- 2. apply nested CoACD source fixes (idempotent) ---
 if [ ! -f "$COACD_SRC/CMakeLists.txt" ]; then

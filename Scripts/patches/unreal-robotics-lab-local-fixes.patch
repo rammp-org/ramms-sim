@@ -1,8 +1,8 @@
 diff --git a/Source/URLab/Private/Bridge/MsgpackHelpers.cpp b/Source/URLab/Private/Bridge/MsgpackHelpers.cpp
-index 117dbd5..20f68b7 100644
+index ac7fda3..38d6603 100644
 --- a/Source/URLab/Private/Bridge/MsgpackHelpers.cpp
 +++ b/Source/URLab/Private/Bridge/MsgpackHelpers.cpp
-@@ -29,16 +29,20 @@
+@@ -30,16 +30,20 @@
  // rpclib's msgpack-cxx headers use member functions and templates named
  // `check`, which collides with UE's `check(cond)` assertion macro. Save
  // the macro, undef while including rpclib, and restore afterwards. We do
@@ -24,11 +24,87 @@ index 117dbd5..20f68b7 100644
  #pragma pop_macro("verify")
  #pragma pop_macro("check")
  
+diff --git a/Source/URLab/Private/MuJoCo/Elements/MjGeom.cpp b/Source/URLab/Private/MuJoCo/Elements/MjGeom.cpp
+index 796b2e4..6124fe9 100644
+--- a/Source/URLab/Private/MuJoCo/Elements/MjGeom.cpp
++++ b/Source/URLab/Private/MuJoCo/Elements/MjGeom.cpp
+@@ -75,10 +75,13 @@ struct FGeomShape
+ 	const TCHAR* CapMeshPath = nullptr;
+ };
+ 
+-const TCHAR* const kCubeMesh = TEXT("/Engine/BasicShapes/Cube.Cube");
+-const TCHAR* const kSphereMesh = TEXT("/Engine/BasicShapes/Sphere.Sphere");
+-const TCHAR* const kCylinderMesh = TEXT("/Engine/BasicShapes/Cylinder.Cylinder");
+-const TCHAR* const kPlaneMesh = TEXT("/Engine/BasicShapes/Plane.Plane");
++// constexpr rather than const: GGeomShapes below reads these inside its own
++// constant-expression initializer, and a plain const pointer variable is not
++// usable there (Apple clang enforces this; see [expr.const]).
++constexpr const TCHAR* kCubeMesh = TEXT("/Engine/BasicShapes/Cube.Cube");
++constexpr const TCHAR* kSphereMesh = TEXT("/Engine/BasicShapes/Sphere.Sphere");
++constexpr const TCHAR* kCylinderMesh = TEXT("/Engine/BasicShapes/Cylinder.Cylinder");
++constexpr const TCHAR* kPlaneMesh = TEXT("/Engine/BasicShapes/Plane.Plane");
+ 
+ constexpr FGeomShape GGeomShapes[] = {
+ 	/* plane     */ {kPlaneMesh, nullptr},
+diff --git a/Source/URLab/Private/Transport/ZmqSubscribeTransport.cpp b/Source/URLab/Private/Transport/ZmqSubscribeTransport.cpp
+index 690a4e1..05fae90 100644
+--- a/Source/URLab/Private/Transport/ZmqSubscribeTransport.cpp
++++ b/Source/URLab/Private/Transport/ZmqSubscribeTransport.cpp
+@@ -21,6 +21,8 @@
+ // CoACD (MIT), and libzmq (MPL 2.0). See ThirdPartyNotices.txt for details.
+ 
+ #include "Transport/ZmqSubscribeTransport.h"
++#include "Misc/CommandLine.h"
++#include "Misc/Parse.h"
+ #include "MuJoCo/Core/MjArticulation.h"
+ #include "MuJoCo/Spec/MjNodeComponent.h"
+ #include "MuJoCo/Core/AMjManager.h"
+@@ -51,6 +53,28 @@ void UURLabZmqSubscribeTransport::TransportShutdown()
+ 	ShutdownZmqSocket();
+ }
+ 
++namespace
++{
++// Farm isolation for the legacy subscriber, matching the bridge's
++// ApplyEnvAndCommandLineOverrides: the manager auto-creates this transport
++// with fixed default endpoints, so on a multi-instance host the command
++// line is the only per-instance channel for these two ports.
++FString OverrideEndpointPort(const FString& Endpoint, const TCHAR* Switch)
++{
++	int32 Port = 0;
++	if (!FParse::Value(FCommandLine::Get(), Switch, Port) || Port <= 0)
++	{
++		return Endpoint;
++	}
++	int32 ColonIndex = INDEX_NONE;
++	if (!Endpoint.FindLastChar(TEXT(':'), ColonIndex))
++	{
++		return Endpoint;
++	}
++	return Endpoint.Left(ColonIndex + 1) + FString::FromInt(Port);
++}
++} // namespace
++
+ void UURLabZmqSubscribeTransport::InitZmqSocket()
+ {
+ 	if (bIsInitialized)
+@@ -58,6 +82,11 @@ void UURLabZmqSubscribeTransport::InitZmqSocket()
+ 
+ 	ZmqContext = zmq_ctx_new();
+ 
++	// Per-instance overrides for multi-sim hosts (see the bridge's
++	// URLabStepPort / URLabStatePort / URLabCamBasePort counterparts).
++	ControlEndpoint = OverrideEndpointPort(ControlEndpoint, TEXT("URLabCtrlPort="));
++	InfoEndpoint = OverrideEndpointPort(InfoEndpoint, TEXT("URLabInfoPort="));
++
+ 	// Setup Subscriber (Controls)
+ 	ControlSubscriber = zmq_socket(ZmqContext, ZMQ_SUB);
+ 	int rc = zmq_bind(ControlSubscriber, TCHAR_TO_UTF8(*ControlEndpoint));
 diff --git a/Source/URLab/URLab.Build.cs b/Source/URLab/URLab.Build.cs
-index 749d2d4..74f6a20 100644
+index aa7e336..e2bd9c3 100644
 --- a/Source/URLab/URLab.Build.cs
 +++ b/Source/URLab/URLab.Build.cs
-@@ -135,7 +135,20 @@ public class URLab : ModuleRules
+@@ -208,7 +208,20 @@ public class URLab : ModuleRules
  
  	private string ThirdPartyPath
  	{
@@ -50,7 +126,7 @@ index 749d2d4..74f6a20 100644
  	}
  
  	private void AddThirdPartyLibrary(string LibraryName, ReadOnlyTargetRules Target)
-@@ -226,6 +239,29 @@ public class URLab : ModuleRules
+@@ -311,6 +324,29 @@ public class URLab : ModuleRules
  				}
  			}
  		}
@@ -80,6 +156,50 @@ index 749d2d4..74f6a20 100644
  	}
  
  	// Set to true to skip the submodule/install SHA drift checks. The default
+diff --git a/Source/URLabEditor/Private/MjDecompositionMenu.cpp b/Source/URLabEditor/Private/MjDecompositionMenu.cpp
+index 388ae2b..144b7da 100644
+--- a/Source/URLabEditor/Private/MjDecompositionMenu.cpp
++++ b/Source/URLabEditor/Private/MjDecompositionMenu.cpp
+@@ -21,6 +21,10 @@
+ 
+ #include "MjDecompositionMenu.h"
+ 
++// Not transitively included: this TU logs to LogURLabEditor, and only unity
++// batching made the category visible here before (a neighbour's include).
++#include "URLabEditorLogging.h"
++
+ #include "GameFramework/Actor.h"
+ #include "Engine/Blueprint.h"
+ #include "Engine/SCS_Node.h"
+diff --git a/protospec/lib/CMakeLists.txt b/protospec/lib/CMakeLists.txt
+index 4a4eab5..92e9e3a 100644
+--- a/protospec/lib/CMakeLists.txt
++++ b/protospec/lib/CMakeLists.txt
+@@ -125,6 +125,8 @@ else()
+ endif()
+ if(WIN32)
+   set(MUJOCO_IMPORT_LIB "${MUJOCO_LIB_DIR}/mujoco.lib")
++elseif(APPLE)
++  set(MUJOCO_IMPORT_LIB "${MUJOCO_LIB_DIR}/libmujoco.dylib")
+ else()
+   set(MUJOCO_IMPORT_LIB "${MUJOCO_LIB_DIR}/libmujoco.so")
+ endif()
+diff --git a/protospec/lib/harness/CMakeLists.txt b/protospec/lib/harness/CMakeLists.txt
+index 0149e82..53eac4d 100644
+--- a/protospec/lib/harness/CMakeLists.txt
++++ b/protospec/lib/harness/CMakeLists.txt
+@@ -29,6 +29,11 @@ endif()
+ if(WIN32)
+   set(MUJOCO_IMPORT_LIB "${MUJOCO_LIB_DIR}/mujoco.lib")
+   set(MUJOCO_DLL        "${MUJOCO_BIN_DIR}/mujoco.dll")
++elseif(APPLE)
++  # The unversioned .dylib is the symlink; linking it records the install
++  # name rather than an absolute versioned path.
++  set(MUJOCO_IMPORT_LIB "${MUJOCO_LIB_DIR}/libmujoco.dylib")
++  set(MUJOCO_DLL        "${MUJOCO_IMPORT_LIB}")
+ else()
+   # The unversioned .so is the symlink; linking it records the SONAME rather
+   # than an absolute versioned path.
 diff --git a/third_party/CoACD/build.sh b/third_party/CoACD/build.sh
 old mode 100644
 new mode 100755
@@ -95,6 +215,23 @@ index afce0c7..07e8ca0
  
  echo "Building CoACD..."
  cmake --build . --config "$BUILD_TYPE" --target _coacd
+diff --git a/third_party/MuJoCo/build.sh b/third_party/MuJoCo/build.sh
+index 1809199..90d7b44 100644
+--- a/third_party/MuJoCo/build.sh
++++ b/third_party/MuJoCo/build.sh
+@@ -76,10 +76,10 @@ cmake --install . --config "$BUILD_TYPE"
+ PLUGIN_OUT="$INSTALL_DIR/lib/mujoco_plugin"
+ mkdir -p "$PLUGIN_OUT"
+ PLUGIN_COUNT=0
+-for LIB in lib/*.so bin/*.so; do
++for LIB in lib/*.so bin/*.so lib/*.dylib bin/*.dylib; do
+     [ -e "$LIB" ] || continue
+     case "$(basename "$LIB")" in
+-        libmujoco.so*) continue ;;
++        libmujoco.so* | libmujoco.dylib | libmujoco.*.dylib) continue ;;
+     esac
+     cp -f "$LIB" "$PLUGIN_OUT/"
+     echo "Installed plugin $(basename "$LIB")"
 diff --git a/third_party/build_all.sh b/third_party/build_all.sh
 old mode 100644
 new mode 100755

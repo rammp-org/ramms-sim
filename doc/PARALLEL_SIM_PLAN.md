@@ -51,7 +51,7 @@ SLURM job array
     ├── Apptainer (containers/ramms.def): packaged Linux build
     │     Ramms <Map> -RenderOffscreen -Unattended -NoSound
     │     -UseFixedTimeStep -FPS=30 -Deterministic -saveddir=<inst_i>
-    │     URLab bridge on port block base+i*10 (or SHM, same host)
+    │     URLab bridge on port block base+i*20 (or SHM, same host)
     └── Python worker (urlab_bridge client)
           reset(seed_i, randomization_i) → Direct-mode step loop
           → obs + camera/ToF/sonar frames
@@ -114,12 +114,17 @@ Both routes produce the same `Packaged/Linux` output.
   100 Direct steps, camera bytes arrive, ToF/sonar return GPU-path hits,
   state stream flows. Automate as the smoke test → CI canary + SLURM health
   probe.
-- URLab port-override patch: **landed** as
-  `Scripts/patches/urlab-port-overrides.patch` (applied by `setup_urlab.sh`,
-  compiles on Mac). Adds `-URLabStepPort/StatePort/CtrlPort/InfoPort/CamPort=`
-  switches — required because the bridge INI lives inside the plugin dir
-  (shared by all instances) and the cooked path hardcoded :5559. Cooked-build
-  bridge autostart confirmed in source (`AAMjManager` owns the bridge when no
+- URLab per-instance ports: **native since URLab v0.6.0-beta** —
+  `-URLabInstanceIndex/-URLabPortBase/-URLabPortStride` (plus explicit
+  `-URLabStepPort/-URLabStatePort/-URLabCamBasePort` and env-var twins) are
+  parsed by the bridge itself (`ApplyEnvAndCommandLineOverrides`), with
+  instance-registry files and an `InstanceId` for SHM sessions. Our old
+  `urlab-port-overrides.patch` is retired; only the legacy ZMQ subscriber's
+  `-URLabCtrlPort/-URLabInfoPort` remain patched in
+  (`unreal-robotics-lab-local-fixes.patch`). `run_headless.sh` now passes
+  index/base/stride (stride 20: step=slot+0, state=slot+1,
+  cams=slot+2..slot+9, ctrl=slot+10, info=slot+11). Cooked-build bridge
+  autostart confirmed in source (`AAMjManager` owns the bridge when no
   editor subsystem resolves). Remaining Phase-1 verification: SHM session
   isolation under per-instance `-saveddir`, and the whole thing on Linux.
 - Validate Vulkan inline ray query (`RHISupportsInlineRayTracing`) on the

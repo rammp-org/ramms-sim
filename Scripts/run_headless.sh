@@ -18,16 +18,19 @@
 #   RAMMS_FPS       Fixed render framerate (default: 30). Paired with
 #                   -UseFixedTimeStep so camera frames keep a fixed phase
 #                   relationship to URLab Direct-mode physics steps.
-#   RAMMS_PORT_BASE URLab port block base (default: 5550). Instance i gets
-#                   step/state/ctrl/info/cam = base+i*10 + {9,5,6,7,8}, so the
-#                   stock 555x layout is instance 0.
+#   RAMMS_PORT_BASE URLab port block base (default: 5559 = upstream PortBase).
+#                   Instance i gets slot = base + i*20, laid out as
+#                   step=slot+0, state=slot+1, cameras=slot+2..slot+9
+#                   (CamBasePort + camera index), ctrl=slot+10, info=slot+11.
 #
-# Port overrides are the -URLab*Port= switches added by
-# Scripts/patches/urlab-port-overrides.patch (applied by setup_urlab.sh) —
-# the bridge's own INI lives inside the plugin dir and is shared by every
-# instance on a host, so the command line is the only per-instance channel.
-# Cameras all rebase to URLabCamPort and spread via the worker's bind retry;
-# clients learn actual camera ports from the handshake.
+# Since URLab v0.6.0-beta the -URLabInstanceIndex/-URLabPortBase/
+# -URLabPortStride/-URLabStepPort/-URLabStatePort/-URLabCamBasePort switches
+# are native (Bridge/BridgeServerConfigUtils.cpp ApplyEnvAndCommandLineOverrides);
+# only -URLabCtrlPort/-URLabInfoPort for the legacy subscriber remain from our
+# local patch (Scripts/patches/unreal-robotics-lab-local-fixes.patch). The
+# bridge's own INI lives inside the plugin dir and is shared by every instance
+# on a host, so the command line is the only per-instance channel. Clients
+# learn actual camera ports from the handshake.
 
 set -euo pipefail
 
@@ -38,7 +41,8 @@ shift $(( $# > 2 ? 2 : $# )) || true
 
 PACKAGED="${RAMMS_PACKAGED:-$REPO_ROOT/Packaged/Linux}"
 FPS="${RAMMS_FPS:-30}"
-PORT_BASE="${RAMMS_PORT_BASE:-5550}"
+PORT_BASE="${RAMMS_PORT_BASE:-5559}"
+PORT_STRIDE=20
 
 log() { echo "[run_headless:$INSTANCE] $*"; }
 
@@ -48,21 +52,20 @@ if [ ! -f "$LAUNCHER" ]; then
 	exit 1
 fi
 
-BLOCK=$(( PORT_BASE + INSTANCE * 10 ))
-STEP_PORT=$(( BLOCK + 9 ))
-STATE_PORT=$(( BLOCK + 5 ))
-CTRL_PORT=$(( BLOCK + 6 ))
-INFO_PORT=$(( BLOCK + 7 ))
-CAM_PORT=$(( BLOCK + 8 ))
+# step/state/cam derive in-engine from index*stride (DerivePorts); ctrl/info
+# are the legacy subscriber's slots at the top of the same block.
+SLOT=$(( PORT_BASE + INSTANCE * PORT_STRIDE ))
+CTRL_PORT=$(( SLOT + 10 ))
+INFO_PORT=$(( SLOT + 11 ))
 
 SAVED_DIR="${RAMMS_SAVED_DIR:-$PACKAGED/Saved_inst$INSTANCE}"
 mkdir -p "$SAVED_DIR"
 
-log "map=$MAP fps=$FPS step_port=$STEP_PORT saved=$SAVED_DIR"
+log "map=$MAP fps=$FPS step_port=$SLOT state_port=$(( SLOT + 1 )) cam_base=$(( SLOT + 2 )) saved=$SAVED_DIR"
 exec "$LAUNCHER" "$MAP" \
 	-RenderOffscreen -Unattended -NoSound -stdout -UTF8Output \
 	-UseFixedTimeStep -FPS="$FPS" -Deterministic \
 	-saveddir="$SAVED_DIR" \
-	-URLabStepPort="$STEP_PORT" -URLabStatePort="$STATE_PORT" \
-	-URLabCtrlPort="$CTRL_PORT" -URLabInfoPort="$INFO_PORT" -URLabCamPort="$CAM_PORT" \
+	-URLabInstanceIndex="$INSTANCE" -URLabPortBase="$PORT_BASE" -URLabPortStride="$PORT_STRIDE" \
+	-URLabCtrlPort="$CTRL_PORT" -URLabInfoPort="$INFO_PORT" \
 	"$@"

@@ -11,5 +11,20 @@ public class RammsTarget : TargetRules
 		DefaultBuildSettings = BuildSettingsVersion.V6;
 		IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_7;
 		ExtraModuleNames.Add("Ramms");
+
+		// Same Apple-clang memory blowup as RammsEditor.Target.cs: URLab's
+		// generated component model in jumbo .gen unity TUs needs ~25 GB per
+		// clang. Compile generated files individually on Mac only.
+		if (Target.Platform == UnrealTargetPlatform.Mac)
+		{
+			bAlwaysUseUnityForGeneratedFiles = false;
+
+			// See RammsEditor.Target.cs: Apple clang's -O3 backend needs
+			// 14-17 GB on the URLab modules' heaviest TUs; compile them
+			// unoptimized and un-batched on Mac (the MuJoCo core is a
+			// prebuilt optimized dylib either way).
+			DisableOptimizeCodeForModules = new string[] { "URLab", "URLabEditor", "URLabRos" };
+			DisableUnityBuildForModules = new string[] { "URLab", "URLabEditor", "URLabRos" };
+		}
 	}
 }

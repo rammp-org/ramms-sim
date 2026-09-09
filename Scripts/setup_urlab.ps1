@@ -9,10 +9,11 @@
 #   unreal-robotics-lab-local-fixes.patch - the install-linux/ ThirdPartyPath
 #     hunk is REQUIRED for Windows->Linux cross builds (without it UBT links
 #     the Windows-native third_party/install/ when targeting Linux); the
+#     -URLabCtrlPort/-URLabInfoPort hunk (legacy subscriber farm isolation)
+#     is platform-independent and needed by Scripts/run_headless.sh; the
 #     remaining hunks are macOS-only and inert on Windows.
-#   urlab-port-overrides.patch - platform-independent feature (per-instance
-#     -URLab*Port= switches) required by Scripts/run_headless.sh; must be in
-#     any binary destined for multi-instance hosts.
+#     (The old urlab-port-overrides.patch was absorbed upstream in
+#     v0.6.0-beta - the bridge's -URLab*Port switches are native now.)
 #   coacd-src-local-fixes.patch (nested submodule third_party/CoACD/src) -
 #     required to compile CoACD with clang 20 (the UE Linux cross toolchain);
 #     not needed for MSVC native builds but harmless.
@@ -96,7 +97,6 @@ if (-not (Test-Path (Join-Path $CoacdSrc "CMakeLists.txt"))) {
 
 # --- 1. plugin-repo patches ---
 Ensure-Patch $Submodule "unreal-robotics-lab-local-fixes.patch"
-Ensure-Patch $Submodule "urlab-port-overrides.patch"
 
 # --- 2. nested CoACD source patch ---
 Ensure-Patch $CoacdSrc "coacd-src-local-fixes.patch"
