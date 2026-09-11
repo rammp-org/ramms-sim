@@ -4,21 +4,37 @@ import WebSocket from 'ws';
 import { RTCPeerConnection } from 'werift';
 
 const url = process.argv[2] ?? 'ws://127.0.0.1:8080';
-const seconds = Number(process.argv[3] ?? 10);
+// Validate/clamp the sample window: a missing or non-positive value would make
+// the result timer fire immediately (0 ms) and report a false negative.
+const secondsArg = Number(process.argv[3] ?? 10);
+const seconds = Number.isFinite(secondsArg) && secondsArg > 0 ? secondsArg : 10;
 const ws = new WebSocket(url);
 let pc = null;
 let videoPackets = 0, videoBytes = 0, audioPackets = 0;
+
+// Cleared as soon as an offer arrives, so a probe that then samples for longer
+// than this window cannot be force-failed by a late "no offer" timeout.
+const noOfferTimer = setTimeout(() => { console.log('RESULT timeout_no_offer'); process.exit(1); }, 20000);
 
 const send = (o) => ws.send(JSON.stringify(o));
 ws.on('open', () => send({ type: 'listStreamers' }));
 ws.on('error', (e) => { console.log('WS ERROR', e.message); process.exit(1); });
 ws.on('message', async (data) => {
-  const msg = JSON.parse(data.toString());
+  let msg;
+  try {
+    msg = JSON.parse(data.toString());
+  } catch (e) {
+    // A malformed frame is a signalling-server problem, not video absence:
+    // fail deterministically with its own result line rather than crashing.
+    console.log('RESULT bad_message', e.message);
+    process.exit(1);
+  }
   if (msg.type === 'streamerList') {
     if (!msg.ids?.length) { console.log('RESULT no_streamers'); process.exit(1); }
     console.log('probe: subscribing to', msg.ids[0]);
     send({ type: 'subscribe', streamerId: msg.ids[0] });
   } else if (msg.type === 'offer') {
+    clearTimeout(noOfferTimer);
     pc = new RTCPeerConnection({});
     pc.onIceCandidate.subscribe((c) => {
       send({ type: 'iceCandidate', candidate: { candidate: c.candidate, sdpMid: c.sdpMid, sdpMLineIndex: c.sdpMLineIndex } });
@@ -43,4 +59,3 @@ ws.on('message', async (data) => {
     await pc.addIceCandidate(msg.candidate);
   }
 });
-setTimeout(() => { console.log('RESULT timeout_no_offer'); process.exit(1); }, 20000);

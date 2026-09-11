@@ -49,6 +49,30 @@ index ea6cb0a..e767161 100644
  	m_CreatedBody = &Body;
  
  	UE_LOG(LogURLab, Log, TEXT("[MjQuickConvert] '%s': authored body '%s' with %d geom(s)."), *Owner->GetName(),
+diff --git a/Source/URLab/Private/MuJoCo/Elements/MjBody.cpp b/Source/URLab/Private/MuJoCo/Elements/MjBody.cpp
+index 03d7462..d712e8c 100644
+--- a/Source/URLab/Private/MuJoCo/Elements/MjBody.cpp
++++ b/Source/URLab/Private/MuJoCo/Elements/MjBody.cpp
+@@ -139,6 +139,19 @@ void UMjBody::ApplyRenderState(const FMjRenderSnapshot& Snap)
+ 		return;
+ 	}
+ 
++	// The world body is not a pose to copy: an articulation's worldbody
++	// component is the actor-relative container of authored content (mocap
++	// targets, static geoms), and body id 0's snapshot pose is always the
++	// MuJoCo origin. Driving it pins that whole subtree to the world origin
++	// the moment the actor sits anywhere else -- a mocap child then pushes
++	// the origin back into the model and the scene welds itself there.
++	// Every bound child body sets its own world transform from the snapshot
++	// regardless, so skipping the world body loses nothing.
++	if (Id == 0)
++	{
++		return;
++	}
++
+ 	const int32 PosIdx = Id * 3;
+ 	const int32 QuatIdx = Id * 4;
+ 	if (Snap.XPos.Num() <= PosIdx + 2 || Snap.XQuat.Num() <= QuatIdx + 3)
 diff --git a/Source/URLab/Private/MuJoCo/Elements/MjGeom.cpp b/Source/URLab/Private/MuJoCo/Elements/MjGeom.cpp
 index 796b2e4..6124fe9 100644
 --- a/Source/URLab/Private/MuJoCo/Elements/MjGeom.cpp
