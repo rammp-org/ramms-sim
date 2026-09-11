@@ -24,6 +24,31 @@ index ac7fda3..38d6603 100644
  #pragma pop_macro("verify")
  #pragma pop_macro("check")
  
+diff --git a/Source/URLab/Private/MuJoCo/Convert/MjQuickConvertComponent.cpp b/Source/URLab/Private/MuJoCo/Convert/MjQuickConvertComponent.cpp
+index ea6cb0a..e767161 100644
+--- a/Source/URLab/Private/MuJoCo/Convert/MjQuickConvertComponent.cpp
++++ b/Source/URLab/Private/MuJoCo/Convert/MjQuickConvertComponent.cpp
+@@ -539,6 +539,20 @@ void UMjQuickConvertComponent::AuthorSceneSpec()
+ 		++MeshIndex;
+ 	}
+ 
++	// The factory registers each geom before its authored fields land, so its
++	// preview was built for an unset type -- MuJoCo's default sphere, at the
++	// engine primitive's own metre scale (a large white sphere on the actor).
++	// Refresh now that every field is authored: a hull mesh has no imported
++	// asset, so the honest preview is none -- the actor's own meshes already
++	// are this body's picture.
++	for (UMjNodeComponent* Geom : m_GeomElements)
++	{
++		if (Geom != nullptr)
++		{
++			Geom->RefreshPresentation();
++		}
++	}
++
+ 	m_CreatedBody = &Body;
+ 
+ 	UE_LOG(LogURLab, Log, TEXT("[MjQuickConvert] '%s': authored body '%s' with %d geom(s)."), *Owner->GetName(),
 diff --git a/Source/URLab/Private/MuJoCo/Elements/MjGeom.cpp b/Source/URLab/Private/MuJoCo/Elements/MjGeom.cpp
 index 796b2e4..6124fe9 100644
 --- a/Source/URLab/Private/MuJoCo/Elements/MjGeom.cpp

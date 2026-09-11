@@ -21,11 +21,23 @@ OUTDIR = os.environ.get("RAMMS_MUJOCO_OUTDIR", os.path.join(os.path.dirname(__fi
 ASSETS = os.path.join(OUTDIR, "assets")
 PREFIX = "2f85_"
 
-# Dynamic tracking base: make base_link a real free body welded to a mocap "base_target" that Unreal
-# drives from the Chaos chair mount. A kinematic mocap base teleports with zero velocity, which shakes
-# grasped objects loose when the chair moves; a welded free base has genuine velocity/momentum so the
-# arm (and anything it holds) accelerates smoothly with the chair.
-TRACKING_BASE     = True
+# Two variants are written:
+#
+#   gen3_2f85.xml        tracking base — base_link is a real free body welded to a mocap
+#                        "base_target" that Unreal drives from the Chaos chair mount. ONLY stable
+#                        with RammsMjEndEffectorController owning/smoothing the mocap: simulated
+#                        bare, any mocap-vs-base mismatch detonates the stiff weld (50 cm of error
+#                        diverges the model in ~60 steps). A kinematic mocap base teleports with
+#                        zero velocity, which shakes grasped objects loose when the chair moves; a
+#                        welded free base has genuine velocity/momentum so the arm (and anything it
+#                        holds) accelerates smoothly with the chair.
+#
+#   gen3_2f85_fixed.xml  rigid base — no free joint, no mocap, no weld. base_link is fixed to its
+#                        parent, so the model is unconditionally stable standalone. This is the
+#                        variant for plain MuJoCo simulation in UE, RL scenes, and for composing
+#                        onto other robots via <attach>/<model> (an attached sub-model should have
+#                        a rigid root; the mount provides its motion).
+#
 # Near-rigid weld: the controller smooths base_target across physics substeps, so the weld can stay
 # stiff (no arm springiness / no wobble from arm motion) without ringing on per-frame target steps.
 BASE_WELD_SOLREF  = [0.005, 1.0]        # timeconst 5ms, dampratio 1
@@ -43,7 +55,7 @@ def abspath_meshes(spec, assets_dir):
     spec.meshdir = ""
 
 
-def main():
+def compose(tracking_base):
     arm = mujoco.MjSpec.from_file(ARM_XML)
     grip = mujoco.MjSpec.from_file(GRIP_XML)
 
@@ -65,9 +77,29 @@ def main():
     arm.option.cone = mujoco.mjtCone.mjCONE_ELLIPTIC
     arm.option.impratio = 10.0
 
+    # Menagerie leaves ctrlrange off the continuous joints' actuators (1/3/5/7), so their
+    # compiled actuator_ctrlrange is [0,0] — any UI that builds a control slider from it
+    # (URLab's simulate widget does) pins those joints at zero. They're position servos, so
+    # author a generous +-2*pi setpoint range.
+    for act in arm.actuators:
+        if act.name in ("joint_1", "joint_3", "joint_5", "joint_7"):
+            act.ctrlrange = [-6.28319, 6.28319]
+
+    # Rigid base: with base_link welded into the world, MuJoCo's parent-child
+    # contact filter no longer covers base_link<->shoulder_link (the filter is
+    # deliberately disabled when the parent is the world weld, so things can
+    # rest on the floor). The menagerie collision hulls overlap ~12 mm there by
+    # design, and without the exclude that contact exactly cancels joint_1's
+    # servo torque (the joint creeps instead of moving).
+    if not tracking_base:
+        ex = arm.add_exclude()
+        ex.name = "base_shoulder"
+        ex.bodyname1 = "base_link"
+        ex.bodyname2 = "shoulder_link"
+
     # Dynamic tracking base (see notes at top). Adds 7 qpos (free joint) at the front of qpos.
     base_free_qpos = []
-    if TRACKING_BASE:
+    if tracking_base:
         base = arm.body("base_link")
         fj = base.add_freejoint()
         fj.damping = [BASE_FREE_DAMPING] * 3  # damp base DOFs to kill the arm-reaction resonance
@@ -112,14 +144,20 @@ def main():
         # to_xml opens the file string relative to CWD, so bake the subfolder into file
         m.file = "assets/" + base
     arm.meshdir = ""
-    arm.modelname = "gen3_2f85"
+    name = "gen3_2f85" if tracking_base else "gen3_2f85_fixed"
+    arm.modelname = name
 
-    out_xml = os.path.join(OUTDIR, "gen3_2f85.xml")
+    out_xml = os.path.join(OUTDIR, name + ".xml")
     os.chdir(OUTDIR)  # so "assets/<mesh>" resolves during to_xml() validation
     with open(out_xml, "w") as f:
         f.write(arm.to_xml())
     print(f"wrote {out_xml}  ({len(arm.meshes)} meshes in assets/)")
     print(f"cone={arm.option.cone}  impratio={arm.option.impratio}")
+
+
+def main():
+    compose(tracking_base=True)   # chair-riding variant (needs RammsMjEndEffectorController)
+    compose(tracking_base=False)  # rigid-base variant (standalone sim / <attach> composition)
 
 
 if __name__ == "__main__":
