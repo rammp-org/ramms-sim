@@ -1,0 +1,10 @@
+WARNING Thu Sep 10 15:35:08 2026: Attach conflict when attaching 'gen3_2f85', policy is 'merge'
+impratio: parent has 1 (default), child has 10, adopting child value
+cone: parent has 0 (default), child has 1, adopting child value
+nkey: parent has 0 (default), child has 1, adopting child value
+
+WARNING Thu Sep 10 15:35:35 2026: Attach conflict when attaching 'gen3_2f85', policy is 'merge'
+impratio: parent has 1 (default), child has 10, adopting child value
+cone: parent has 0 (default), child has 1, adopting child value
+nkey: parent has 0 (default), child has 1, adopting child value
+
