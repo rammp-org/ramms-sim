@@ -1,25 +1,20 @@
-# Windows counterpart of Scripts/setup_urlab.sh (patch handling only): makes
-# sure the unreal-robotics-lab submodule carries the local patches that
-# upstream does not (yet), idempotently. Unlike the .sh it does NOT build
-# third-party deps or generate project files - on Windows those are separate
-# scripts (third_party\build_all.ps1 for the native editor,
-# Scripts\build_all_linux_cross.ps1 for the Linux cross route).
+# Windows counterpart of Scripts/setup_urlab.sh (patch handling only). Unlike
+# the .sh it does NOT build third-party deps or generate project files - on
+# Windows those are separate scripts (third_party\build_all.ps1 for the native
+# editor, Scripts\build_all_linux_cross.ps1 for the Linux cross route).
 #
-# Which patches matter where:
-#   unreal-robotics-lab-local-fixes.patch - the install-linux/ ThirdPartyPath
-#     hunk is REQUIRED for Windows->Linux cross builds (without it UBT links
-#     the Windows-native third_party/install/ when targeting Linux); the
-#     -URLabCtrlPort/-URLabInfoPort hunk (legacy subscriber farm isolation)
-#     is platform-independent and needed by Scripts/run_headless.sh; the
-#     remaining hunks are macOS-only and inert on Windows.
-#     (The old urlab-port-overrides.patch was absorbed upstream in
-#     v0.6.0-beta - the bridge's -URLab*Port switches are native now.)
+# Our URLab fixes now live on our FORK, not in a patch:
+#   git@github.com:rammp-org/UnrealRoboticsLab  branch ramms/v0.6.0-beta
+# The submodule pins that branch's tip, so `git submodule update --init` brings
+# the fixes (install-linux/ ThirdPartyPath cross hunk, the -URLabCtrlPort/
+# -URLabInfoPort legacy-subscriber overrides, and the macOS-only hunks) with
+# no patch to apply. This script now only handles the one NESTED patch:
 #   coacd-src-local-fixes.patch (nested submodule third_party/CoACD/src) -
 #     required to compile CoACD with clang 20 (the UE Linux cross toolchain);
-#     not needed for MSVC native builds but harmless.
+#     not needed for MSVC native builds but harmless. It cannot live on the
+#     fork because we do not own CoACD's repo.
 #
-# Idempotent - safe to re-run any time. Re-run after `git submodule update`,
-# which silently reverts all of these.
+# Idempotent - safe to re-run any time.
 #
 # Usage:
 #   powershell -ExecutionPolicy Bypass -File Scripts\setup_urlab.ps1 [-CheckOnly]
@@ -95,10 +90,15 @@ if (-not (Test-Path (Join-Path $CoacdSrc "CMakeLists.txt"))) {
     if ($R.Code -ne 0) { $R.Output | Write-Host; throw "git submodule update failed for CoACD src" }
 }
 
-# --- 1. plugin-repo patches ---
-Ensure-Patch $Submodule "unreal-robotics-lab-local-fixes.patch"
+# --- 1. plugin-repo fixes are committed on the fork branch, not patched ---
+$R = Invoke-Git @("-C", $Submodule, "merge-base", "--is-ancestor", "41fd7cceda538039581f5ed48e88956171c5d753", "HEAD")
+if ($R.Code -ne 0) {
+    Log "WARN: submodule does not contain our fix commit 41fd7cc - is the URL the"
+    Log "      rammp-org/UnrealRoboticsLab fork and the pin on ramms/v0.6.0-beta?"
+    if ($CheckOnly) { throw "URLab submodule missing our fix commit" }
+}
 
-# --- 2. nested CoACD source patch ---
+# --- 2. nested CoACD source patch (we do not own CoACD's repo) ---
 Ensure-Patch $CoacdSrc "coacd-src-local-fixes.patch"
 
-Log "done - all URLab local patches present."
+Log "done - CoACD nested patch present; URLab fixes come from the fork branch."

@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 # Sets up the Plugins/unreal-robotics-lab submodule for building RAMMS on
-# macOS/Linux: applies the local fixes the upstream plugin does not (yet)
-# carry, builds its third-party dependencies, and regenerates project files.
+# macOS/Linux: applies the one nested patch upstream does not carry, builds
+# its third-party dependencies, and regenerates project files.
 #
-# Idempotent — safe to re-run any time (e.g. after `git submodule update`,
-# which discards the local fixes).
+# Idempotent — safe to re-run any time.
 #
 # Usage:
 #   Scripts/setup_urlab.sh [--no-thirdparty] [--no-projectfiles]
@@ -13,19 +12,20 @@
 #   UE_ROOT   Unreal Engine install root
 #             (default: /Users/Shared/Epic Games/UE_5.7)
 #
-# What the patches contain:
-# Scripts/patches/unreal-robotics-lab-local-fixes.patch (plugin repo):
-#   - MsgpackHelpers.cpp: push/undef/pop the `nil` macro around rpclib includes
-#     (Apple's MacTypes.h defines `nil`, breaking msgpack's `typedef nil_t nil`).
-#   - URLab.Build.cs: Mac branch in AddThirdPartyLibrary — links the third-party
-#     dylibs (MuJoCo/CoACD/libzmq); without it the plugin fails to link on Mac.
-#   - URLab.Build.cs: ThirdPartyPath resolves to third_party/install-linux/
-#     when cross-compiling Windows→Linux (artifacts from
-#     Scripts/build_all_linux_cross.ps1 — see doc/PARALLEL_SIM_PLAN.md).
-#   - third_party/CoACD/build.sh: CMAKE_POLICY_VERSION_MINIMUM=3.5 (CMake 4.x
-#     compatibility) + executable bit.
-#   - third_party/build_all.sh: executable bit.
-# Scripts/patches/coacd-src-local-fixes.patch (NESTED submodule third_party/CoACD/src):
+# Our URLab fixes now live on our FORK, not in a patch:
+#   git@github.com:rammp-org/UnrealRoboticsLab  branch ramms/v0.6.0-beta
+# The submodule pins that branch's tip, so `git submodule update --init`
+# already brings the fixes (the `nil` macro guard, the Mac Build.cs dylib
+# linking + install-linux cross path, the MjBody world-body render fix, the
+# quick-convert preview refresh, the CoACD/MuJoCo build-script dylib staging,
+# the legacy-subscriber port overrides). The fork's `upstream` remote points
+# at urlab-sim/UnrealRoboticsLab so each fix can be split onto a clean branch
+# and PR'd back. See the ramms/v0.6.0-beta commit for the grouped changelog.
+#
+# The ONE thing still applied as a patch is the NESTED submodule
+# third_party/CoACD/src (we don't own CoACD's repo, so its fix cannot be
+# committed on our fork):
+# Scripts/patches/coacd-src-local-fixes.patch:
 #   - CMakeLists.txt / cmake/openvdb.cmake / public/coacd.h: build + template
 #     compile fixes for modern clang/CMake.
 #
@@ -36,7 +36,6 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SUBMODULE="$REPO_ROOT/Plugins/unreal-robotics-lab"
-PATCH="$REPO_ROOT/Scripts/patches/unreal-robotics-lab-local-fixes.patch"
 COACD_SRC="$SUBMODULE/third_party/CoACD/src"
 COACD_PATCH="$REPO_ROOT/Scripts/patches/coacd-src-local-fixes.patch"
 UPROJECT="$REPO_ROOT/Ramms.uproject"
@@ -60,25 +59,16 @@ if [ ! -f "$SUBMODULE/URLab.uplugin" ] && [ ! -f "$SUBMODULE/UnrealRoboticsLab.u
 	git -C "$REPO_ROOT" submodule update --init Plugins/unreal-robotics-lab
 fi
 
-# --- 1. apply local fixes (idempotent) ---
-if git -C "$SUBMODULE" apply --reverse --check "$PATCH" 2>/dev/null; then
-	log "local fixes already applied — skipping patch"
-elif git -C "$SUBMODULE" apply --check "$PATCH" 2>/dev/null; then
-	git -C "$SUBMODULE" apply "$PATCH"
-	log "local fixes applied"
-else
-	log "ERROR: patch no longer applies cleanly — upstream has drifted."
-	log "Apply the equivalent changes by hand (see the patch header comments in"
-	log "$PATCH) and regenerate the patch with:"
-	log "  (cd Plugins/unreal-robotics-lab && git diff > $PATCH)"
-	exit 1
+# --- 1. our URLab fixes are committed on the fork branch, not patched ---
+# The submodule pin already carries them. Warn (don't fail) if the checkout
+# is unexpectedly a bare upstream tag with none of our commits — e.g. someone
+# repointed the URL back to urlab-sim.
+if ! git -C "$SUBMODULE" merge-base --is-ancestor \
+		41fd7cceda538039581f5ed48e88956171c5d753 HEAD 2>/dev/null; then
+	log "WARN: submodule does not contain our fix commit 41fd7cc — is the URL"
+	log "      the rammp-org/UnrealRoboticsLab fork and the pin on ramms/v0.6.0-beta?"
+	log "      (run: git submodule sync && git submodule update --init Plugins/unreal-robotics-lab)"
 fi
-
-# (The former 1b port-override patch was absorbed upstream in URLab
-# v0.6.0-beta: -URLabInstanceIndex/-URLabPortBase/-URLabPortStride/
-# -URLabStepPort/-URLabStatePort/-URLabCamBasePort are native switches now.
-# The legacy subscriber's -URLabCtrlPort/-URLabInfoPort live on in the
-# local-fixes patch above.)
 
 # --- 2. apply nested CoACD source fixes (idempotent) ---
 if [ ! -f "$COACD_SRC/CMakeLists.txt" ]; then
