@@ -182,3 +182,40 @@ graph node lived in an Editor-type module and broke crowd anim blueprints in
 uncooked `-game` runs. Fixed 2026-08-05 in the RammsCrowd plugin
 (`RammsCrowdUncooked` UncookedOnly module + CoreRedirect). If it recurs,
 check the log for `LoadErrors` naming `AnimGraphNode_RammsFootPlacement`.
+
+## Headless verification without a browser (`Scripts/ps_probe/`)
+
+A real WebRTC player (pure-TS stack, no native deps) that subscribes to the
+first streamer and counts received video RTP — the cluster instance-health
+check, CI-able:
+
+```bash
+cd Scripts/ps_probe && npm install
+node ps_probe.mjs ws://<signalling-host>:<player-port> 10
+```
+
+Exit codes: **0** = video flowing (prints packet/byte counts), **2** =
+connected but no video received, **1** = no streamer registered / handshake
+failed. On exit 2, read the sim-side log next: `Starting media capture`
+present but only an *audio* (Opus) encoder line at player join ⇒ the video
+encoder never initialized — on cluster nodes that almost always means NVENC
+is not visible in the container (`apptainer exec --nv ramms.sif sh -c
+'ldconfig -p | grep -i nvidia-encode'`; retest with
+`-PixelStreamingEncoderCodec=VP8` to confirm the rest of the chain via
+software encode). `No viewport could be found` or `capture hit an error` ⇒
+producer-side; note the engine does NOT retry capture after an error.
+
+## Packaged-build gotchas (Mac test campaign, 2026-08-19)
+
+- The Mac `-archive` output is a bare `.app` without staged content; run
+  the real package from `Saved/StagedBuilds/Mac/Ramms.app`.
+- URLab's third-party dylibs (libzmq/mujoco/coacd) are **not staged** into
+  Mac packages — instant dyld abort on `libzmq.5.dylib`. The Linux
+  Build.cs branch stages its `.so` files via RuntimeDependencies; the Mac
+  branch needs the same treatment (patch TODO). Workaround: copy
+  `third_party/install/*/lib/*.dylib` into `Contents/MacOS/`.
+- Cooked Metal SM6 is hard-disabled on M1 chips (`MetalRHI`:
+  `bSupportsSM6 = !AdapterName.Contains("M1")`, macOS 15+) and we cook
+  SM6-only, so **packaged runs are impossible on M1 Macs** even windowed;
+  the editor is unaffected. Do packaged validation on Linux/Windows (or an
+  M2+ Mac).

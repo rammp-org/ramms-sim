@@ -1,0 +1,10 @@
+{
+  "name": "ramms-ps-probe",
+  "private": true,
+  "type": "module",
+  "description": "Headless Pixel Streaming player probe: joins as a real WebRTC peer and counts received video RTP. Exit 0 = video flowing, 2 = connected but no video, 1 = no streamer/handshake failure. Usage: npm install && node ps_probe.mjs ws://<signalling-host>:<player-port> [seconds]",
+  "dependencies": {
+    "werift": "^0.22.0",
+    "ws": "^8.18.0"
+  }
+}

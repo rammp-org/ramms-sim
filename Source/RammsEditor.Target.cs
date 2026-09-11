@@ -11,5 +11,25 @@ public class RammsEditorTarget : TargetRules
 		DefaultBuildSettings = BuildSettingsVersion.V6;
 		IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_7;
 		ExtraModuleNames.Add("Ramms");
+
+		// URLab v0.6.0-beta's generated MuJoCo component model (hundreds of
+		// reflected classes over template-heavy ProtoSpec headers) makes the
+		// default jumbo Module.URLab.gen.N.cpp unity TUs explode Apple clang
+		// to ~25 GB each. Compile generated files individually on Mac; MSVC
+		// and Linux clang handle the batched TUs fine, so keep them fast.
+		if (Target.Platform == UnrealTargetPlatform.Mac)
+		{
+			bAlwaysUseUnityForGeneratedFiles = false;
+
+			// Even single hand-written URLab TUs (MjFromtoFold.cpp,
+			// MjSpecWriteHooks.cpp, URLabEditor unity blobs) peak 14-17 GB
+			// under Apple clang's -O3 backend, which starves a 32 GB
+			// machine. Compile the URLab modules unoptimized and un-batched
+			// on Mac: the MuJoCo core is a prebuilt optimized dylib, so
+			// physics stepping keeps its speed — only URLab's glue slows,
+			// which dev-on-Mac tolerates.
+			DisableOptimizeCodeForModules = new string[] { "URLab", "URLabEditor", "URLabRos" };
+			DisableUnityBuildForModules = new string[] { "URLab", "URLabEditor", "URLabRos" };
+		}
 	}
 }
