@@ -24,7 +24,8 @@
 	url = git@github.com:rammp-org/ramms-mujoco-support
 [submodule "Plugins/unreal-robotics-lab"]
 	path = Plugins/unreal-robotics-lab
-	url = git@github.com:urlab-sim/UnrealRoboticsLab
+	url = git@github.com:rammp-org/UnrealRoboticsLab
+	branch = ramms/v0.6.0-beta
 [submodule "Plugins/RammsCrowd"]
 	path = Plugins/RammsCrowd
 	url = git@github.com:rammp-org/ramms-crowd

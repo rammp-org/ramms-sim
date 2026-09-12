@@ -7,7 +7,7 @@
 # editor uses), because every dep build wipes its own install dir and the
 # two platforms would otherwise clobber each other. URLab.Build.cs picks
 # install-linux/ automatically when targeting Linux from a Windows host
-# (part of Scripts/patches/unreal-robotics-lab-local-fixes.patch).
+# (committed on our fork branch ramms/v0.6.0-beta).
 #
 # Prerequisites:
 #   - UE Linux cross-toolchain installed (the same one you already use for
@@ -38,9 +38,10 @@ $BuildType = "Release"
 
 function Log($msg) { Write-Host "[cross-thirdparty] $msg" -ForegroundColor Cyan }
 
-# --- URLab local patches (idempotent; a git submodule update reverts them,
-# and without them CoACD fails under clang 20 and UBT links the wrong
-# third-party root when targeting Linux) ---
+# --- URLab setup: our plugin fixes (incl. the install-linux/ ThirdPartyPath
+# cross hunk) are committed on the fork branch the submodule pins; this only
+# applies the nested CoACD source patch (clang-20 build fix) and verifies the
+# fork pin. ---
 & (Join-Path $PSScriptRoot "setup_urlab.ps1")
 
 # --- UE Linux cross-toolchain ---

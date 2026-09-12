@@ -120,8 +120,8 @@ Both routes produce the same `Packaged/Linux` output.
   parsed by the bridge itself (`ApplyEnvAndCommandLineOverrides`), with
   instance-registry files and an `InstanceId` for SHM sessions. Our old
   `urlab-port-overrides.patch` is retired; only the legacy ZMQ subscriber's
-  `-URLabCtrlPort/-URLabInfoPort` remain patched in
-  (`unreal-robotics-lab-local-fixes.patch`). `run_headless.sh` now passes
+  `-URLabCtrlPort/-URLabInfoPort` remain as our own addition, now committed on
+  the URLab fork branch `ramms/v0.6.0-beta`. `run_headless.sh` now passes
   index/base/stride (stride 20: step=slot+0, state=slot+1,
   cams=slot+2..slot+9, ctrl=slot+10, info=slot+11). Cooked-build bridge
   autostart confirmed in source (`AAMjManager` owns the bridge when no

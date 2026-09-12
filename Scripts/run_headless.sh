@@ -26,8 +26,8 @@
 # Since URLab v0.6.0-beta the -URLabInstanceIndex/-URLabPortBase/
 # -URLabPortStride/-URLabStepPort/-URLabStatePort/-URLabCamBasePort switches
 # are native (Bridge/BridgeServerConfigUtils.cpp ApplyEnvAndCommandLineOverrides);
-# only -URLabCtrlPort/-URLabInfoPort for the legacy subscriber remain from our
-# local patch (Scripts/patches/unreal-robotics-lab-local-fixes.patch). The
+# only -URLabCtrlPort/-URLabInfoPort for the legacy subscriber remain as our
+# own addition (committed on our URLab fork branch ramms/v0.6.0-beta). The
 # bridge's own INI lives inside the plugin dir and is shared by every instance
 # on a host, so the command line is the only per-instance channel. Clients
 # learn actual camera ports from the handshake.
