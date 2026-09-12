@@ -95,11 +95,15 @@ void ARammsPlayerController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
 
-	// get a pointer to the controlled pawn
-	VehiclePawn = CastChecked<ARammsPawn>(InPawn);
-
-	// subscribe to the pawn's OnDestroyed delegate
-	VehiclePawn->OnDestroyed.AddDynamic(this, &ARammsPlayerController::OnPawnDestroyed);
+	// get a pointer to the controlled pawn. Not every possessable pawn is the
+	// vehicle (e.g. a MuJoCo robot base pawn with AutoPossessPlayer); the
+	// vehicle-specific respawn hook only applies when it is.
+	VehiclePawn = Cast<ARammsPawn>(InPawn);
+	if (VehiclePawn)
+	{
+		// subscribe to the pawn's OnDestroyed delegate
+		VehiclePawn->OnDestroyed.AddDynamic(this, &ARammsPlayerController::OnPawnDestroyed);
+	}
 }
 
 void ARammsPlayerController::OnPawnDestroyed(AActor* DestroyedPawn)
