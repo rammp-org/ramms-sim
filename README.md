@@ -128,24 +128,48 @@ cd Plugins/unreal-robotics-lab/third_party
 The script syncs each dependency's source submodule to the expected revision,
 builds it in Release, and installs into `third_party/install/`.
 
-**macOS / Linux:** do **not** run `build_all.sh` directly. Upstream
-unreal-robotics-lab does not (yet) compile on macOS, so the repository ships
-local patches (`Scripts/patches/`) that fix it — the `nil` macro clash between
-Apple's `MacTypes.h` and rpclib/msgpack, the missing Mac dylib link branch in
-`URLab.Build.cs`, and CoACD build fixes for modern clang/CMake. Run the setup
-script from the repository root instead; it applies the patches, builds the
-third-party dependencies with the patches preserved, and regenerates project
-files:
+**macOS / Linux:** do **not** run `build_all.sh` directly. Run the setup
+script from the repository root instead; it verifies the submodule, applies the
+one nested patch that can't live on our fork, builds the third-party
+dependencies, and regenerates project files:
 
 ```bash
 UE_ROOT="/Users/Shared/Epic Games/UE_5.7" Scripts/setup_urlab.sh
 ```
 
-The script is idempotent — re-run it any time. In particular, re-run it after
-`git submodule update`, which discards the local patches. Flags:
-`--no-thirdparty` skips the dependency build, `--no-projectfiles` skips
-project file generation; `UE_ROOT` defaults to
-`/Users/Shared/Epic Games/UE_5.7`.
+Our fixes to unreal-robotics-lab (the `nil` macro clash between Apple's
+`MacTypes.h` and rpclib/msgpack, the Mac dylib link branch in `URLab.Build.cs`,
+the `MjBody` world-body render fix, the quick-convert preview refresh, and the
+build-script dylib staging) now live on **our fork**, not in a patch file —
+see [The unreal-robotics-lab fork](#the-unreal-robotics-lab-fork) below. The
+submodule pins the fork branch, so `git submodule update --init` already brings
+them. The only thing `setup_urlab` still patches is the **nested** CoACD source
+submodule (`Scripts/patches/coacd-src-local-fixes.patch`), which can't live on
+our fork because we don't own CoACD's repo — so re-run `setup_urlab` after a
+`git submodule update --recursive`, which reverts that nested patch.
+
+The script is idempotent — re-run it any time. Flags: `--no-thirdparty` skips
+the dependency build, `--no-projectfiles` skips project file generation;
+`UE_ROOT` defaults to `/Users/Shared/Epic Games/UE_5.7`.
+
+#### The unreal-robotics-lab fork
+
+The `unreal-robotics-lab` submodule points at **our fork**,
+`git@github.com:rammp-org/UnrealRoboticsLab`, pinned to branch
+**`ramms/v0.6.0-beta`** — the upstream `v0.6.0-beta` tag plus our committed
+fixes (grouped by category in that branch's commit for easy upstreaming). The
+fork keeps an `upstream` remote (`urlab-sim/UnrealRoboticsLab`) so each fix can
+be split onto a clean branch and PR'd back.
+
+If you cloned **before** the submodule moved to the fork, point your local
+checkout at the new URL:
+
+```bash
+git submodule sync Plugins/unreal-robotics-lab
+git submodule update --init --recursive Plugins/unreal-robotics-lab
+```
+
+New recursive clones pick up the fork automatically from `.gitmodules`.
 
 > If you skip this step, compiling `RammsEditor` fails at the build-rules
 > stage with an error like `MuJoCo install is missing '...INSTALLED_SHA.txt'`.
