@@ -15,9 +15,11 @@ public class RammsEditorTarget : TargetRules
 		// URLab v0.6.0-beta's generated MuJoCo component model (hundreds of
 		// reflected classes over template-heavy ProtoSpec headers) makes the
 		// default jumbo Module.URLab.gen.N.cpp unity TUs explode Apple clang
-		// to ~25 GB each. Compile generated files individually on Mac; MSVC
-		// and Linux clang handle the batched TUs fine, so keep them fast.
-		if (Target.Platform == UnrealTargetPlatform.Mac)
+		// to ~25 GB each. Compile generated files individually on Mac and
+		// Linux; MSVC handles the batched TUs fine, so keep them fast. Linux
+		// clang 20 peaks at 11+ GB per URLab TU at -O3, which runs a 32 GB
+		// machine out of memory, so it takes the same settings as Mac.
+		if (Target.Platform == UnrealTargetPlatform.Mac || Target.Platform == UnrealTargetPlatform.Linux)
 		{
 			bAlwaysUseUnityForGeneratedFiles = false;
 
