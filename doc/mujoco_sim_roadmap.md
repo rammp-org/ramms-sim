@@ -198,7 +198,16 @@ holonomic controller.
   hangs off `Bodies[0]` = the static `worldbody` in these scenes, so it never
   follows the robot — the pawns list `CameraNames = [FollowCamera, TopCamera]`
   and the component orders authored cameras before runtime-added ones.
-- **(5) NEXT** — holonomic drive controller.
+- **Chair lift/linkage motors on the base (2026-09-14)** — the Chaos backend
+  drives Position motors as physics-asset constraint drives (DOF inferred from
+  the constraint; rad / cm), `DT_Mebot_ChaosMotors` registers the elevators,
+  translators and caster arms, and `UMebotControllerComponent` routes through
+  the base (`bUseRobotBase`) — so both chair controllers are base consumers
+  now. Found on the way: the holonomic base's centre-wheel hinges are −Y, so
+  its table carries `Direction = −1` (forward was inverted); the chair's
+  drive-wheel L/R swap compensates for the diff-drive turn mixing sign.
+- **(5) NEXT** — holonomic drive controller; un-swap the chair's wheels by
+  fixing the mixing sign (table + BP together).
 
 Note on the linkage mechanism (lift_drive_linkage_ue.xml): each side has front
 and rear legs (crank position actuator + coupler + arm closed by a `<connect>`)

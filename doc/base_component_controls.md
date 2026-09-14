@@ -28,7 +28,7 @@ exactly as before; the MuJoCo lift_drive linkage base drives and its centre
 
 | Asset | Backend | Components (in the Blueprint) | Tables |
 |---|---|---|---|
-| `/Game/Robots/BP_Mebot_Ramms` (the powered chair pawn) | Chaos — `RobotBase` (Backend=**Chaos**, `ChaosSkeletalMeshComponentName=VehicleMesh`) | `RammsDifferentialDriveController` (`LeftMotorId=left_motor`, `RightMotorId=right_motor`), `RammsAccessInput`, `MebotController`, `KinovaGen3Controller`, … | `DT_Mebot_ChaosMotors` |
+| `/Game/Robots/BP_Mebot_Ramms` (the powered chair pawn) | Chaos — `RobotBase` (Backend=**Chaos**, `ChaosSkeletalMeshComponentName=VehicleMesh`) | `RammsDifferentialDriveController` (`LeftMotorId=left_motor`, `RightMotorId=right_motor`), `MebotController` (elevators / translators / caster arms, routed through the base), `RammsAccessInput`, `KinovaGen3Controller`, … | `DT_Mebot_ChaosMotors` (wheels + 6 constraint Position motors) |
 | `/Game/Robots/BP_LiftDriveLinkage_Ramms` (**pawn**, child of the imported `lift_drive_linkage` articulation, so a reimport doesn't clobber it; `AutoPossessPlayer=Player0`) | MuJoCo — `RobotBase` (Backend=**Mujoco**) | `DifferentialDrive` (centre wheels, radius 12.7 cm, measured track), `LeftCenterLinkage`, `RightCenterLinkage` (`Ramms5BarLinkageController`), `KeyboardTeleop`, `FollowArm`+`FollowCamera` on `base_link` | `DT_LiftDriveLinkage_Motors`, `DT_LiftDriveLinkage_5Bar` |
 | `/Game/Robots/BP_LiftDriveHolonomic_Ramms` (**pawn**, child of `lift_drive_holonomic`; `AutoPossessPlayer=Player0`) | MuJoCo — `RobotBase` (Backend=**Mujoco**) | `DifferentialDrive` (centre wheels), `KeyboardTeleop` (hips R/F T/G, cranks Y/H U/J), `FollowArm`+`FollowCamera` | `DT_LiftDriveHolonomic_Motors` (all 14 actuators parsed from the MJCF) |
 | `/Game/Robots/BP_Mebot_Mujoco` | *not migrated* — a Chaos chair carrying a MuJoCo arm child actor. If it gets a base component, set Backend=**Chaos** explicitly: `Auto` would find the arm articulation attached under it. | | |
@@ -57,10 +57,32 @@ target and infers the degree of freedom from the constraint's first non-locked
 axis — a linear axis → linear actuator in cm, else an angular one (twist = X,
 swing2 = Y, swing1 = Z) in radians; reads come back the same way. Drive
 stiffness / damping / force limit are the base component's
-`ChaosPositionDrive*` settings (defaults match `MebotController`). The first
-command through the base disables the matching `MebotController` motor entry
-so the two don't fight over the drive target — use one path or the other per
-motor.
+`ChaosPositionDrive*` settings (defaults match `MebotController`).
+
+`UMebotControllerComponent` (the chair's rate-limited lift/linkage targets:
+`SetAngularMotorTarget(constraint, degrees)`, `SetLinearMotorTarget(constraint,
+cm)`, the getters) now **routes through the robot base** when the owner has one
+with a backend (`bUseRobotBase`, default on): each entry maps to the registry
+motor whose `ChaosName` is its constraint (or an explicit `MotorId`), the
+interpolated target becomes a `SetMotorCommand` (radians / cm) and the getters
+read the base — so the same API drives a MuJoCo chair's position actuators. An
+entry the registry doesn't list keeps driving its constraint directly, and a
+`MebotController` with `bUseRobotBase` off is disabled per constraint on the
+first base command so the two never fight over a drive target.
+
+**Drive-wheel L/R swap and joint signs.** The chair's diff-drive is authored
+`LeftWheelBoneName = drive_wheel_r` / `Right = drive_wheel_l` although the bones
+sit on the sides their names say (`drive_wheel_l` at component Y = −30 cm, the
+UE left). It compensates for the drive's turn mixing: with joystick X = +1 the
+controller gives the *left* command the smaller torque, which would turn left
+on honestly-named wheels; swapped, the chair turns right as the joystick
+promises (verified: yaw increases). The table keeps the swap so behaviour is
+unchanged; the honest fix is to flip the sign in the mixing and un-swap both
+the table and the BP's bone names together. On MuJoCo the same class of issue
+is per-joint: `lift_drive_holonomic`'s centre-wheel hinges are authored about
+**−Y** (the linkage's about +Y), so a positive ctrl rolled them backwards —
+`DT_LiftDriveHolonomic_Motors` now carries `Direction = −1` for them
+(`make_pawns.py` derives it from the joint axis) and forward is forward.
 
 `DT_LiftDriveLinkage_Motors` — one row per MJCF actuator, ranges from
 `lift_drive_linkage_ue.xml`:

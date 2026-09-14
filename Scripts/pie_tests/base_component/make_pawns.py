@@ -51,17 +51,21 @@ def make_table(name, row_struct, rows):
     return dt
 
 
-def motor_row(name, kind, lo, hi):
+def motor_row(name, kind, lo, hi, direction=1.0):
     return {"Name": name, "Id": name, "ChaosName": "None", "Type": kind,
-            "ControlRange": {"X": float(lo), "Y": float(hi)}, "Direction": 1.0}
+            "ControlRange": {"X": float(lo), "Y": float(hi)}, "Direction": direction}
 
 
 def motors_from_mjcf(xml_path):
     """One FRammsMotorSpec row per <motor>/<position>/<velocity> actuator."""
     rows = []
-    for m in re.finditer(r'<(motor|position|velocity)\s+name="([^"]+)"[^>]*?ctrlrange="([-\d.]+)\s+([-\d.]+)"', open(xml_path).read()):
-        kind, name, lo, hi = m.groups()
-        rows.append(motor_row(name, kind.capitalize(), lo, hi))
+    xml = open(xml_path).read()
+    axes = {m.group(1): m.group(2) for m in re.finditer(r'<joint name="([^"]+)"[^>]*?axis="([^"]+)"', xml)}
+    for m in re.finditer(r'<(motor|position|velocity)\s+name="([^"]+)"\s+joint="([^"]+)"[^>]*?ctrlrange="([-\d.]+)\s+([-\d.]+)"', xml):
+        kind, name, joint, lo, hi = m.groups()
+        # Wheel hinges about -Y roll backwards for a positive ctrl: flip them.
+        direction = -1.0 if (kind == "motor" and axes.get(joint, "").split() == ["0", "-1", "0"]) else 1.0
+        rows.append(motor_row(name, kind.capitalize(), lo, hi, direction))
     return rows
 
 
@@ -82,8 +86,11 @@ HOLONOMIC_MOTORS = [
     motor_row("front_right_omni_wheel", "Motor", -30, 30),
     motor_row("rear_left_omni_wheel", "Motor", -30, 30),
     motor_row("rear_right_omni_wheel", "Motor", -30, 30),
-    motor_row("right_center_wheel", "Motor", -30, 30),
-    motor_row("left_center_wheel", "Motor", -30, 30),
+    # The centre (drive) wheel hinges are authored about -Y (the linkage base's
+    # are +Y): a positive MuJoCo ctrl rolls them backwards, so Direction -1
+    # makes "positive = rolls forward" hold, as the diff-drive assumes.
+    motor_row("right_center_wheel", "Motor", -30, 30, direction=-1.0),
+    motor_row("left_center_wheel", "Motor", -30, 30, direction=-1.0),
 ]
 HOLONOMIC_MJCF = PROJECT + "Saved/URLab/ImportPrep/lift_drive_holonomic/lift_drive_holonomic_ue.xml"
 
