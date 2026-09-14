@@ -1,7 +1,7 @@
 # MuJoCo simulation roadmap
 
 Status: **draft for review** (2026-09-11). Companion to
-[`newton_learnings_to_urlab_plan.md`](newton_learnings_to_urlab_plan.md) (which
+`newton_learnings_to_urlab_plan.md` (a separate draft, not yet in the repo, which
 records the Chaos-deprioritized decision and archives the Chaos-specific
 learnings). This doc is the forward plan under a **MuJoCo-only focus** on
 URLab v0.6.0-beta: the re-scoped no-regret work, plus three integration threads

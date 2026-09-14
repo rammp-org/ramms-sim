@@ -15,6 +15,7 @@ orbits, wheel zooms, Home resets.
 Idempotent: re-running updates existing components / tables.
 """
 import json
+import os
 import re
 import unreal
 
@@ -50,13 +51,49 @@ def make_table(name, row_struct, rows):
     return dt
 
 
+def motor_row(name, kind, lo, hi):
+    return {"Name": name, "Id": name, "ChaosName": "None", "Type": kind,
+            "ControlRange": {"X": float(lo), "Y": float(hi)}, "Direction": 1.0}
+
+
 def motors_from_mjcf(xml_path):
     """One FRammsMotorSpec row per <motor>/<position>/<velocity> actuator."""
     rows = []
     for m in re.finditer(r'<(motor|position|velocity)\s+name="([^"]+)"[^>]*?ctrlrange="([-\d.]+)\s+([-\d.]+)"', open(xml_path).read()):
         kind, name, lo, hi = m.groups()
-        rows.append({"Name": name, "Id": name, "ChaosName": "None", "Type": kind.capitalize(),
-                     "ControlRange": {"X": float(lo), "Y": float(hi)}, "Direction": 1.0})
+        rows.append(motor_row(name, kind.capitalize(), lo, hi))
+    return rows
+
+
+# The 14 lift_drive_holonomic actuators (name, MJCF actuator kind, ctrlrange),
+# transcribed from the URLab import's prepared MJCF. That file lives under
+# Saved/ (ignored), so the rows are the source of truth here; when the MJCF is
+# present it is parsed and compared, and any drift is reported.
+HOLONOMIC_MOTORS = [
+    motor_row("front_left_crank", "Position", -0.49880, 3.19897),
+    motor_row("front_right_crank", "Position", -0.49880, 3.19897),
+    motor_row("rear_left_crank", "Position", -0.49880, 3.19897),
+    motor_row("rear_right_crank", "Position", -0.49880, 3.19897),
+    motor_row("right_hip_rear", "Position", -0.10668, 1.73411),
+    motor_row("right_hip_front", "Position", -0.07946, 1.66730),
+    motor_row("left_hip_front", "Position", -0.10668, 1.73411),
+    motor_row("left_hip_rear", "Position", -0.07946, 1.66730),
+    motor_row("front_left_omni_wheel", "Motor", -30, 30),
+    motor_row("front_right_omni_wheel", "Motor", -30, 30),
+    motor_row("rear_left_omni_wheel", "Motor", -30, 30),
+    motor_row("rear_right_omni_wheel", "Motor", -30, 30),
+    motor_row("right_center_wheel", "Motor", -30, 30),
+    motor_row("left_center_wheel", "Motor", -30, 30),
+]
+HOLONOMIC_MJCF = PROJECT + "Saved/URLab/ImportPrep/lift_drive_holonomic/lift_drive_holonomic_ue.xml"
+
+
+def holonomic_motors():
+    rows = HOLONOMIC_MOTORS
+    if os.path.exists(HOLONOMIC_MJCF):
+        parsed = motors_from_mjcf(HOLONOMIC_MJCF)
+        if parsed != rows:
+            log("WARNING: %s differs from the HOLONOMIC_MOTORS rows in this script; update the script:\n%s" % (HOLONOMIC_MJCF, parsed))
     return rows
 
 
@@ -188,8 +225,7 @@ setup_pawn(child_bp("/Game/Robots/URL/lift_drive_linkage", "BP_LiftDriveLinkage_
            linkage_rows=["left_center", "right_center"], fivebar_table=dt_5bar)
 
 # ----------------------------------------------------------- holonomic base
-dt_holo = make_table("DT_LiftDriveHolonomic_Motors", unreal.RammsMotorSpec.static_struct(),
-                     motors_from_mjcf(PROJECT + "Saved/URLab/ImportPrep/lift_drive_holonomic/lift_drive_holonomic_ue.xml"))
+dt_holo = make_table("DT_LiftDriveHolonomic_Motors", unreal.RammsMotorSpec.static_struct(), holonomic_motors())
 setup_pawn(child_bp("/Game/Robots/URL/lift_drive_holonomic", "BP_LiftDriveHolonomic_Ramms"), dt_holo,
            ("left_center_wheel", "right_center_wheel"),
            [motor_binding("front hips", "R", "F", ["left_hip_front", "right_hip_front"]),
