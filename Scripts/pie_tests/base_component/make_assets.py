@@ -100,8 +100,10 @@ def finish_bp(bp):
 ensure_dir(DATA_DIR)
 
 # ---------------------------------------------------------------- Chaos chair
-# The chair's diff-drive maps LEFT -> bone drive_wheel_r and RIGHT -> drive_wheel_l
-# (that is how the existing BP is authored); preserve it via ChaosName.
+# Wheel bones by their physical side (drive_wheel_l sits at component Y = -30 cm,
+# the UE left). The BP used to swap them to compensate for an inverted turn
+# mixing in the diff-drive library; the mixing is fixed, so the names are honest
+# here and the BP's own bone names are un-swapped below to match.
 #
 # The chair's other actuators are physics-asset constraint drives (the same
 # constraints UMebotControllerComponent lists): Position motors whose ChaosName
@@ -109,8 +111,8 @@ ensure_dir(DATA_DIR)
 # cm; the Chaos backend infers the driven axis from the constraint's free DOF.
 # Ranges are left to the constraint limits (ControlRange unset).
 dt_chaos = make_table("DT_Mebot_ChaosMotors", unreal.RammsMotorSpec.static_struct(), [
-    motor("left_motor", "Torque", chaos="drive_wheel_r"),
-    motor("right_motor", "Torque", chaos="drive_wheel_l"),
+    motor("left_motor", "Torque", chaos="drive_wheel_l"),
+    motor("right_motor", "Torque", chaos="drive_wheel_r"),
     # drive-motor elevators: swing arms that raise/lower each drive wheel
     motor("left_elevator", "Position", chaos="motor_swing_arm_l"),
     motor("right_elevator", "Position", chaos="motor_swing_arm_r"),
@@ -130,7 +132,9 @@ base = add_component(bp, unreal.RammsRobotBaseComponent, "RobotBase")
 setp(base, motor_table=dt_chaos, backend=unreal.RammsPhysicsBackend.CHAOS,
      chaos_skeletal_mesh_component_name="VehicleMesh")
 _, dd = find_component(bp, cls_name="RammsDifferentialDriveController")
-setp(dd, left_motor_id="left_motor", right_motor_id="right_motor")
+setp(dd, left_motor_id="left_motor", right_motor_id="right_motor",
+     # honest bone names (the legacy bone path uses them when no base is present)
+     left_wheel_bone_name="drive_wheel_l", right_wheel_bone_name="drive_wheel_r")
 log("  diff-drive: left_motor_id=%s right_motor_id=%s bones=%s/%s" % (
     dd.get_editor_property("left_motor_id"), dd.get_editor_property("right_motor_id"),
     dd.get_editor_property("left_wheel_bone_name"), dd.get_editor_property("right_wheel_bone_name")))

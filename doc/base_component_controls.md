@@ -39,14 +39,14 @@ MuJoCo pawns. Both are idempotent.
 
 ### Motor registries (`FRammsMotorSpec` rows)
 
-`DT_Mebot_ChaosMotors` — the chair's diff-drive was authored with **left → bone
-`drive_wheel_r`** and **right → `drive_wheel_l`**; the table preserves that via
-`ChaosName`:
+`DT_Mebot_ChaosMotors` — the chair's wheels by their physical side (see *Turn
+mixing and joint signs* below for the swap that used to be here) and the six
+constraint-driven position motors:
 
 | Id | Type | ChaosName | Drives | ControlRange | Direction |
 |---|---|---|---|---|---|
-| `left_motor` | Torque | `drive_wheel_r` (bone) | wheel spin | (0,0) = defer | +1 |
-| `right_motor` | Torque | `drive_wheel_l` (bone) | wheel spin | (0,0) = defer | +1 |
+| `left_motor` | Torque | `drive_wheel_l` (bone) | wheel spin | (0,0) = defer | +1 |
+| `right_motor` | Torque | `drive_wheel_r` (bone) | wheel spin | (0,0) = defer | +1 |
 | `left_elevator`, `right_elevator` | Position | `motor_swing_arm_l/_r` (constraint) | drive-motor elevator swing arms, **rad** | defer to constraint limits | +1 |
 | `left_translator`, `right_translator` | Position | `dw_main_plate_l/_r` (constraint) | drive-plate linear actuators fore/aft, **cm** | defer | +1 |
 | `front_caster_elevator`, `rear_caster_elevator` | Position | `front/rear_caster_swing_arm` (constraint) | caster arm elevation, **rad** | defer | +1 |
@@ -70,18 +70,19 @@ entry the registry doesn't list keeps driving its constraint directly, and a
 `MebotController` with `bUseRobotBase` off is disabled per constraint on the
 first base command so the two never fight over a drive target.
 
-**Drive-wheel L/R swap and joint signs.** The chair's diff-drive is authored
-`LeftWheelBoneName = drive_wheel_r` / `Right = drive_wheel_l` although the bones
-sit on the sides their names say (`drive_wheel_l` at component Y = −30 cm, the
-UE left). It compensates for the drive's turn mixing: with joystick X = +1 the
-controller gives the *left* command the smaller torque, which would turn left
-on honestly-named wheels; swapped, the chair turns right as the joystick
-promises (verified: yaw increases). The table keeps the swap so behaviour is
-unchanged; the honest fix is to flip the sign in the mixing and un-swap both
-the table and the BP's bone names together. On MuJoCo the same class of issue
-is per-joint: `lift_drive_holonomic`'s centre-wheel hinges are authored about
-**−Y** (the linkage's about +Y), so a positive ctrl rolled them backwards —
-`DT_LiftDriveHolonomic_Motors` now carries `Direction = −1` for them
+**Turn mixing and joint signs.** `JoystickToDifferentialDrive` used to mix
+`Left = throttle − steering`, the opposite of its own comment, so joystick
+X = +1 slowed the *left* wheel and every honestly-named robot turned left. The
+chair Blueprint had compensated by swapping its wheel bones
+(`LeftWheelBoneName = drive_wheel_r`, although `drive_wheel_l` sits at
+component Y = −30 cm, the UE left). Both are fixed together: the mixing is
+`Left = throttle + steering` (and the over-speed turn damping opposes the
+turn accordingly), and the chair's bone names / `ChaosName`s are the honest
+ones — so the chair still turns right on X = +1 and the MuJoCo bases now do
+too (`run_chaos.sh` / `run_mj_full.sh` assert yaw increases). On MuJoCo the
+other sign lives per joint: `lift_drive_holonomic`'s centre-wheel hinges are
+authored about **−Y** (the linkage's about +Y), so a positive ctrl rolled them
+backwards — `DT_LiftDriveHolonomic_Motors` carries `Direction = −1` for them
 (`make_pawns.py` derives it from the joint axis) and forward is forward.
 
 `DT_LiftDriveLinkage_Motors` — one row per MJCF actuator, ranges from

@@ -4,7 +4,7 @@
 S=$(cd "$(dirname "$0")" && pwd); ROOT=$(cd "$S/../../.." && pwd); cd "$ROOT" || exit 1
 FAIL=0
 # Run one script in the editor; keep the Python exit status (the filters only shape the output).
-f(){ python3 Scripts/editor_remote_exec.py --file "$1" 2>&1 | grep -E "\[t1\]|\[s\]|\[pie\]|\[stop\]|\[pos\]|\[mc\]|Traceback|Error|^ERROR" | sed 's/.*LogPython: //'
+f(){ python3 Scripts/editor_remote_exec.py --file "$1" 2>&1 | grep -E "\[t1\]|\[s\]|\[pie\]|\[stop\]|\[pos\]|\[mc\]|\[turn\]|Traceback|Error|^ERROR" | sed 's/.*LogPython: //'
      local st=${PIPESTATUS[0]}; if [ "$st" -ne 0 ]; then echo "!! $(basename "$1") failed (exit $st)"; FAIL=1; fi; return "$st"; }
 cleanup(){ f "$S/pie_end.py"; sleep 4; }
 trap cleanup EXIT
@@ -15,6 +15,9 @@ sleep 14
 f "$S/chaos_t1.py"
 for i in 1 2 3 4 5 6; do f "$S/chaos_sample.py"; sleep 0.5; done
 f "$S/chaos_stop.py"; sleep 2; f "$S/chaos_sample.py"
+echo "--- turn: X=+1 must turn right ---"
+python3 Scripts/editor_remote_exec.py --code "unreal._ramms_turn_op='start'" >/dev/null 2>&1; f "$S/chaos_turn.py"; sleep 2
+python3 Scripts/editor_remote_exec.py --code "unreal._ramms_turn_op='check'" >/dev/null 2>&1; f "$S/chaos_turn.py"; sleep 2
 echo "--- constraint position motors (elevators / translators / caster arms) ---"
 f "$S/chaos_pos_cmd.py"; sleep 3; f "$S/chaos_pos_read.py"; sleep 2
 echo "--- MebotController API through the base ---"

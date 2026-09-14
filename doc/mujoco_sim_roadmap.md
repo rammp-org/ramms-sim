@@ -204,10 +204,11 @@ holonomic controller.
   translators and caster arms, and `UMebotControllerComponent` routes through
   the base (`bUseRobotBase`) — so both chair controllers are base consumers
   now. Found on the way: the holonomic base's centre-wheel hinges are −Y, so
-  its table carries `Direction = −1` (forward was inverted); the chair's
-  drive-wheel L/R swap compensates for the diff-drive turn mixing sign.
-- **(5) NEXT** — holonomic drive controller; un-swap the chair's wheels by
-  fixing the mixing sign (table + BP together).
+  its table carries `Direction = −1` (forward was inverted); the diff-drive's
+  joystick mixing had the steering sign inverted (the chair BP hid it by
+  swapping its wheel bones) — fixed in the library, chair un-swapped, turn
+  direction asserted by both PIE runners.
+- **(5) NEXT** — holonomic drive controller.
 
 Note on the linkage mechanism (lift_drive_linkage_ue.xml): each side has front
 and rear legs (crank position actuator + coupler + arm closed by a `<connect>`)
