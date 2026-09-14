@@ -215,7 +215,8 @@ def setup_pawn(bp, motor_table, drive_ids, bindings, linkage_rows=None, fivebar_
     camctl = add_component(bp, unreal.RammsRobotCameraComponent, "CameraControl")
     # Cycle only the authored cameras: URLab's PossessCamera hangs off Bodies[0]
     # (the static worldbody here), so it never follows the robot.
-    setp(camctl, orbit_sensitivity=0.25, zoom_step=40.0, min_arm_length=60.0, max_arm_length=1500.0,
+    setp(camctl, orbit_sensitivity=0.25, zoom_sensitivity=1.0, zoom_step_fraction=0.08, zoom_interp_speed=10.0,
+         min_arm_length=60.0, max_arm_length=1500.0,
          camera_names=["FollowCamera", "TopCamera"], next_camera_key=key("N"))
 
     unreal.BlueprintEditorLibrary.compile_blueprint(bp)

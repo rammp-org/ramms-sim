@@ -223,7 +223,7 @@ on the video (the forwarded click focuses it).
 |---|---|
 | **N** | next camera (Follow → Top → …); `CameraNames` lists the cycle in order and `[0]` is the start camera (without it: authored cameras first, runtime-added last) |
 | **Right-drag** (or left-drag, `bAlsoOrbitWithLeftDrag`) | orbit: yaw / pitch the active camera's spring arm (`OrbitSensitivity` °/px, pitch clamped to `[MinPitch, MaxPitch]` = [−85°, 15°]) |
-| **Mouse wheel** | zoom: arm length ± `ZoomStep` (40 cm) within `[MinArmLength, MaxArmLength]` = [60, 1500] cm |
+| **Mouse wheel** | zoom: one wheel click = one step of `ZoomStepFraction` (8 %) of the current arm length (or a fixed `ZoomStep` with `bZoomProportional` off) × `ZoomSensitivity`; the arm eases toward it at `ZoomInterpSpeed` (10/s; 0 = instant) within `[MinArmLength, MaxArmLength]` = [60, 1500] cm. A physical click arrives as a burst of wheel events (macOS smooth scrolling: ~16 for one line), so a burst counts as one step: a new step starts after the wheel was idle for `ZoomIdleGap` (0.08 s), or when `ZoomRepeatDelay` (0.3 s) has passed since the last step (a held wheel repeats at ~3 steps/s) — that burst is why the old 40 cm-per-event zoom jumped metres per click. Tune `ZoomSensitivity` / `ZoomStepFraction` / `ZoomRepeatDelay` on the `CameraControl` component |
 | **Home** | reset the active arm to its authored rotation/length |
 
 Everything is also a Blueprint/Python call on the component — `NextCamera()`,
