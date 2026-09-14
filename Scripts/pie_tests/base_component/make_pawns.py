@@ -9,7 +9,7 @@ Player 0 so a placed instance is driven by the player as soon as PIE starts.
 
 Keys (both pawns): W/S drive, A/D turn, E/Q linkage/leg endpoint up/down (linkage
 base), R/F front cranks|hips, T/G rear cranks|hips, Y/H + U/J holonomic cranks.
-Camera: Tab cycles follow / top-down / URLab possess cameras; right-mouse drag
+Camera: N cycles follow / top-down cameras; right-mouse drag
 orbits, wheel zooms, Home resets.
 
 Idempotent: re-running updates existing components / tables.
@@ -146,6 +146,10 @@ def setp(obj, **props):
         obj.set_editor_property(k, v)
 
 
+# Key budget: URLab's UMjInputHandler owns 1-7, P (pause), R (reset), O (orbit
+# cameras), F (launchers) and its simulate widget uses Tab; the arm teleops own
+# I/K/J/L/U/O/M/./arrows/[/]/G/R. The base pawns therefore use W/S/A/D, E/Q,
+# Y/H, T/B, Z/X, C/V and N (camera), which collide with none of them.
 def motor_binding(label, inc, dec, ids, rate=0.6):
     b = unreal.RammsMotorKeyBinding()
     setp(b, label=label, increase_key=key(inc), decrease_key=key(dec), motor_ids=ids, rate_per_second=rate)
@@ -198,7 +202,7 @@ def setup_pawn(bp, motor_table, drive_ids, bindings, linkage_rows=None, fivebar_
          use_pawn_control_rotation=False, inherit_pitch=False, inherit_roll=False, inherit_yaw=True)
     add_component(bp, unreal.CameraComponent, "FollowCamera", parent_var="FollowArm")
 
-    # A second, top-down camera (world-aligned: inherits nothing) to Tab to.
+    # A second, top-down camera (world-aligned: inherits nothing) to switch to (N).
     top = add_component(bp, unreal.SpringArmComponent, "TopArm", parent_var="base_link")
     setp(top, target_arm_length=550.0, relative_rotation=unreal.Rotator(roll=0.0, pitch=-89.0, yaw=0.0),
          do_collision_test=False, enable_camera_lag=True, camera_lag_speed=6.0,
@@ -206,13 +210,13 @@ def setup_pawn(bp, motor_table, drive_ids, bindings, linkage_rows=None, fivebar_
     topcam = add_component(bp, unreal.CameraComponent, "TopCamera", parent_var="TopArm")
     setp(topcam, auto_activate=False)
 
-    # Tab cycles cameras (FollowCamera, TopCamera, URLab's PossessCamera);
+    # N cycles cameras (FollowCamera, TopCamera);
     # right-mouse drag orbits the active camera's arm, wheel zooms, Home resets.
     camctl = add_component(bp, unreal.RammsRobotCameraComponent, "CameraControl")
     # Cycle only the authored cameras: URLab's PossessCamera hangs off Bodies[0]
     # (the static worldbody here), so it never follows the robot.
     setp(camctl, orbit_sensitivity=0.25, zoom_step=40.0, min_arm_length=60.0, max_arm_length=1500.0,
-         camera_names=["FollowCamera", "TopCamera"])
+         camera_names=["FollowCamera", "TopCamera"], next_camera_key=key("N"))
 
     unreal.BlueprintEditorLibrary.compile_blueprint(bp)
     cdo = unreal.get_default_object(bp.generated_class())
@@ -227,16 +231,16 @@ dt_link = EAL.load_asset(DATA_DIR + "/DT_LiftDriveLinkage_Motors")
 dt_5bar = EAL.load_asset(DATA_DIR + "/DT_LiftDriveLinkage_5Bar")
 setup_pawn(child_bp("/Game/Robots/URL/lift_drive_linkage", "BP_LiftDriveLinkage_Ramms"), dt_link,
            ("left_center_wheel", "right_center_wheel"),
-           [motor_binding("front cranks", "R", "F", ["left_front_crank", "right_front_crank"]),
-            motor_binding("rear cranks", "T", "G", ["left_rear_crank", "right_rear_crank"])],
+           [motor_binding("front cranks", "Y", "H", ["left_front_crank", "right_front_crank"]),
+            motor_binding("rear cranks", "T", "B", ["left_rear_crank", "right_rear_crank"])],
            linkage_rows=["left_center", "right_center"], fivebar_table=dt_5bar)
 
 # ----------------------------------------------------------- holonomic base
 dt_holo = make_table("DT_LiftDriveHolonomic_Motors", unreal.RammsMotorSpec.static_struct(), holonomic_motors())
 setup_pawn(child_bp("/Game/Robots/URL/lift_drive_holonomic", "BP_LiftDriveHolonomic_Ramms"), dt_holo,
            ("left_center_wheel", "right_center_wheel"),
-           [motor_binding("front hips", "R", "F", ["left_hip_front", "right_hip_front"]),
-            motor_binding("rear hips", "T", "G", ["left_hip_rear", "right_hip_rear"]),
-            motor_binding("front cranks", "Y", "H", ["front_left_crank", "front_right_crank"]),
-            motor_binding("rear cranks", "U", "J", ["rear_left_crank", "rear_right_crank"])])
+           [motor_binding("front hips", "Y", "H", ["left_hip_front", "right_hip_front"]),
+            motor_binding("rear hips", "T", "B", ["left_hip_rear", "right_hip_rear"]),
+            motor_binding("front cranks", "Z", "X", ["front_left_crank", "front_right_crank"]),
+            motor_binding("rear cranks", "C", "V", ["rear_left_crank", "rear_right_crank"])])
 log("done")

@@ -11,7 +11,7 @@ on both physics backends. Requires the editor open with Remote Execution on.
 - `make_pawns.py` — makes `BP_LiftDriveLinkage_Ramms` / `BP_LiftDriveHolonomic_Ramms`
   keyboard-driveable pawns (RobotBase, diff-drive, 5-bar, KeyboardTeleop, follow
   + top-down cameras with a RammsRobotCameraComponent, AutoPossessPlayer).
-  Keys: W/S A/D drive, E/Q legs, R/F T/G Y/H U/J motors; Tab camera, mouse
+  Keys: W/S A/D drive, E/Q legs, Y/H T/B Z/X C/V motors; N camera, mouse
   drag orbit, wheel zoom, Home reset.
 - `make_test_map.py` — `BP_LiftDriveTestGameMode` + rewrites `Map_BaseTest_URL`
   (PlayerStart, GameMode Override, placed articulations removed) so a plain Play

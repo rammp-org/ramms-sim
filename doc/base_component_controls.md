@@ -169,7 +169,7 @@ changes. The MuJoCo bases are keyboard-driveable pawns too — see §2b, and
 (the imported URLab articulation is an `APawn`) with `AutoPossessPlayer =
 Player 0`, a follow camera on `base_link` (spring arm, yaw-only inheritance so
 the view stays level), a top-down camera, a **`RammsRobotCameraComponent`**
-(Tab to switch, mouse to orbit/zoom — see *Cameras* below) and a
+(N to switch cameras, mouse to orbit/zoom — see *Cameras* below) and a
 **`RammsKeyboardTeleopComponent`**. Place one in a
 level and PIE / launch: the player possesses it and drives it with the keyboard
 — locally or through the Pixel Streaming page. The component polls keys
@@ -182,10 +182,17 @@ motor Ids, rates), created by `Scripts/pie_tests/base_component/make_pawns.py`.
 | W / S | drive forward / back (centre wheels) | same |
 | A / D | turn left / right | same |
 | E / Q | centre 5-bar legs: endpoint up (retract) / down (extend) | — |
-| R / F | front cranks + / − | front hips + / − |
-| T / G | rear cranks + / − | rear hips + / − |
-| Y / H | — | front cranks + / − |
-| U / J | — | rear cranks + / − |
+| Y / H | front cranks + / − | front hips + / − |
+| T / B | rear cranks + / − | rear hips + / − |
+| Z / X | — | front cranks + / − |
+| C / V | — | rear cranks + / − |
+
+Keys are chosen around what else listens on the same player controller:
+URLab's `UMjInputHandler` owns **1–7** (debug toggles), **P** (pause), **R**
+(reset simulation), **O** (orbit cameras) and **F** (launchers), its simulate
+widget uses **Tab** (input-mode toggle), and the arm teleops own
+I/K/J/L/U/O/M/./arrows/[/]/G/R — so none of those are used here (R/F, T/G,
+U/J and Tab were, until the R = reset collision showed up).
 
 Position-motor keys move a *target* at `RatePerSecond` (rad/s) clamped to each
 motor's `ControlRange`; the 5-bar keys move the endpoint target at
@@ -214,7 +221,7 @@ on the video (the forwarded click focuses it).
 
 | Input | Action |
 |---|---|
-| **Tab** | next camera (Follow → Top → …); `CameraNames` lists the cycle in order and `[0]` is the start camera (without it: authored cameras first, runtime-added last) |
+| **N** | next camera (Follow → Top → …); `CameraNames` lists the cycle in order and `[0]` is the start camera (without it: authored cameras first, runtime-added last) |
 | **Right-drag** (or left-drag, `bAlsoOrbitWithLeftDrag`) | orbit: yaw / pitch the active camera's spring arm (`OrbitSensitivity` °/px, pitch clamped to `[MinPitch, MaxPitch]` = [−85°, 15°]) |
 | **Mouse wheel** | zoom: arm length ± `ZoomStep` (40 cm) within `[MinArmLength, MaxArmLength]` = [60, 1500] cm |
 | **Home** | reset the active arm to its authored rotation/length |
@@ -222,7 +229,7 @@ on the video (the forwarded click focuses it).
 Everything is also a Blueprint/Python call on the component — `NextCamera()`,
 `ActivateCamera(Name)`, `Orbit(DeltaYaw°, DeltaPitch°)`, `Zoom(DeltaCm)`,
 `ResetOrbit()`, `GetActiveCamera()` — so a touch UI or a gamepad stick can drive
-the same arm. Validated live (2026-09-13): Tab cycling, wheel zoom and Home through the
+the same arm. Validated live (2026-09-13, when the key was still Tab): camera cycling, wheel zoom and Home through the
 Pixel Streaming page; orbit and zoom through `Orbit()`/`Zoom()` from Python;
 and a real mouse drag on the editor's PIE viewport orbits *while* dragging.
 
