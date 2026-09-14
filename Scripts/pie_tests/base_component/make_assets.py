@@ -146,6 +146,9 @@ dt_mj = make_table("DT_LiftDriveLinkage_Motors", unreal.RammsMotorSpec.static_st
 
 # 5-bar geometry (cm, local x-z), measured from the MJCF. The right leg mirrors
 # the left: its "a" pivot is the rear one and both joint axes flip.
+# Joint sign: a MuJoCo hinge about +Y rotates +X toward -Z, so the link angle
+# atan2(z, x) is ZeroDir - q => AngleSign -1 for axis "0 1 0", +1 for "0 -1 0".
+# (left hip_a / right hip_b are +Y; left hip_b / right hip_a are -Y.)
 def fivebar(name, ma, mb, pa, pb, zda, sa, eua, zdb, sb, eub, flip):
     return {"Name": name, "ProximalMotorA": ma, "ProximalMotorB": mb,
             "PivotA": {"X": pa[0], "Y": pa[1]}, "PivotB": {"X": pb[0], "Y": pb[1]},
@@ -155,9 +158,9 @@ def fivebar(name, ma, mb, pa, pb, zda, sa, eua, zdb, sb, eub, flip):
 
 dt_5bar = make_table("DT_LiftDriveLinkage_5Bar", unreal.Ramms5BarLinkageSpec.static_struct(), [
     fivebar("left_center", "left_center_hip_a", "left_center_hip_b",
-            (6.5, 20.993), (-6.5, 20.992), -0.2397, 1.0, True, -2.9019, -1.0, False, False),
+            (6.5, 20.993), (-6.5, 20.992), -0.2397, -1.0, True, -2.9019, 1.0, False, False),
     fivebar("right_center", "right_center_hip_a", "right_center_hip_b",
-            (-6.5, 20.993), (6.5, 20.993), -2.9019, -1.0, False, -0.2397, 1.0, True, True),
+            (-6.5, 20.993), (6.5, 20.993), -2.9019, 1.0, False, -0.2397, -1.0, True, True),
 ])
 
 parent_bp = EAL.load_asset("/Game/Robots/URL/lift_drive_linkage")

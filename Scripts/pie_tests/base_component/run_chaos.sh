@@ -1,5 +1,6 @@
 #!/bin/bash
-S=$(cd "$(dirname "$0")" && pwd); cd /Users/bob/atdev/Ramms
+# Chaos PIE drive test on Map_Demo: the chair drives through the base component.
+S=$(cd "$(dirname "$0")" && pwd); ROOT=$(cd "$S/../../.." && pwd); cd "$ROOT" || exit 1
 f(){ python3 Scripts/editor_remote_exec.py --file "$1" 2>&1 | grep -E "\[t1\]|\[s\]|\[pie\]|\[stop\]|Traceback|Error|^ERROR" | sed 's/.*LogPython: //'; }
 LOG="$HOME/Library/Logs/Unreal Engine/RammsEditor/Ramms.log"; MARK=$(wc -l < "$LOG" | tr -d ' ')
 f $S/pie_begin_demo.py; sleep 14

@@ -18,12 +18,15 @@ on both physics backends. Requires the editor open with Remote Execution on.
   spawns, possesses and simulates the chosen lift-drive pawn.
 - `run_chaos.sh` — PIE on Map_Demo: the Chaos chair drives through the base
   component (`chaos_*.py`).
-- `run_mj_full.sh` — PIE on Map_BaseTest_URL with the placed linkage swapped
-  for the child BP (editor world only; the map is reloaded unsaved after):
-  unpause the MuJoCo scene, drive, retract (expected refused), extend
-  (`mj_*.py`).
+- `run_mj_full.sh` — PIE on Map_BaseTest_URL with `BP_LiftDriveLinkage_Ramms`:
+  points `BP_LiftDriveTestGameMode.DefaultPawnClass` at the linkage pawn for the
+  run (unsaved; `mj_restore.py` reloads the game mode from disk afterwards), lets
+  the game mode spawn/possess/unpause it, then drives, retracts (expected
+  refused) and extends the 5-bar legs (`mj_*.py`).
 
-Gotchas: each remote command runs synchronously on the game thread, so tests are
-chains of short scripts with local sleeps, run from **bash**; the MuJoCo scene in
-Map_BaseTest_URL starts paused; never `set_editor_property` on live PIE
-components (use the `Set*` UFUNCTIONs).
+The runners resolve the repo root from their own location, so they work from
+any clone. Gotchas: each remote command runs synchronously on the game thread,
+so tests are chains of short scripts with local sleeps, run from **bash**; never
+`set_editor_property` on live PIE components (use the `Set*` UFUNCTIONs); the
+keyboard teleop component re-issues the key state every tick, so a scripted
+`SetDriveInput` needs its tick disabled first.
