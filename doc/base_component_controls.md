@@ -79,7 +79,10 @@ component Y = −30 cm, the UE left). Both are fixed together: the mixing is
 `Left = throttle + steering` (and the over-speed turn damping opposes the
 turn accordingly), and the chair's bone names / `ChaosName`s are the honest
 ones — so the chair still turns right on X = +1 and the MuJoCo bases now do
-too (`run_chaos.sh` / `run_mj_full.sh` assert yaw increases). On MuJoCo the
+too (`run_chaos.sh` / `run_mj_full.sh` assert yaw increases). The library's
+kinematics helpers and the odometry use the same sense: a positive angular
+velocity / heading change is clockwise (UE yaw increasing), so
+`GetOdometry().Orientation.Yaw` tracks the actor's yaw. On MuJoCo the
 other sign lives per joint: `lift_drive_holonomic`'s centre-wheel hinges are
 authored about **−Y** (the linkage's about +Y), so a positive ctrl rolled them
 backwards — `DT_LiftDriveHolonomic_Motors` carries `Direction = −1` for them
