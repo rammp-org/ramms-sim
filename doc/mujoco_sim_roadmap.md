@@ -169,14 +169,14 @@ holonomic controller.
 - **Docs + media** — `doc/base_component_controls.md` details which assets carry
   which controllers and every control surface (Blueprint/C++, player input incl.
   Pixel Streaming, Python remote execution, Remote Control HTTP, URLab bridge
-  coexistence); GIFs/screenshots captured over Pixel Streaming in
-  `doc/media/base_component/`.
+  coexistence). Captures from the validation runs are not versioned; the
+  scripted PIE checks in `Scripts/pie_tests/base_component/` reproduce them.
 - **Player pawns (2026-09-12)** — `URammsKeyboardTeleopComponent` (RammsCore,
   on PR #22): polls keys → diff-drive input, 5-bar endpoint height, and
   data-driven key→position-motor groups. `BP_LiftDriveLinkage_Ramms` and
   `BP_LiftDriveHolonomic_Ramms` are auto-possessed pawns with a follow camera;
   validated by keyboard through the editor and the Pixel Streaming page
-  (`doc/base_component_controls.md` §2b, media in `doc/media/base_component/`).
+  (`doc/base_component_controls.md` §2b).
   Fixed on the way: `ARammsPlayerController::OnPossess` crashed (CastChecked)
   on any non-chair pawn.
 - **Test-drive map (2026-09-12)** — `ARammsMujocoTestGameMode`

@@ -20,7 +20,7 @@ touches physics itself.
        bone torque on a skeletal mesh         actuator ctrl on an AMjArticulation
 ```
 
-Validated live on 2026-09-12 (see [media](#media)): the Chaos chair drives
+Validated live on 2026-09-12 (see [Reproducing the validation](#reproducing-the-validation)): the Chaos chair drives
 exactly as before; the MuJoCo lift_drive linkage base drives and its centre
 5-bar legs extend/retract on command.
 
@@ -219,8 +219,7 @@ on the video (the forwarded click focuses it).
 Everything is also a Blueprint/Python call on the component — `NextCamera()`,
 `ActivateCamera(Name)`, `Orbit(DeltaYaw°, DeltaPitch°)`, `Zoom(DeltaCm)`,
 `ResetOrbit()`, `GetActiveCamera()` — so a touch UI or a gamepad stick can drive
-the same arm. Validated live (2026-09-13, `doc/media/base_component/camera_*.jpg`,
-`camera_switch_orbit_zoom.gif`): Tab cycling, wheel zoom and Home through the
+the same arm. Validated live (2026-09-13): Tab cycling, wheel zoom and Home through the
 Pixel Streaming page; orbit and zoom through `Orbit()`/`Zoom()` from Python;
 and a real mouse drag on the editor's PIE viewport orbits *while* dragging.
 
@@ -315,20 +314,11 @@ architecture) *or* from the bridge, not both. Known limitation: if an enabled
 **same** articulation, URLab applies only that controller's `ctrl` — the base
 component warns; the fix belongs in URLab's `ApplyControls` (see the roadmap).
 
-## Media
+## Reproducing the validation
 
-Captured 2026-09-12 over Pixel Streaming from Chrome (`doc/media/base_component/`):
-
-- `lift_drive_linkage_drive_and_5bar.gif` — MuJoCo linkage base: drive forward,
-  centre legs extend (front wheel lifts, body rises ~6 cm), then retract.
-- `linkage_01_rest_threequarter.jpg`, `linkage_02_driving_forward.jpg`,
-  `linkage_03_legs_extended_side.jpg`, `linkage_04_legs_retracted_side.jpg`,
-  `linkage_05_zoom_5bar_leg.png`.
-- `mebot_chaos_drive.gif` and `mebot_0*.jpg` — the Chaos chair driven through
-  the base component (reverse away from the building, then spin in place).
-- `linkage_pawn_keyboard_teleop.gif`, `pawn_0*.jpg` — the linkage **pawn** driven
-  by keyboard through the Pixel Streaming page (W, A, Q, E, R, F).
-- `holonomic_pawn_keyboard_teleop.gif`, `holo_pawn_0*.jpg` — the holonomic pawn:
-  drive, turn, front hips (R), front cranks (Y).
-- `testmap_0*.jpg` — `Map_BaseTest_URL` on a plain Play with
-  `BP_LiftDriveTestGameMode`: no HUD/widget, holonomic pawn driven by keys.
+Screenshots and GIFs of these runs are not versioned (`doc/media/` is ignored).
+To see them again: Play `Map_BaseTest_URL` (or `Map_Demo` for the chair) and
+drive with the keys in §2b, or run the scripted checks in
+`Scripts/pie_tests/base_component/` (`run_chaos.sh`, `run_mj_full.sh`), which
+assert forward drive, turn direction, the 5-bar retract/extend and the chair's
+position motors and print what they measured.

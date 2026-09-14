@@ -70,6 +70,9 @@ Saved/*
 Intermediate/*
 Plugins/*/Intermediate/*
 
+# Screenshots / GIFs captured during validation runs: kept locally, not versioned
+doc/media/
+
 # Cache files for the editor to use
 DerivedDataCache/*
 .vsconfig
