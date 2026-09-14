@@ -4,7 +4,7 @@
 S=$(cd "$(dirname "$0")" && pwd); ROOT=$(cd "$S/../../.." && pwd); cd "$ROOT" || exit 1
 FAIL=0
 # Run one script in the editor; keep the Python exit status (the filters only shape the output).
-f(){ python3 Scripts/editor_remote_exec.py --file "$1" 2>&1 | grep -E "\[t1\]|\[s\]|\[pie\]|\[stop\]|Traceback|Error|^ERROR" | sed 's/.*LogPython: //'
+f(){ python3 Scripts/editor_remote_exec.py --file "$1" 2>&1 | grep -E "\[t1\]|\[s\]|\[pie\]|\[stop\]|\[pos\]|Traceback|Error|^ERROR" | sed 's/.*LogPython: //'
      local st=${PIPESTATUS[0]}; if [ "$st" -ne 0 ]; then echo "!! $(basename "$1") failed (exit $st)"; FAIL=1; fi; return "$st"; }
 cleanup(){ f "$S/pie_end.py"; sleep 4; }
 trap cleanup EXIT
@@ -15,6 +15,8 @@ sleep 14
 f "$S/chaos_t1.py"
 for i in 1 2 3 4 5 6; do f "$S/chaos_sample.py"; sleep 0.5; done
 f "$S/chaos_stop.py"; sleep 2; f "$S/chaos_sample.py"
+echo "--- constraint position motors (elevators / translators / caster arms) ---"
+f "$S/chaos_pos_cmd.py"; sleep 3; f "$S/chaos_pos_read.py"; sleep 2
 trap - EXIT; cleanup
 echo "=== editor log ==="; tail -n +"$MARK" "$LOG" 2>/dev/null | grep -E "DiffDrive\]|RammsRobotBaseComponent|RammsChaosActuationBackend|LogPython: Error" | sed 's/^\[[0-9.:-]*\]\[ *[0-9]*\]//' | head -12
 [ "$FAIL" -eq 0 ] && echo "=== run_chaos: PASS" || echo "=== run_chaos: FAIL"

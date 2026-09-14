@@ -43,10 +43,24 @@ MuJoCo pawns. Both are idempotent.
 `drive_wheel_r`** and **right → `drive_wheel_l`**; the table preserves that via
 `ChaosName`:
 
-| Id | Type | ChaosName | ControlRange | Direction |
-|---|---|---|---|---|
-| `left_motor` | Torque | `drive_wheel_r` | (0,0) = defer | +1 |
-| `right_motor` | Torque | `drive_wheel_l` | (0,0) = defer | +1 |
+| Id | Type | ChaosName | Drives | ControlRange | Direction |
+|---|---|---|---|---|---|
+| `left_motor` | Torque | `drive_wheel_r` (bone) | wheel spin | (0,0) = defer | +1 |
+| `right_motor` | Torque | `drive_wheel_l` (bone) | wheel spin | (0,0) = defer | +1 |
+| `left_elevator`, `right_elevator` | Position | `motor_swing_arm_l/_r` (constraint) | drive-motor elevator swing arms, **rad** | defer to constraint limits | +1 |
+| `left_translator`, `right_translator` | Position | `dw_main_plate_l/_r` (constraint) | drive-plate linear actuators fore/aft, **cm** | defer | +1 |
+| `front_caster_elevator`, `rear_caster_elevator` | Position | `front/rear_caster_swing_arm` (constraint) | caster arm elevation, **rad** | defer | +1 |
+
+On Chaos a **Position** motor's `ChaosName` is a physics-asset *constraint*
+(the same six `UMebotControllerComponent` lists): the backend drives its
+target and infers the degree of freedom from the constraint's first non-locked
+axis — a linear axis → linear actuator in cm, else an angular one (twist = X,
+swing2 = Y, swing1 = Z) in radians; reads come back the same way. Drive
+stiffness / damping / force limit are the base component's
+`ChaosPositionDrive*` settings (defaults match `MebotController`). The first
+command through the base disables the matching `MebotController` motor entry
+so the two don't fight over the drive target — use one path or the other per
+motor.
 
 `DT_LiftDriveLinkage_Motors` — one row per MJCF actuator, ranges from
 `lift_drive_linkage_ue.xml`:

@@ -17,7 +17,9 @@ on both physics backends. Requires the editor open with Remote Execution on.
   (PlayerStart, GameMode Override, placed articulations removed) so a plain Play
   spawns, possesses and simulates the chosen lift-drive pawn.
 - `run_chaos.sh` — PIE on Map_Demo: the Chaos chair drives through the base
-  component (`chaos_*.py`).
+  component (`chaos_*.py`), then its constraint-driven Position motors
+  (elevators, translators, caster arms) are commanded and read back
+  (`chaos_pos_cmd.py` / `chaos_pos_read.py`).
 - `run_mj_full.sh` — PIE on Map_BaseTest_URL with `BP_LiftDriveLinkage_Ramms`:
   points `BP_LiftDriveTestGameMode.DefaultPawnClass` at the linkage pawn for the
   run (unsaved; `mj_restore.py` reloads the game mode from disk afterwards), lets

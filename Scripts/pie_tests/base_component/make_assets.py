@@ -102,9 +102,24 @@ ensure_dir(DATA_DIR)
 # ---------------------------------------------------------------- Chaos chair
 # The chair's diff-drive maps LEFT -> bone drive_wheel_r and RIGHT -> drive_wheel_l
 # (that is how the existing BP is authored); preserve it via ChaosName.
+#
+# The chair's other actuators are physics-asset constraint drives (the same
+# constraints UMebotControllerComponent lists): Position motors whose ChaosName
+# is the constraint. Angular ones are commanded/read in radians, linear ones in
+# cm; the Chaos backend infers the driven axis from the constraint's free DOF.
+# Ranges are left to the constraint limits (ControlRange unset).
 dt_chaos = make_table("DT_Mebot_ChaosMotors", unreal.RammsMotorSpec.static_struct(), [
     motor("left_motor", "Torque", chaos="drive_wheel_r"),
     motor("right_motor", "Torque", chaos="drive_wheel_l"),
+    # drive-motor elevators: swing arms that raise/lower each drive wheel
+    motor("left_elevator", "Position", chaos="motor_swing_arm_l"),
+    motor("right_elevator", "Position", chaos="motor_swing_arm_r"),
+    # drive-motor translators: linear actuators sliding each drive plate fore/aft
+    motor("left_translator", "Position", chaos="dw_main_plate_l"),
+    motor("right_translator", "Position", chaos="dw_main_plate_r"),
+    # caster arm elevators
+    motor("front_caster_elevator", "Position", chaos="front_caster_swing_arm"),
+    motor("rear_caster_elevator", "Position", chaos="rear_caster_swing_arm"),
 ])
 
 bp = EAL.load_asset("/Game/Robots/BP_Mebot_Ramms")
