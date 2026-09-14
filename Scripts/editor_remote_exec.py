@@ -25,6 +25,12 @@ import uuid
 
 MULTICAST_GROUP = ("239.0.0.1", 6766)
 BIND_ADDR = "127.0.0.1"
+# Where we SEND. The editor binds its multicast socket to BIND_ADDR:port and
+# reads whatever lands there, so unicasting to that endpoint reaches it even on
+# macOS, where a multicast route for 239.0.0.0/8 typically points at a physical
+# NIC rather than lo0 (a group-addressed ping then never arrives). The editor's
+# replies still go to the group, which our group-joined socket receives.
+EDITOR_ENDPOINT = (BIND_ADDR, MULTICAST_GROUP[1])
 MAGIC = "ue_py"
 PROTO_VERSION = 1
 DISCOVER_TIMEOUT_S = 6.0
@@ -72,6 +78,9 @@ def main():
     # Multicast socket: shared with the editor's own bind, loopback interface.
     mcast = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
     mcast.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    if hasattr(socket, "SO_REUSEPORT"):
+        # BSD/macOS: needed to share the port the editor already bound.
+        mcast.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
     mcast.bind(("", MULTICAST_GROUP[1]))
     mreq = struct.pack("4s4s", socket.inet_aton(MULTICAST_GROUP[0]), socket.inet_aton(BIND_ADDR))
     mcast.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
@@ -84,7 +93,7 @@ def main():
     remote_id = None
     deadline = time.monotonic() + DISCOVER_TIMEOUT_S
     while time.monotonic() < deadline and remote_id is None:
-        mcast.sendto(make_msg("ping", node_id), MULTICAST_GROUP)
+        mcast.sendto(make_msg("ping", node_id), EDITOR_ENDPOINT)
         try:
             payload, _ = mcast.recvfrom(4096)
         except socket.timeout:
@@ -113,7 +122,7 @@ def main():
 
     mcast.sendto(make_msg("open_connection", node_id, remote_id,
                           {"command_ip": cmd_endpoint[0], "command_port": cmd_endpoint[1]}),
-                 MULTICAST_GROUP)
+                 EDITOR_ENDPOINT)
     try:
         conn, _ = listener.accept()
     except socket.timeout:
@@ -139,7 +148,7 @@ def main():
             print("ERROR: timed out waiting for a command result from the editor.", file=sys.stderr)
             return 1
     finally:
-        mcast.sendto(make_msg("close_connection", node_id, remote_id), MULTICAST_GROUP)
+        mcast.sendto(make_msg("close_connection", node_id, remote_id), EDITOR_ENDPOINT)
         conn.close()
         listener.close()
         mcast.close()
