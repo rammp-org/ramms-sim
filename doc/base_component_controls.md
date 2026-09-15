@@ -218,14 +218,43 @@ should prefer the surface.
 `GetMotorTransform(Id, out)`, `GetMotorSeparation(IdA, IdB)`, `HasMotor`,
 `GetMotorType`, `HasBackend`.
 
-### 2. Player input (keyboard / gamepad / touch, incl. Pixel Streaming)
+### 2. Player input: Enhanced Input -> the control surface
 
-The chair pawn's Enhanced Input mapping feeds `SetDriveInput` every tick, so
-WASD / a gamepad stick — or the touch sticks on the Pixel Streaming player page
-(`http://<host>/`, embedded signalling on `:80`/`:8888`) — drive it with no
-changes. The MuJoCo bases are keyboard-driveable pawns too — see §2b, and
-§2c for the ready-made test map.
+Keys and gamepad reach the robot through `RammsControlInputComponent`
+("ControlInput" on the pawn) and its `URammsControlInputMap` assets — no
+component polls keys any more. The map (`/Game/Input/Ramms/DA_RammsInput_*`)
+names the mapping context to add and binds each `UInputAction` to control
+Ids; `make_input_assets.py` authors all of it and is the place to change a
+key. Binding modes: **Axis** (value × Scale sets the axis, Completed
+releases it — 2-D / 3-D actions feed `ControlId` / `ControlIdY` /
+`ControlIdZ`), **Action** (Started fires it), **Increment at rate** (a held
+key moves a Position target at RatePerSecond, clamped to the axis range; the
+motor holds where you let go). Ids may be wildcards (`linkage.*.height`,
+`motor.*_front_crank`), so one map serves a robot family.
 
+`IMC_RammsRobot` (shared by every map):
+
+| Keys | Action | Binds to |
+|---|---|---|
+| W / S, A / D, left stick | `IA_Ramms_Drive` (2-D) | `drive.forward` / `drive.turn` |
+| E / Q | `IA_Ramms_LinkageHeight` | `linkage.*.height` (6 cm/s) |
+| Y / H, T / B, Z / X, C / V | `IA_Ramms_MotorGroupA..D` | per family: cranks / hips (0.6 rad/s), chair elevators / translators / caster arms |
+| N, Home | `IA_Ramms_CameraNext` / `CameraReset` | `camera.next` / `camera.reset` |
+| I / K, J / L, U / O | `IA_Ramms_ArmMove` (3-D) | `arm.forward` / `arm.strafe` / `arm.up` |
+| ← →, ↑ ↓, M / . | `IA_Ramms_ArmRotate` (3-D) | `arm.yaw` / `arm.pitch` / `arm.roll` |
+| R | `IA_Ramms_ArmResync` | `arm.resync` |
+| [ , ] , G | `IA_Ramms_Gripper*` | `gripper.open` / `close` / `toggle` |
+| P, Backspace, / | `IA_Ramms_SimPause` / `SimReset` / `SimStep` | `sim.pause` / `sim.reset` / `sim.step` |
+| 1 – 7 | `IA_Ramms_SimDebug1..7` | `sim.debug.*` |
+
+Mouse drag orbit and wheel zoom stay on `RammsRobotCameraComponent` (its
+per-frame mouse deltas don't map onto rate axes). In RAMMS MuJoCo game modes
+(`RammsMujocoTestGameMode`, `bDisableUrlabHotkeys`) URLab's `UMjInputHandler`
+and its simulate widget are disabled, so R / P / O / 1-7 / Tab are ours; the
+sim functions come back as the `sim.*` controls above. Pixel Streaming
+keyboard events reach Enhanced Input like local ones (spike in
+`ui_input_refactor_plan.md`). Touch panels and tests use the same path:
+`ControlInput.InjectActionByName("IA_Ramms_Drive", (0, 1, 0), hold_s)`.
 
 ### 2b. Player-controlled pawns for the MuJoCo bases (keyboard)
 

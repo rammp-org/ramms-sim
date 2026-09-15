@@ -4,7 +4,7 @@
 S=$(cd "$(dirname "$0")" && pwd); ROOT=$(cd "$S/../../.." && pwd); cd "$ROOT" || exit 1
 FAIL=0
 # Run one script in the editor; keep the Python exit status (the filters only shape the output).
-f(){ python3 Scripts/editor_remote_exec.py --file "$1" 2>&1 | grep -E "\[setup\]|\[run\]|\[st\]|\[drv\]|\[lift\]|\[t3\]|\[pie\]|\[restore\]|\[turn\]|\[cs\]|Traceback|Error|^ERROR" | sed 's/.*LogPython: //' | grep -v "manager AMjManager_1 props"
+f(){ python3 Scripts/editor_remote_exec.py --file "$1" 2>&1 | grep -E "\[setup\]|\[run\]|\[st\]|\[drv\]|\[lift\]|\[t3\]|\[pie\]|\[restore\]|\[turn\]|\[cs\]|\[ci\]|Traceback|Error|^ERROR" | sed 's/.*LogPython: //' | grep -v "manager AMjManager_1 props"
      local st=${PIPESTATUS[0]}; if [ "$st" -ne 0 ]; then echo "!! $(basename "$1") failed (exit $st)"; FAIL=1; fi; return "$st"; }
 cleanup(){ f "$S/mj_teardown.py"; sleep 5; f "$S/mj_restore.py"; }
 trap cleanup EXIT
@@ -24,6 +24,15 @@ echo "--- control surface: raw motors, camera actions ---"
 python3 Scripts/editor_remote_exec.py --code "unreal._ramms_cs_op='describe'" >/dev/null 2>&1; f "$S/control_surface_check.py"
 python3 Scripts/editor_remote_exec.py --code "unreal._ramms_cs_op='trigger camera.next'" >/dev/null 2>&1; f "$S/control_surface_check.py"
 python3 Scripts/editor_remote_exec.py --code "unreal._ramms_cs_op='registry'" >/dev/null 2>&1; f "$S/control_surface_check.py"
+echo "--- Enhanced Input -> surface (injected actions): W, Q, N, P, Backspace ---"
+ci(){ python3 Scripts/editor_remote_exec.py --code "unreal._ramms_ci_op='$*'" >/dev/null 2>&1; f "$S/control_input_check.py"; }
+ci status; ci urlab
+ci inject IA_Ramms_Drive 0 1 0 1.5; sleep 0.3; ci expect drive.forward 0.99 1.01; sleep 2; ci expect drive.forward -0.01 0.01; f "$S/mj_state.py"
+ci inject IA_Ramms_LinkageHeight -1 0 0 1.0; sleep 2.5; ci expect linkage.LeftCenterLinkage.height 2 8; ci expect linkage.RightCenterLinkage.height 2 8
+ci camera; ci inject IA_Ramms_CameraNext 1 0 0 0.2; sleep 0.5; ci camera; ci camera_changed
+ci inject IA_Ramms_SimPause 1 0 0 0.2; sleep 0.6; ci expect sim.running -0.1 0.1
+ci inject IA_Ramms_SimPause 1 0 0 0.2; sleep 0.6; ci expect sim.running 0.9 1.1
+ci inject IA_Ramms_SimReset 1 0 0 0.2; sleep 1.5; f "$S/mj_state.py"
 echo "--- sim controls: pause, resume, reset ---"
 python3 Scripts/editor_remote_exec.py --code "unreal._ramms_cs_op='trigger sim.pause'" >/dev/null 2>&1; f "$S/control_surface_check.py"; sleep 1
 python3 Scripts/editor_remote_exec.py --code "unreal._ramms_cs_op='read sim.running'" >/dev/null 2>&1; f "$S/control_surface_check.py"

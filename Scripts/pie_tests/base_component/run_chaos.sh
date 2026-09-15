@@ -4,7 +4,7 @@
 S=$(cd "$(dirname "$0")" && pwd); ROOT=$(cd "$S/../../.." && pwd); cd "$ROOT" || exit 1
 FAIL=0
 # Run one script in the editor; keep the Python exit status (the filters only shape the output).
-f(){ python3 Scripts/editor_remote_exec.py --file "$1" 2>&1 | grep -E "\[t1\]|\[s\]|\[pie\]|\[stop\]|\[pos\]|\[mc\]|\[turn\]|\[cs\]|\[arm\]|Traceback|Error|^ERROR" | sed 's/.*LogPython: //'
+f(){ python3 Scripts/editor_remote_exec.py --file "$1" 2>&1 | grep -E "\[t1\]|\[s\]|\[pie\]|\[stop\]|\[pos\]|\[mc\]|\[turn\]|\[cs\]|\[arm\]|\[ci\]|Traceback|Error|^ERROR" | sed 's/.*LogPython: //'
      local st=${PIPESTATUS[0]}; if [ "$st" -ne 0 ]; then echo "!! $(basename "$1") failed (exit $st)"; FAIL=1; fi; return "$st"; }
 cleanup(){ f "$S/pie_end.py"; sleep 4; }
 trap cleanup EXIT
@@ -33,6 +33,15 @@ python3 Scripts/editor_remote_exec.py --code "unreal._ramms_arm_op='check'" >/de
 python3 Scripts/editor_remote_exec.py --code "unreal._ramms_arm_op='gripper'" >/dev/null 2>&1; f "$S/chaos_arm.py"; sleep 2
 python3 Scripts/editor_remote_exec.py --code "unreal._ramms_arm_op='gripper_check'" >/dev/null 2>&1; f "$S/chaos_arm.py"
 python3 Scripts/editor_remote_exec.py --code "unreal._ramms_arm_op='resync'" >/dev/null 2>&1; f "$S/chaos_arm.py"
+echo "--- Enhanced Input -> surface (injected actions) ---"
+ci(){ python3 Scripts/editor_remote_exec.py --code "unreal._ramms_ci_op='$*'" >/dev/null 2>&1; f "$S/control_input_check.py"; }
+ci status
+ci inject IA_Ramms_MotorGroupA 1 0 0 1.0; sleep 1.5; ci expect lift.motor_swing_arm_l 15 45; ci expect lift.motor_swing_arm_r 15 45
+ci inject IA_Ramms_GripperOpen 1 0 0 0.2; sleep 0.5; ci expect gripper.closed -0.1 0.1
+ci inject IA_Ramms_GripperClose 1 0 0 0.2; sleep 0.5; ci expect gripper.closed 0.9 1.1
+python3 Scripts/editor_remote_exec.py --code "unreal._ramms_arm_op='start'" >/dev/null 2>&1; f "$S/chaos_arm.py" >/dev/null; python3 Scripts/editor_remote_exec.py --code "unreal.log('')" >/dev/null 2>&1
+ci inject IA_Ramms_ArmMove 0 0 1 1.5; sleep 2
+python3 Scripts/editor_remote_exec.py --code "unreal._ramms_arm_op='check'" >/dev/null 2>&1; f "$S/chaos_arm.py"
 echo "--- MebotController API through the base ---"
 python3 Scripts/editor_remote_exec.py --code "unreal._ramms_mc_op='cmd'" >/dev/null 2>&1; f "$S/chaos_mc_api.py"; sleep 3
 python3 Scripts/editor_remote_exec.py --code "unreal._ramms_mc_op='read'" >/dev/null 2>&1; f "$S/chaos_mc_api.py"; sleep 2

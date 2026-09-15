@@ -142,19 +142,20 @@ def add_component(bp, cls, var_name, parent_var=None):
     return obj
 
 
+def remove_component(bp, var_name):
+    h, obj = find_component(bp, var_name=var_name)
+    if obj:
+        n = SDS.delete_subobject(handles(bp)[0], h, bp)
+        log("  removed %s (%s)" % (var_name, n))
+
+
 def setp(obj, **props):
     for k, v in props.items():
         obj.set_editor_property(k, v)
 
 
-# Key budget: URLab's UMjInputHandler owns 1-7, P (pause), R (reset), O (orbit
-# cameras), F (launchers) and its simulate widget uses Tab; the arm teleops own
-# I/K/J/L/U/O/M/./arrows/[/]/G/R. The base pawns therefore use W/S/A/D, E/Q,
-# Y/H, T/B, Z/X, C/V and N (camera), which collide with none of them.
-def motor_binding(label, inc, dec, ids, rate=0.6):
-    b = unreal.RammsMotorKeyBinding()
-    setp(b, label=label, increase_key=key(inc), decrease_key=key(dec), motor_ids=ids, rate_per_second=rate)
-    return b
+# Keys live in /Game/Input/Ramms (make_input_assets.py): one mapping context,
+# one URammsControlInputMap per robot family, bound to control Ids.
 
 
 def child_bp(parent_path, child_name):
@@ -169,7 +170,7 @@ def child_bp(parent_path, child_name):
     return bp
 
 
-def setup_pawn(bp, motor_table, drive_ids, bindings, linkage_rows=None, fivebar_table=None):
+def setup_pawn(bp, motor_table, drive_ids, input_map, linkage_rows=None, fivebar_table=None):
     log("=== %s" % bp.get_name())
     base = add_component(bp, unreal.RammsRobotBaseComponent, "RobotBase")
     setp(base, motor_table=motor_table, backend=unreal.RammsPhysicsBackend.MUJOCO)
@@ -190,10 +191,11 @@ def setup_pawn(bp, motor_table, drive_ids, bindings, linkage_rows=None, fivebar_
         c = add_component(bp, unreal.Ramms5BarLinkageController, row.split("_")[0].capitalize() + "CenterLinkage")
         setp(c, kinematic_table=fivebar_table, linkage_row=row)
 
-    tele = add_component(bp, unreal.RammsKeyboardTeleopComponent, "KeyboardTeleop")
-    lk = unreal.RammsLinkageKeyBinding()
-    setp(lk, up_key=key("E"), down_key=key("Q"), rate_cm_per_second=6.0)
-    setp(tele, linkage=lk, motor_bindings=bindings, turn_scale=0.8, forward_scale=1.0, log_commands=True)
+    # Keys come through Enhanced Input now (IMC_RammsRobot + the robot's input
+    # map -> ControlInput -> the control surface); drop the legacy polled teleop.
+    remove_component(bp, "KeyboardTeleop")
+    ctrl_in = add_component(bp, unreal.RammsControlInputComponent, "ControlInput")
+    setp(ctrl_in, input_maps=[EAL.load_asset("/Game/Input/Ramms/" + input_map)], log_commands=True)
 
     # Follow camera on the simulated body (the actor root does not move; base_link does).
     arm = add_component(bp, unreal.SpringArmComponent, "FollowArm", parent_var="base_link")
@@ -222,7 +224,7 @@ def setup_pawn(bp, motor_table, drive_ids, bindings, linkage_rows=None, fivebar_
     # (the static worldbody here), so it never follows the robot.
     setp(camctl, orbit_sensitivity=0.25, zoom_sensitivity=1.0, zoom_step_fraction=0.08, zoom_interp_speed=10.0,
          min_arm_length=60.0, max_arm_length=1500.0,
-         camera_names=["FollowCamera", "TopCamera"], next_camera_key=key("N"))
+         camera_names=["FollowCamera", "TopCamera"])
 
     unreal.BlueprintEditorLibrary.compile_blueprint(bp)
     cdo = unreal.get_default_object(bp.generated_class())
@@ -236,17 +238,11 @@ def setup_pawn(bp, motor_table, drive_ids, bindings, linkage_rows=None, fivebar_
 dt_link = EAL.load_asset(DATA_DIR + "/DT_LiftDriveLinkage_Motors")
 dt_5bar = EAL.load_asset(DATA_DIR + "/DT_LiftDriveLinkage_5Bar")
 setup_pawn(child_bp(PRIVATE + "/Robots/URL/lift_drive_linkage", "BP_LiftDriveLinkage_Ramms"), dt_link,
-           ("left_center_wheel", "right_center_wheel"),
-           [motor_binding("front cranks", "Y", "H", ["left_front_crank", "right_front_crank"]),
-            motor_binding("rear cranks", "T", "B", ["left_rear_crank", "right_rear_crank"])],
+           ("left_center_wheel", "right_center_wheel"), "DA_RammsInput_LiftDriveLinkage",
            linkage_rows=["left_center", "right_center"], fivebar_table=dt_5bar)
 
 # ----------------------------------------------------------- holonomic base
 dt_holo = make_table("DT_LiftDriveHolonomic_Motors", unreal.RammsMotorSpec.static_struct(), holonomic_motors())
 setup_pawn(child_bp(PRIVATE + "/Robots/URL/lift_drive_holonomic", "BP_LiftDriveHolonomic_Ramms"), dt_holo,
-           ("left_center_wheel", "right_center_wheel"),
-           [motor_binding("front hips", "Y", "H", ["left_hip_front", "right_hip_front"]),
-            motor_binding("rear hips", "T", "B", ["left_hip_rear", "right_hip_rear"]),
-            motor_binding("front cranks", "Z", "X", ["front_left_crank", "front_right_crank"]),
-            motor_binding("rear cranks", "C", "V", ["rear_left_crank", "rear_right_crank"])])
+           ("left_center_wheel", "right_center_wheel"), "DA_RammsInput_LiftDriveHolonomic")
 log("done")

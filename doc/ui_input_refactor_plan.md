@@ -248,6 +248,21 @@ same `arm.*` / `gripper.*` ids), the MuJoCo sim contributor
 control-surface registry are in too, all exercised by the runners. Phase 2 is
 complete; the "per-robot defaults out of constructors" cleanup moves to phase 5.
 
+Phase 4 (2026-09-15): `URammsControlInputComponent` (RammsCore) + the assets
+from `make_input_assets.py` (`IA_Ramms_*`, `IMC_RammsRobot`, `DA_RammsInput_*`;
+`FRammsControlInputBinding` gained `ControlIdZ` and wildcard Ids). The lift-drive
+pawns and the chair carry `ControlInput`; the polled `KeyboardTeleop` is off the
+pawns (class kept one release), the camera's N / Home polling is gone, and both
+arm teleops' key polling is off by default. `RammsMujocoTestGameMode` disables
+URLab's `UMjInputHandler` and simulate widget. Validated by injecting the
+actions through the same Enhanced Input path (`control_input_check.py` in both
+runners): drive, linkage height, motor groups, camera next, gripper, arm, sim
+pause / reset. Left for later: mouse orbit / wheel zoom stay polled on the
+camera component; the chair's drive still also runs through the legacy vehicle
+template (`IA_Throttle` -> Chaos vehicle, joystick tick) until phase 3 replaces
+that layer; the dead `DefaultInput.ini` action / axis mappings were not deleted
+(the vehicle-template layer goes as a whole).
+
 ## Decisions (2026-09-15)
 
 1. Shared types: `RammsControl` module inside the ramms-ui plugin.
