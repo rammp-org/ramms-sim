@@ -3,8 +3,9 @@ package from disk (so nothing is left dirty), falling back to setting the
 documented default pawn back on the CDO."""
 import unreal
 
-GAME_MODE = "/Game/Robots/BP_LiftDriveTestGameMode"
-DEFAULT_PAWN = "/Game/Robots/BP_LiftDriveHolonomic_Ramms"
+PRIVATE = "/RammsPrivateAssets"
+GAME_MODE = PRIVATE + "/Robots/BP_LiftDriveTestGameMode"
+DEFAULT_PAWN = PRIVATE + "/Robots/BP_LiftDriveHolonomic_Ramms"
 
 gm = unreal.EditorAssetLibrary.load_asset(GAME_MODE)
 pkg = gm.get_outermost()

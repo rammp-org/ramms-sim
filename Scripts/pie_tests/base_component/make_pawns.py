@@ -19,7 +19,8 @@ import os
 import re
 import unreal
 
-DATA_DIR = "/Game/Robots/Data"
+PRIVATE = "/RammsPrivateAssets"  # optional plugin: lift-drive CAD-derived content
+DATA_DIR = PRIVATE + "/Robots/Data"
 SDS = unreal.get_engine_subsystem(unreal.SubobjectDataSubsystem)
 SDL = unreal.SubobjectDataBlueprintFunctionLibrary
 AT = unreal.AssetToolsHelpers.get_asset_tools()
@@ -157,13 +158,13 @@ def motor_binding(label, inc, dec, ids, rate=0.6):
 
 
 def child_bp(parent_path, child_name):
-    path = "/Game/Robots/" + child_name
+    path = PRIVATE + "/Robots/" + child_name
     if EAL.does_asset_exist(path):
         return EAL.load_asset(path)
     parent = EAL.load_asset(parent_path)
     factory = unreal.BlueprintFactory()
     factory.set_editor_property("parent_class", parent.generated_class())
-    bp = AT.create_asset(child_name, "/Game/Robots", unreal.Blueprint, factory)
+    bp = AT.create_asset(child_name, PRIVATE + "/Robots", unreal.Blueprint, factory)
     log("created %s (parent %s)" % (path, parent.generated_class().get_name()))
     return bp
 
@@ -230,7 +231,7 @@ def setup_pawn(bp, motor_table, drive_ids, bindings, linkage_rows=None, fivebar_
 # ------------------------------------------------------------- linkage base
 dt_link = EAL.load_asset(DATA_DIR + "/DT_LiftDriveLinkage_Motors")
 dt_5bar = EAL.load_asset(DATA_DIR + "/DT_LiftDriveLinkage_5Bar")
-setup_pawn(child_bp("/Game/Robots/URL/lift_drive_linkage", "BP_LiftDriveLinkage_Ramms"), dt_link,
+setup_pawn(child_bp(PRIVATE + "/Robots/URL/lift_drive_linkage", "BP_LiftDriveLinkage_Ramms"), dt_link,
            ("left_center_wheel", "right_center_wheel"),
            [motor_binding("front cranks", "Y", "H", ["left_front_crank", "right_front_crank"]),
             motor_binding("rear cranks", "T", "B", ["left_rear_crank", "right_rear_crank"])],
@@ -238,7 +239,7 @@ setup_pawn(child_bp("/Game/Robots/URL/lift_drive_linkage", "BP_LiftDriveLinkage_
 
 # ----------------------------------------------------------- holonomic base
 dt_holo = make_table("DT_LiftDriveHolonomic_Motors", unreal.RammsMotorSpec.static_struct(), holonomic_motors())
-setup_pawn(child_bp("/Game/Robots/URL/lift_drive_holonomic", "BP_LiftDriveHolonomic_Ramms"), dt_holo,
+setup_pawn(child_bp(PRIVATE + "/Robots/URL/lift_drive_holonomic", "BP_LiftDriveHolonomic_Ramms"), dt_holo,
            ("left_center_wheel", "right_center_wheel"),
            [motor_binding("front hips", "Y", "H", ["left_hip_front", "right_hip_front"]),
             motor_binding("rear hips", "T", "B", ["left_hip_rear", "right_hip_rear"]),

@@ -208,6 +208,12 @@ holonomic controller.
   joystick mixing had the steering sign inverted (the chair BP hid it by
   swapping its wheel bones) — fixed in the library, chair un-swapped, turn
   direction asserted by both PIE runners.
+- **Private assets (2026-09-14)** — the lift-drive CAD-derived content (imported
+  articulations + meshes, `BP_LiftDrive*` pawns, `DT_LiftDrive*` tables, test
+  game mode, `Map_BaseTest_URL`) moved out of `/Game` into the content-only
+  `RammsPrivateAssets` plugin (`rammp-org/ramms-private-assets`, private), an
+  *optional* submodule (`update = none`) at `Plugins/RammsPrivateAssets`. The
+  public project has no reference to it; the chair stays public.
 - **(5) NEXT** — holonomic drive controller.
 
 Note on the linkage mechanism (lift_drive_linkage_ue.xml): each side has front

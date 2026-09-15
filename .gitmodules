@@ -32,3 +32,7 @@
 [submodule "Plugins/RammsAccess"]
 	path = Plugins/RammsAccess
 	url = git@github.com:rammp-org/ramms-access
+[submodule "Plugins/RammsPrivateAssets"]
+	path = Plugins/RammsPrivateAssets
+	url = git@github.com:rammp-org/ramms-private-assets
+	update = none

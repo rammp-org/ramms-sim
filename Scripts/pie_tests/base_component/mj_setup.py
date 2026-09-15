@@ -8,9 +8,10 @@ change is never saved.
 """
 import unreal
 
-MAP = "/Game/Maps/URL/Map_BaseTest_URL"
-GAME_MODE = "/Game/Robots/BP_LiftDriveTestGameMode"
-PAWN = "/Game/Robots/BP_LiftDriveLinkage_Ramms"
+PRIVATE = "/RammsPrivateAssets"  # optional plugin: everything lift-drive lives here
+MAP = PRIVATE + "/Maps/URL/Map_BaseTest_URL"
+GAME_MODE = PRIVATE + "/Robots/BP_LiftDriveTestGameMode"
+PAWN = PRIVATE + "/Robots/BP_LiftDriveLinkage_Ramms"
 
 les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 if unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world().get_path_name() != MAP + "." + MAP.split("/")[-1]:

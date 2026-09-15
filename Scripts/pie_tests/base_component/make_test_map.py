@@ -1,6 +1,6 @@
 """Make Map_BaseTest_URL a keyboard test-drive map for the lift_drive pawns.
 
-- Creates /Game/Robots/BP_LiftDriveTestGameMode (parent ARammsMujocoTestGameMode)
+- Creates /RammsPrivateAssets/Robots/BP_LiftDriveTestGameMode (parent ARammsMujocoTestGameMode)
   with DefaultPawnClass = BP_LiftDriveHolonomic_Ramms. Change that one property
   (or the map's GameMode Override) to drive the linkage base instead.
 - In Map_BaseTest_URL: removes the placed raw lift_drive articulations (the game
@@ -14,7 +14,8 @@ import unreal
 
 EAL = unreal.EditorAssetLibrary
 AT = unreal.AssetToolsHelpers.get_asset_tools()
-MAP = "/Game/Maps/URL/Map_BaseTest_URL"
+PRIVATE = "/RammsPrivateAssets"  # optional plugin: everything lift-drive lives here
+MAP = PRIVATE + "/Maps/URL/Map_BaseTest_URL"
 
 
 def log(s):
@@ -22,15 +23,15 @@ def log(s):
 
 
 # --- game mode blueprint ------------------------------------------------------
-gm_path = "/Game/Robots/BP_LiftDriveTestGameMode"
+gm_path = PRIVATE + "/Robots/BP_LiftDriveTestGameMode"
 if EAL.does_asset_exist(gm_path):
     gm_bp = EAL.load_asset(gm_path)
 else:
     factory = unreal.BlueprintFactory()
     factory.set_editor_property("parent_class", unreal.RammsMujocoTestGameMode)
-    gm_bp = AT.create_asset("BP_LiftDriveTestGameMode", "/Game/Robots", unreal.Blueprint, factory)
+    gm_bp = AT.create_asset("BP_LiftDriveTestGameMode", PRIVATE + "/Robots", unreal.Blueprint, factory)
     log("created %s" % gm_path)
-holo = EAL.load_asset("/Game/Robots/BP_LiftDriveHolonomic_Ramms").generated_class()
+holo = EAL.load_asset(PRIVATE + "/Robots/BP_LiftDriveHolonomic_Ramms").generated_class()
 cdo = unreal.get_default_object(gm_bp.generated_class())
 cdo.set_editor_property("default_pawn_class", holo)
 cdo.set_editor_property("player_controller_class", unreal.PlayerController)

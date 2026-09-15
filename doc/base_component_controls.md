@@ -26,11 +26,25 @@ exactly as before; the MuJoCo lift_drive linkage base drives and its centre
 
 ## Assets
 
+**Where the lift-drive content lives.** The lift-drive robot's CAD is private,
+so everything derived from it — the imported MuJoCo articulations and their
+meshes (`MuJoCoImports/lift_drive_*`), the `BP_LiftDrive*` pawns, their
+`DT_LiftDrive*` tables, `BP_LiftDriveTestGameMode` and `Map_BaseTest_URL` —
+lives in the **`RammsPrivateAssets`** content-only plugin (repo
+`rammp-org/ramms-private-assets`, mounted at `/RammsPrivateAssets/`). It is an
+*optional* submodule at `Plugins/RammsPrivateAssets`: `git submodule update
+--init --recursive` skips it (`update = none`), so the public project builds and
+runs without it and nothing public references it; with access, run
+`git submodule update --init --checkout Plugins/RammsPrivateAssets` and restart
+the editor. The code (base component, 5-bar linkage, teleop, camera, test game
+mode) is public in `ramms-core` / `ramms-mujoco-support`; the chair
+(`BP_Mebot_Ramms`, `DT_Mebot_ChaosMotors`) stays in `/Game`.
+
 | Asset | Backend | Components (in the Blueprint) | Tables |
 |---|---|---|---|
 | `/Game/Robots/BP_Mebot_Ramms` (the powered chair pawn) | Chaos — `RobotBase` (Backend=**Chaos**, `ChaosSkeletalMeshComponentName=VehicleMesh`) | `RammsDifferentialDriveController` (`LeftMotorId=left_motor`, `RightMotorId=right_motor`), `MebotController` (elevators / translators / caster arms, routed through the base), `RammsAccessInput`, `KinovaGen3Controller`, … | `DT_Mebot_ChaosMotors` (wheels + 6 constraint Position motors) |
-| `/Game/Robots/BP_LiftDriveLinkage_Ramms` (**pawn**, child of the imported `lift_drive_linkage` articulation, so a reimport doesn't clobber it; `AutoPossessPlayer=Player0`) | MuJoCo — `RobotBase` (Backend=**Mujoco**) | `DifferentialDrive` (centre wheels, radius 12.7 cm, measured track), `LeftCenterLinkage`, `RightCenterLinkage` (`Ramms5BarLinkageController`), `KeyboardTeleop`, `FollowArm`+`FollowCamera` on `base_link` | `DT_LiftDriveLinkage_Motors`, `DT_LiftDriveLinkage_5Bar` |
-| `/Game/Robots/BP_LiftDriveHolonomic_Ramms` (**pawn**, child of `lift_drive_holonomic`; `AutoPossessPlayer=Player0`) | MuJoCo — `RobotBase` (Backend=**Mujoco**) | `DifferentialDrive` (centre wheels), `KeyboardTeleop` (hips R/F T/G, cranks Y/H U/J), `FollowArm`+`FollowCamera` | `DT_LiftDriveHolonomic_Motors` (all 14 actuators parsed from the MJCF) |
+| `/RammsPrivateAssets/Robots/BP_LiftDriveLinkage_Ramms` (**pawn**, child of the imported `lift_drive_linkage` articulation, so a reimport doesn't clobber it; `AutoPossessPlayer=Player0`) | MuJoCo — `RobotBase` (Backend=**Mujoco**) | `DifferentialDrive` (centre wheels, radius 12.7 cm, measured track), `LeftCenterLinkage`, `RightCenterLinkage` (`Ramms5BarLinkageController`), `KeyboardTeleop`, `FollowArm`+`FollowCamera` on `base_link` | `DT_LiftDriveLinkage_Motors`, `DT_LiftDriveLinkage_5Bar` |
+| `/RammsPrivateAssets/Robots/BP_LiftDriveHolonomic_Ramms` (**pawn**, child of `lift_drive_holonomic`; `AutoPossessPlayer=Player0`) | MuJoCo — `RobotBase` (Backend=**Mujoco**) | `DifferentialDrive` (centre wheels), `KeyboardTeleop` (hips R/F T/G, cranks Y/H U/J), `FollowArm`+`FollowCamera` | `DT_LiftDriveHolonomic_Motors` (all 14 actuators parsed from the MJCF) |
 | `/Game/Robots/BP_Mebot_Mujoco` | *not migrated* — a Chaos chair carrying a MuJoCo arm child actor. If it gets a base component, set Backend=**Chaos** explicitly: `Auto` would find the arm articulation attached under it. | | |
 
 All tables live in `/Game/Robots/Data`. `Scripts/pie_tests/base_component/make_assets.py`
@@ -245,7 +259,7 @@ doesn't orbit) and Slate's cursor position as the movement fallback; the raw
 
 ### 2c. Test-drive map: `Map_BaseTest_URL` + `BP_LiftDriveTestGameMode`
 
-`Content/Maps/URL/Map_BaseTest_URL` now has a **GameMode Override** of
+`Map_BaseTest_URL` (in the RammsPrivateAssets plugin) has a **GameMode Override** of
 `BP_LiftDriveTestGameMode` (child of `ARammsMujocoTestGameMode`, RammsMujocoSupport)
 and a `PlayerStart`; the raw placed articulations were removed (the game mode
 spawns the robot). Press **Play**: the chosen lift-drive pawn is spawned at the

@@ -3,6 +3,10 @@
 Drives the running editor over Python remote execution
 (`Scripts/editor_remote_exec.py`) to validate the shared robot base component
 on both physics backends. Requires the editor open with Remote Execution on.
+The lift-drive assets live in the optional `RammsPrivateAssets` plugin
+(`git submodule update --init --checkout Plugins/RammsPrivateAssets`, then
+restart the editor); the MuJoCo builders/tests need it, the Chaos chair test
+doesn't. `move_private_assets.py` is the one-shot migration that put them there.
 
 - `make_assets.py` — creates the motor / 5-bar DataTables under
   `/Game/Robots/Data`, adds `RobotBase` to `BP_Mebot_Ramms`, and builds

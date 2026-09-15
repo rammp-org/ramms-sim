@@ -2,15 +2,20 @@
 onto the MeBot blueprints. Idempotent: re-running updates existing assets.
 
 - /Game/Robots/Data/DT_Mebot_ChaosMotors      (FRammsMotorSpec)  -> BP_Mebot_Ramms
-- /Game/Robots/Data/DT_LiftDriveLinkage_Motors (FRammsMotorSpec)  -> BP_LiftDriveLinkage_Ramms
-- /Game/Robots/Data/DT_LiftDriveLinkage_5Bar   (FRamms5BarLinkageSpec)
-- /Game/Robots/BP_LiftDriveLinkage_Ramms : child of lift_drive_linkage (AMjArticulation)
+- /RammsPrivateAssets/Robots/Data/DT_LiftDriveLinkage_Motors (FRammsMotorSpec)  -> BP_LiftDriveLinkage_Ramms
+- /RammsPrivateAssets/Robots/Data/DT_LiftDriveLinkage_5Bar   (FRamms5BarLinkageSpec)
+- /RammsPrivateAssets/Robots/BP_LiftDriveLinkage_Ramms : child of lift_drive_linkage (AMjArticulation)
+
+Everything lift-drive lives in the optional RammsPrivateAssets plugin (its CAD is
+private); the chair pieces stay in /Game. The plugin must be mounted.
   with RobotBase(MuJoCo) + differential drive + left/right centre 5-bar controllers.
 """
 import json
 import unreal
 
 DATA_DIR = "/Game/Robots/Data"
+PRIVATE = "/RammsPrivateAssets"  # optional plugin: lift-drive CAD-derived content
+PRIVATE_DATA_DIR = PRIVATE + "/Robots/Data"
 SDS = unreal.get_engine_subsystem(unreal.SubobjectDataSubsystem)
 SDL = unreal.SubobjectDataBlueprintFunctionLibrary
 AT = unreal.AssetToolsHelpers.get_asset_tools()
@@ -26,14 +31,14 @@ def ensure_dir(path):
         EAL.make_directory(path)
 
 
-def make_table(name, row_struct, rows):
+def make_table(name, row_struct, rows, data_dir=DATA_DIR):
     """Create (or refill) a DataTable from a list of row dicts (each with 'Name')."""
-    path = DATA_DIR + "/" + name
+    path = data_dir + "/" + name
     dt = EAL.load_asset(path) if EAL.does_asset_exist(path) else None
     if not dt:
         factory = unreal.DataTableFactory()
         factory.set_editor_property("struct", row_struct)
-        dt = AT.create_asset(name, DATA_DIR, unreal.DataTable, factory)
+        dt = AT.create_asset(name, data_dir, unreal.DataTable, factory)
         log("created table %s" % path)
     else:
         log("refilling table %s" % path)
@@ -98,6 +103,9 @@ def finish_bp(bp):
 
 
 ensure_dir(DATA_DIR)
+if not EAL.does_directory_exist(PRIVATE + "/"):
+    raise RuntimeError("%s is not mounted: init the optional RammsPrivateAssets submodule and restart the editor" % PRIVATE)
+ensure_dir(PRIVATE_DATA_DIR)
 
 # ---------------------------------------------------------------- Chaos chair
 # Wheel bones by their physical side (drive_wheel_l sits at component Y = -30 cm,
@@ -146,7 +154,7 @@ CRANK = (-0.02867, 2.30752)
 REAR_CRANK = (0.0, 2.24614)
 HIP_WIDE = (-0.76370, 0.81275)
 HIP_FWD = (0.0, 1.71740)
-dt_mj = make_table("DT_LiftDriveLinkage_Motors", unreal.RammsMotorSpec.static_struct(), [
+dt_mj = make_table("DT_LiftDriveLinkage_Motors", unreal.RammsMotorSpec.static_struct(), data_dir=PRIVATE_DATA_DIR, rows=[
     motor("left_front_crank", "Position", rng=CRANK),
     motor("left_rear_crank", "Position", rng=REAR_CRANK),
     motor("left_center_hip_a", "Position", rng=HIP_WIDE),
@@ -175,22 +183,22 @@ def fivebar(name, ma, mb, pa, pb, zda, sa, eua, zdb, sb, eub, flip):
             "ZeroDirA": zda, "AngleSignA": sa, "ZeroDirB": zdb, "AngleSignB": sb,
             "bElbowUpA": eua, "bElbowUpB": eub, "bFlipEndpointSide": flip}
 
-dt_5bar = make_table("DT_LiftDriveLinkage_5Bar", unreal.Ramms5BarLinkageSpec.static_struct(), [
+dt_5bar = make_table("DT_LiftDriveLinkage_5Bar", unreal.Ramms5BarLinkageSpec.static_struct(), data_dir=PRIVATE_DATA_DIR, rows=[
     fivebar("left_center", "left_center_hip_a", "left_center_hip_b",
             (6.5, 20.993), (-6.5, 20.992), -0.2397, -1.0, True, -2.9019, 1.0, False, False),
     fivebar("right_center", "right_center_hip_a", "right_center_hip_b",
             (-6.5, 20.993), (6.5, 20.993), -2.9019, 1.0, False, -0.2397, -1.0, True, True),
 ])
 
-parent_bp = EAL.load_asset("/Game/Robots/URL/lift_drive_linkage")
-child_path = "/Game/Robots/BP_LiftDriveLinkage_Ramms"
+parent_bp = EAL.load_asset(PRIVATE + "/Robots/URL/lift_drive_linkage")
+child_path = PRIVATE + "/Robots/BP_LiftDriveLinkage_Ramms"
 if EAL.does_asset_exist(child_path):
     child = EAL.load_asset(child_path)
     log("=== %s exists" % child_path)
 else:
     factory = unreal.BlueprintFactory()
     factory.set_editor_property("parent_class", parent_bp.generated_class())
-    child = AT.create_asset("BP_LiftDriveLinkage_Ramms", "/Game/Robots", unreal.Blueprint, factory)
+    child = AT.create_asset("BP_LiftDriveLinkage_Ramms", PRIVATE + "/Robots", unreal.Blueprint, factory)
     log("=== created %s (parent %s)" % (child_path, parent_bp.generated_class().get_name()))
 
 base = add_component(child, unreal.RammsRobotBaseComponent, "RobotBase")

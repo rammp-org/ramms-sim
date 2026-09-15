@@ -1,7 +1,7 @@
 import unreal
 SDS = unreal.get_engine_subsystem(unreal.SubobjectDataSubsystem)
 SDL = unreal.SubobjectDataBlueprintFunctionLibrary
-for path in ["/Game/Robots/BP_Mebot_Ramms", "/Game/Robots/BP_LiftDriveLinkage_Ramms"]:
+for path in ["/Game/Robots/BP_Mebot_Ramms", "/RammsPrivateAssets/Robots/BP_LiftDriveLinkage_Ramms"]:
     bp = unreal.EditorAssetLibrary.load_asset(path)
     handles = SDS.k2_gather_subobject_data_for_blueprint(bp)
     root = handles[0]
