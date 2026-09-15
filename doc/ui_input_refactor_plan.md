@@ -240,8 +240,13 @@ lift through `SetControl` on the pawns' `ControlSurface`, and the lift-drive
 pawn lists its unclaimed cranks / wheels as `motor.<id>` axes. The 5-bar's
 height range is derived from the mechanism (`GetReachableHeightRange`), which
 also exposed that the runner's old "lift to 16 cm" had been refused since the
-motor-range check landed. Still open in phase 2: arm / gripper contributors,
-the MuJoCo sim contributor (`sim.reset` etc.), subsystem registration.
+motor-range check landed. Arm / gripper contributors (Chaos Kinova via
+`RammsEndEffectorTeleopComponent`, MuJoCo via `RammsMjArmTeleopComponent`,
+same `arm.*` / `gripper.*` ids), the MuJoCo sim contributor
+(`RammsMjSimControlComponent`: `sim.reset` / `sim.pause` / `sim.step` /
+`sim.running` + the URLab debug toggles) and the `RammsUISubsystem`
+control-surface registry are in too, all exercised by the runners. Phase 2 is
+complete; the "per-robot defaults out of constructors" cleanup moves to phase 5.
 
 ## Decisions (2026-09-15)
 

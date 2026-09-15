@@ -54,6 +54,11 @@ elif op[0] == "trigger":
         raise RuntimeError("trigger %s refused" % op[1])
 elif op[0] == "read":
     log("read %s = %.4f" % (op[1], cs.get_control_value(op[1])))
+elif op[0] == "registry":
+    found = unreal.RammsRobotControlSurfaceComponent.find_control_surfaces(pawn)
+    log("registry (RammsUISubsystem): %d surface(s): %s ; contains ours=%s" % (len(found), [f.get_outer().get_name() for f in found], cs in found))
+    if cs not in found:
+        raise RuntimeError("[cs] the pawn's surface is not registered with RammsUISubsystem")
 elif op[0] == "json":
     j = cs.get_control_surface_json()
     log("json %d bytes: %s..." % (len(j), j[:160].replace("\n", " ")))

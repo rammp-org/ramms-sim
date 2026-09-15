@@ -23,6 +23,13 @@ python3 Scripts/editor_remote_exec.py --code "unreal._ramms_lift_z='hi'" >/dev/n
 echo "--- control surface: raw motors, camera actions ---"
 python3 Scripts/editor_remote_exec.py --code "unreal._ramms_cs_op='describe'" >/dev/null 2>&1; f "$S/control_surface_check.py"
 python3 Scripts/editor_remote_exec.py --code "unreal._ramms_cs_op='trigger camera.next'" >/dev/null 2>&1; f "$S/control_surface_check.py"
+python3 Scripts/editor_remote_exec.py --code "unreal._ramms_cs_op='registry'" >/dev/null 2>&1; f "$S/control_surface_check.py"
+echo "--- sim controls: pause, resume, reset ---"
+python3 Scripts/editor_remote_exec.py --code "unreal._ramms_cs_op='trigger sim.pause'" >/dev/null 2>&1; f "$S/control_surface_check.py"; sleep 1
+python3 Scripts/editor_remote_exec.py --code "unreal._ramms_cs_op='read sim.running'" >/dev/null 2>&1; f "$S/control_surface_check.py"
+python3 Scripts/editor_remote_exec.py --code "unreal._ramms_cs_op='set sim.running 1'" >/dev/null 2>&1; f "$S/control_surface_check.py"; sleep 1
+python3 Scripts/editor_remote_exec.py --code "unreal._ramms_cs_op='read sim.running'" >/dev/null 2>&1; f "$S/control_surface_check.py"
+python3 Scripts/editor_remote_exec.py --code "unreal._ramms_cs_op='trigger sim.reset'" >/dev/null 2>&1; f "$S/control_surface_check.py"; sleep 2; f "$S/mj_state.py"
 trap - EXIT; cleanup
 [ "$FAIL" -eq 0 ] && echo "=== run_mj_full: PASS" || echo "=== run_mj_full: FAIL"
 exit "$FAIL"

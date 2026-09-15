@@ -158,6 +158,11 @@ wired by name: add a contributor to the actor and its controls appear.
 | `linkage.<name>.height` | `Ramms5BarLinkageController` | Position, cm | range derived from the IK + motor ControlRanges (`GetReachableHeightRange`) unless `EndpointHeightRange` is authored |
 | `camera.next`, `camera.reset` | `RammsRobotCameraComponent` | Action | |
 | `camera.orbit_yaw`, `camera.orbit_pitch`, `camera.zoom` | `RammsRobotCameraComponent` | Continuous rate | integrated per tick |
+| `arm.forward`, `arm.strafe`, `arm.up`, `arm.yaw`, `arm.pitch`, `arm.roll` | `RammsEndEffectorTeleopComponent` (Chaos Kinova) / `RammsMjArmTeleopComponent` (MuJoCo) | Continuous rate, normalized ±1 | integrated per tick at the teleop speeds; same ids on both backends |
+| `arm.resync` | same | Action | snap the IK target to the live end effector |
+| `gripper.open`, `gripper.close`, `gripper.toggle`; `gripper.closed` | same (when a gripper is present) | Actions; Position 0/1 with readback | `gripper.closed` is also writable |
+| `sim.reset`, `sim.pause`, `sim.step`; `sim.running` | `RammsMjSimControlComponent` (MuJoCo scenes) | Actions; Position 0/1 with readback | what URLab's `UMjInputHandler` hotkeys R / P do, without the key collisions |
+| `sim.debug.<contacts\|visuals\|collisions\|joints\|quick_convert_collisions\|shader_mode\|tendons>` | `RammsMjSimControlComponent` | Action | the URLab 1–7 debug toggles |
 | `motor.<id>` | *(unclaimed registry motors)* | from `FRammsMotorSpec` | Position → rad, Velocity → rad/s, Torque → backend units |
 
 API (`BlueprintCallable`, also the `IRammsControlSurfaceProvider` /
@@ -169,6 +174,10 @@ arbitrated: Autonomy > Remote > local (Keyboard / Gamepad / Touch) > Script,
 and a Remote / Autonomy command holds its axis over local input for
 `ExternalHoldSeconds` (0.3 s). Releasing a Continuous axis springs it to its
 default; releasing a Position axis stops holding the target (`ReleaseMotor`).
+Every surface registers with `RammsUISubsystem` (ramms-ui) on BeginPlay —
+`GetAllControlSurfaces()` / `FindControlSurfaceByRobotName()`, or from Python
+`unreal.RammsRobotControlSurfaceComponent.find_control_surfaces(any_actor)` —
+so panels and input components find every controllable robot without naming it.
 
 ```python
 cs = pawn.get_component_by_class(unreal.RammsRobotControlSurfaceComponent)

@@ -14,7 +14,8 @@ doesn't. `move_private_assets.py` is the one-shot migration that put them there.
   base, diff-drive and both centre 5-bar controllers. Idempotent.
 - `make_pawns.py` — makes `BP_LiftDriveLinkage_Ramms` / `BP_LiftDriveHolonomic_Ramms`
   keyboard-driveable pawns (RobotBase, diff-drive, 5-bar, KeyboardTeleop, follow
-  + top-down cameras with a RammsRobotCameraComponent, AutoPossessPlayer).
+  + top-down cameras with a RammsRobotCameraComponent, ControlSurface,
+  SimControl, AutoPossessPlayer).
   Keys: W/S A/D drive, E/Q legs, Y/H T/B Z/X C/V motors; N camera, mouse
   drag orbit, wheel zoom, Home reset.
 - `make_test_map.py` — `BP_LiftDriveTestGameMode` + rewrites `Map_BaseTest_URL`
@@ -26,20 +27,25 @@ doesn't. `move_private_assets.py` is the one-shot migration that put them there.
   `RammsRobotControlSurfaceComponent`), then its constraint-driven Position
   motors are commanded and read back through the base (`chaos_pos_*.py`),
   the surface's lift axes and source arbitration are checked
-  (`control_surface_check.py`), and the MebotController API is exercised.
+  (`control_surface_check.py`), the Kinova arm and gripper are driven through
+  `arm.forward` / `gripper.closed` / `arm.resync` (`chaos_arm.py`), the
+  RammsUISubsystem registry is checked, and the MebotController API is
+  exercised.
 - `run_mj_full.sh` — PIE on Map_BaseTest_URL with `BP_LiftDriveLinkage_Ramms`:
   points `BP_LiftDriveTestGameMode.DefaultPawnClass` at the linkage pawn for the
   run (unsaved; `mj_restore.py` reloads the game mode from disk afterwards), lets
   the game mode spawn/possess/unpause it, then drives and turns through the
   surface (`mj_drive.py`, `mj_turn.py`), moves the 5-bar legs to the bottom
   and top of the height range the linkage reports (`mj_lift.py`, which fails
-  if the surface refuses), and lists the surface — drive, linkage, camera and
-  the unclaimed crank / wheel motors (`control_surface_check.py`).
+  if the surface refuses), lists the surface — drive, linkage, camera, sim and
+  the unclaimed crank / wheel motors — and pauses, resumes and resets the
+  MuJoCo scene through `sim.pause` / `sim.running` / `sim.reset`
+  (`control_surface_check.py`).
 - `cs_common.py` — the runners' helpers: find the pawn's surface, pause the
   per-tick local input writers, `set_control` that raises when refused.
 - `control_surface_check.py` — ad-hoc surface ops via `unreal._ramms_cs_op`:
   `describe | drive | stop | set <id> <v> | release <id> | trigger <id> |
-  read <id> | json | arbitration`.
+  read <id> | json | arbitration | registry`.
 
 The runners resolve the repo root from their own location, so they work from
 any clone. Gotchas: each remote command runs synchronously on the game thread,
