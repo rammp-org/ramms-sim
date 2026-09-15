@@ -24,6 +24,16 @@ if op[0] == "status":
         host.is_in_viewport() if host else None))
     if not (host and panel and joy and panel.get_row_count() > 0):
         raise RuntimeError("[hud] HUD not fully spawned")
+elif op[0] == "row_state":
+    row = panel.find_row(op[1])
+    if not row:
+        raise RuntimeError("[hud] no row for %s" % op[1])
+    r = cs.get_control_target(op[1])  # None when no target; else the out value (or (bool, value))
+    tgt = None if r is None else (r[1] if isinstance(r, tuple) else r)
+    log("%s: slider(target)=%.2f surface target=%s live=%.2f" % (op[1], row.get_target_value(), "none" if tgt is None else "%.2f" % tgt, cs.get_control_value(op[1])))
+elif op[0] == "layout":
+    for line in panel.get_layout_report():
+        log("  " + str(line))
 elif op[0] == "scroll_to":
     panel.set_scroll_offset(float(op[1]))
     log("scroll_to %s -> offset %.1f" % (op[1], panel.get_scroll_offset()))

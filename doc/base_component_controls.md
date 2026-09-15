@@ -206,8 +206,12 @@ player in Game-and-UI input mode with the cursor shown. The panel renders whatev
 collapsible section per group, a joystick per paired Continuous axes
 (drive, arm move / rotate, camera orbit), hold buttons for lone rate axes
 (`arm.up`, `camera.zoom`), a slider row (`URammsAxisControl`) per Position /
-Velocity axis with readback, a button per Action; it rebuilds when the
-surface's version changes. Everything goes through `SetAxis` /
+Velocity axis, a button per Action, and a plain value for read-only state
+(`gripper.closed`); it rebuilds when the surface's version changes. On a
+slider row the slider and its value are the **target** (it tracks the live
+pose until the row is first commanded, then holds the target) and a separate
+"live" column follows the motor. The wheel over the panel scrolls it; the
+groups size to their content (no inner scrollbars). Everything goes through `SetAxis` /
 `TriggerAction` / `ReleaseAxis` with `Source = Touch`, so it arbitrates like
 any other driver. From Python (`hud_check.py`):
 
