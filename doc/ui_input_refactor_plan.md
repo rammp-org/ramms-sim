@@ -314,6 +314,13 @@ in `DefaultInput.ini`: with it on, a desktop PIE session fakes touch, so
 hover, widget paths and wheel routing only update while a button is held.
 Real touch (Pixel Streaming) is unaffected.
 
+Deferred by decision (2026-09-15): the holonomic base's four omni wheels are
+`<motor>` (torque) actuators in the MJCF and appear on the surface as raw
+continuous `motor.*_omni_wheel` axes. That is fine for now; a holonomic drive
+contributor (`drive.forward` / `drive.strafe` / `drive.turn`, claiming the
+omni wheels and closing its own velocity loop over the torque actuators, as
+the differential drive does) replaces those raw rows when it lands.
+
 ## Decisions (2026-09-15)
 
 1. Shared types: `RammsControl` module inside the ramms-ui plugin.
