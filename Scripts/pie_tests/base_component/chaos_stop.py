@@ -1,6 +1,6 @@
-import unreal
-w = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_game_world()
-for p in unreal.GameplayStatics.get_all_actors_of_class(w, unreal.Pawn):
-    dd = p.get_component_by_class(unreal.RammsDifferentialDriveController)
-    if dd:
-        dd.set_drive_input(unreal.Vector2D(0.0, 0.0)); unreal.log("[stop] zeroed")
+import unreal, sys
+sys.path.insert(0, __import__("os").path.dirname(__file__))
+import importlib, cs_common; importlib.reload(cs_common)
+w, p = cs_common.find_chaos_pawn()
+cs = cs_common.surface_of(p)
+unreal.log("[stop] released drive.forward/turn -> %s ; forward now %.2f" % (cs_common.release(cs, "drive.forward", "drive.turn"), cs.get_control_value("drive.forward")))

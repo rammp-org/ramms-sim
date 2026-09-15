@@ -1,11 +1,8 @@
 import unreal, sys
 sys.path.insert(0, __import__("os").path.dirname(__file__))
-import importlib, mj_find; importlib.reload(mj_find)
+import importlib, mj_find, cs_common; importlib.reload(mj_find); importlib.reload(cs_common)
 w, a = mj_find.find()
-# The keyboard teleop component re-issues the (idle) key state every tick and
-# would overwrite a scripted drive input: pause it for the test.
-tele = a.get_component_by_class(unreal.RammsKeyboardTeleopComponent)
-if tele:
-    tele.set_component_tick_enabled(False)
-a.get_component_by_class(unreal.RammsDifferentialDriveController).set_drive_input(unreal.Vector2D(0.0, 1.0))
-unreal.log("[drv] set_drive_input forward (teleop tick paused=%s)" % (tele is not None))
+cs_common.quiet_local_input(a)
+cs = cs_common.surface_of(a)
+cs_common.set_control(cs, "drive.forward", 1.0)
+unreal.log("[drv] drive.forward=1 via control surface (owner=%s, value=%.2f)" % (cs.get_axis_owner("drive.forward"), cs.get_control_value("drive.forward")))
