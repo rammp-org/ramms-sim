@@ -24,6 +24,18 @@ if op[0] == "status":
         host.is_in_viewport() if host else None))
     if not (host and panel and joy and panel.get_row_count() > 0):
         raise RuntimeError("[hud] HUD not fully spawned")
+elif op[0] == "scroll_to":
+    panel.set_scroll_offset(float(op[1]))
+    log("scroll_to %s -> offset %.1f" % (op[1], panel.get_scroll_offset()))
+elif op[0] == "scroll":
+    ext = panel.get_scroll_extent()
+    cam = pawn.get_component_by_class(unreal.RammsRobotCameraComponent)
+    log("panel scroll offset = %.1f (list height %.0f, end %.0f) ; camera over-UI=%s" % (panel.get_scroll_offset(), ext.x, ext.y, "%s/%s" % (cam.is_cursor_over_ui(), cam.get_widget_type_under_cursor()) if cam else None))
+elif op[0] == "camera_state":
+    cam = pawn.get_component_by_class(unreal.RammsRobotCameraComponent)
+    arm = [c for c in pawn.get_components_by_class(unreal.SpringArmComponent) if c.get_name() == "FollowArm"]
+    rot = arm[0].get_relative_transform().rotation.rotator() if arm else None
+    log("camera arm=%.1f yaw=%.1f pitch=%.1f" % (cam.get_desired_arm_length(), rot.yaw if rot else 0.0, rot.pitch if rot else 0.0))
 elif op[0] == "shot":
     # 'Shot showui' captures the viewport with Slate UI (HighResShot omits it).
     unreal.SystemLibrary.execute_console_command(w, "Shot showui")

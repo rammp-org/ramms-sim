@@ -305,6 +305,15 @@ the chair is driven only through the surface. The vehicle mapping context
 (`IMC_Vehicle_Default`) is still added by `BP_VehicleAdvPlayerController` and
 goes with the vehicle layer.
 
+Second try-out: the wheel over the panel didn't scroll it (the collapsible
+groups forced `ConsumeMouseWheel = Always`; the panel now handles the wheel
+itself), and a touch drag on the panel or joystick also orbited the camera
+(the camera now asks Slate for the widget path under the cursor and leaves
+drags and the wheel that land on UI alone). `bUseMouseForTouch` is now off
+in `DefaultInput.ini`: with it on, a desktop PIE session fakes touch, so
+hover, widget paths and wheel routing only update while a button is held.
+Real touch (Pixel Streaming) is unaffected.
+
 ## Decisions (2026-09-15)
 
 1. Shared types: `RammsControl` module inside the ramms-ui plugin.
