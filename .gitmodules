@@ -36,3 +36,6 @@
 	path = Plugins/RammsPrivateAssets
 	url = git@github.com:rammp-org/ramms-private-assets
 	update = none
+[submodule "Plugins/RammsUI"]
+	path = Plugins/RammsUI
+	url = git@github.com:rammp-org/ramms-ui
