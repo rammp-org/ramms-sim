@@ -56,6 +56,10 @@ doesn't. `move_private_assets.py` is the one-shot migration that put them there.
   (`control_input_check.py`).
 - `cs_common.py` — the runners' helpers: find the pawn's surface, pause the
   per-tick local input writers, `set_control` that raises when refused.
+- `hud_check.py` — the auto-spawned control HUD (ramms-ui) via
+  `unreal._ramms_hud_op`: `status | shot | joystick <x> <y> | joystick_release |
+  row <id> <value> | action <id> | hold <id> <+|-> | release <id>` — drives
+  the panel's rows and the drive joystick the way a touch would.
 - `control_input_check.py` — Enhanced Input ops via `unreal._ramms_ci_op`:
   `status | inject <IA name> <x> <y> <z> [hold_s] | expect <id> <min> <max> |
   camera | camera_changed | urlab`. `inject` feeds an action as if its key

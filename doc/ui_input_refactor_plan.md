@@ -263,6 +263,21 @@ template (`IA_Throttle` -> Chaos vehicle, joystick tick) until phase 3 replaces
 that layer; the dead `DefaultInput.ini` action / axis mappings were not deleted
 (the vehicle-template layer goes as a whole).
 
+Phase 3 (2026-09-15): in ramms-ui, `URammsControlSurfacePanel` (+
+`URammsControlRow`, `URammsSurfaceJoystick`), `URammsSimLayout` and the
+single spawn path `URammsControlHUDSubsystem` / `URammsControlHUDSettings`.
+`ARammsPlayerController` no longer spawns the vehicle HUD / mobile controls.
+The paired-axis convention (lower Order = vertical) is documented on
+`FRammsControlAxis::PairedAxis` and the arm / camera contributors follow it.
+Validated in PIE on the chair (13 rows: slider row moves a lift motor, action
+row closes the gripper, hold row raises the arm, joystick drives) and the
+lift-drive pawn (24 rows: joystick drives, linkage row lowers the leg,
+`sim.pause` row pauses, `camera.next` row switches), with screenshots. Left
+for later: the `URammsStatusPanel` (speed / battery) and the themed
+decorations (MeBot modes, arm home / retract) on the sim layout; per-robot
+Pixel Streaming screenshots (the page path is unchanged: keys and touch reach
+the same Enhanced Input / sink paths); the time-trial variant keeps its own HUD.
+
 ## Decisions (2026-09-15)
 
 1. Shared types: `RammsControl` module inside the ramms-ui plugin.

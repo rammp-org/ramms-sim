@@ -190,6 +190,32 @@ cs.release_control("drive.forward", unreal.RammsControlSource.SCRIPT)
 The sections below describe the underlying components; scripts and panels
 should prefer the surface.
 
+### 0b. The HUD (ramms-ui panels)
+
+`URammsControlHUDSubsystem` (a local-player subsystem in ramms-ui) is the one
+spawn path for the sim's UI: as soon as a robot registers a control surface
+it creates a `URammsLayoutHost` with `URammsSimLayout` (slots SurfacePanel /
+Joystick / Status) and pools a `URammsControlSurfacePanel` and a
+`URammsSurfaceJoystick` — for the chair's controller, the MuJoCo test game
+mode's plain controller, any controller. Project Settings > Plugins > Ramms
+Control HUD (`URammsControlHUDSettings`) turns it off, swaps the layout,
+picks a theme. The panel renders whatever the surface describes: one
+collapsible section per group, a joystick per paired Continuous axes
+(drive, arm move / rotate, camera orbit), hold buttons for lone rate axes
+(`arm.up`, `camera.zoom`), a slider row (`URammsAxisControl`) per Position /
+Velocity axis with readback, a button per Action; it rebuilds when the
+surface's version changes. Everything goes through `SetAxis` /
+`TriggerAction` / `ReleaseAxis` with `Source = Touch`, so it arbitrates like
+any other driver. From Python (`hud_check.py`):
+
+```python
+hud = unreal.RammsControlHUDSubsystem.get(pawn)
+panel, joy = hud.get_surface_panel(), hud.get_joystick()
+joy.simulate_input(unreal.Vector2D(0.0, -1.0))          # thumb up = forward
+panel.find_row("linkage.LeftCenterLinkage.height").simulate_value(-5.0)
+panel.find_row("sim.pause").simulate_action()
+```
+
 ### 1. Blueprint / C++ (the same functions everywhere)
 
 `URammsDifferentialDriveController` (public API unchanged by the migration):

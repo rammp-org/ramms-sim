@@ -18,39 +18,11 @@ void ARammsPlayerController::BeginPlay()
 	// ensure we're attached to the vehicle pawn so that World Partition streaming works correctly
 	bAttachToPawn = true;
 
-	// only spawn UI on local player controllers
-	if (IsLocalPlayerController())
-	{
-		if (ShouldUseTouchControls())
-		{
-			// spawn the mobile controls widget
-			MobileControlsWidget = CreateWidget<UUserWidget>(this, MobileControlsWidgetClass);
-
-			if (MobileControlsWidget)
-			{
-				// add the controls to the player screen
-				MobileControlsWidget->AddToPlayerScreen(0);
-			}
-			else
-			{
-
-				UE_LOG(LogRamms, Error, TEXT("Could not spawn mobile controls widget."));
-			}
-		}
-
-		// spawn the UI widget and add it to the viewport
-		VehicleUI = CreateWidget<URammsUI>(this, VehicleUIClass);
-
-		if (VehicleUI)
-		{
-			VehicleUI->AddToViewport();
-		}
-		else
-		{
-
-			UE_LOG(LogRamms, Error, TEXT("Could not spawn vehicle UI widget."));
-		}
-	}
+	// The UI (control-surface panel + drive joystick) is spawned for every
+	// local player by ramms-ui's URammsControlHUDSubsystem once a robot
+	// registers a control surface; the vehicle template's HUD and touch
+	// controls (VehicleUIClass / MobileControlsWidgetClass, legacy) are no
+	// longer created here.
 }
 
 void ARammsPlayerController::SetupInputComponent()
