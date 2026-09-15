@@ -56,6 +56,9 @@ doesn't. `move_private_assets.py` is the one-shot migration that put them there.
   (`control_input_check.py`).
 - `cs_common.py` — the runners' helpers: find the pawn's surface, pause the
   per-tick local input writers, `set_control` that raises when refused.
+- `access_send.py` — host-side sender of ramms-access v1 intent packets (UDP
+  JSON: `--drive X Y`, `--ee-lin`, `--ee-ang`, `--event`); `access_check.py`
+  asserts the surface's owner (`expect_owner drive.forward Autonomy`).
 - `hud_check.py` — the auto-spawned control HUD (ramms-ui) via
   `unreal._ramms_hud_op`: `status | shot | joystick <x> <y> | joystick_release |
   row <id> <value> | action <id> | hold <id> <+|-> | release <id>` — drives

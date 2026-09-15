@@ -278,6 +278,18 @@ decorations (MeBot modes, arm home / retract) on the sim layout; per-robot
 Pixel Streaming screenshots (the page path is unchanged: keys and touch reach
 the same Enhanced Input / sink paths); the time-trial variant keeps its own HUD.
 
+Phase 5 (2026-09-15): RammsAccess drives the surface with `Source = Autonomy`
+(ramms-access PR; legacy direct path kept as fallback); the diff-drive
+contributor goes through the external hold so a surface command outranks the
+chair's legacy per-tick joystick writer; `unreal_remote.control_surface`
+wraps the surface for Remote Control clients (and the client's component
+discovery parameter name was fixed). `base_component_controls.md` is the
+control-surface guide. Deferred: deleting the retired components
+(`RammsKeyboardTeleopComponent`, the arm teleops' key polling, the vehicle
+HUD spawn members) after one release; the `IRammsRobotController` shim stays
+(decision 2); the `DefaultInput.ini` legacy mappings go with the vehicle
+layer.
+
 ## Decisions (2026-09-15)
 
 1. Shared types: `RammsControl` module inside the ramms-ui plugin.

@@ -429,7 +429,15 @@ PUT http://127.0.0.1:30010/remote/object/call
 ```
 
 or, preferably, through the control surface (`GetControlSurfaceJson` lists
-the ids and ranges):
+the ids and ranges) — `Plugins/RammsCore/Scripts/unreal_remote/control_surface.py`
+wraps it:
+
+```python
+from unreal_remote import UnrealRemote
+from unreal_remote.control_surface import ControlSurface
+cs = ControlSurface.find(UnrealRemote())[0]
+cs.describe()["axes"]; cs.set("drive.forward", 1.0); cs.trigger("gripper.toggle"); cs.get("lift.motor_swing_arm_l")
+```
 
 ```http
 PUT http://127.0.0.1:30010/remote/object/call
@@ -444,6 +452,14 @@ Call the `Set*` functions; do not write properties of live components through
 `/remote/object/property` (array-valued `TOptional`s and live URLab components
 get cleared). Object paths differ between PIE (`UEDPIE_0_` prefix) and
 `-game`.
+
+### 4b. RammsAccess (UDP intents, `:30040`)
+
+`RammsAccessInputComponent` (the ramms-access plugin) consumes the v1 intent
+stream and drives the surface with `Source = Autonomy` — `drive.*`, the
+`arm.*` rate axes, `gripper.*` / `arm.resync` actions — which outranks local
+input for the surface's hold window; watchdog / estop release everything.
+`Scripts/pie_tests/base_component/access_send.py` streams test packets.
 
 ### 5. URLab bridge (ZMQ, `:5559`) — coexistence
 

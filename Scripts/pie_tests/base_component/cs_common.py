@@ -22,11 +22,12 @@ def find_chaos_pawn():
 
 
 def quiet_local_input(actor):
-    """Pause the per-tick local writers (keyboard teleop, access input, the
-    pawn's own Event Tick) that would overwrite a scripted command every frame.
-    Phase 4 retires them in favour of the surface, at which point this goes."""
+    """Pause the legacy per-tick local writers (the polled keyboard teleop, if a
+    pawn still carries one, and the chair pawn's own Event Tick joystick) that
+    would overwrite a scripted command every frame. RammsAccess stays ticking:
+    it drives the surface and only releases once per watchdog episode."""
     for c in actor.get_components_by_class(unreal.ActorComponent):
-        if c.get_class().get_name() in ("RammsKeyboardTeleopComponent", "RammsAccessInputComponent"):
+        if c.get_class().get_name() == "RammsKeyboardTeleopComponent":
             c.set_component_tick_enabled(False)
     actor.set_actor_tick_enabled(False)
 
