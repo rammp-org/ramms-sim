@@ -135,6 +135,10 @@ dt_chaos = make_table("DT_Mebot_ChaosMotors", unreal.RammsMotorSpec.static_struc
 bp = EAL.load_asset("/Game/Robots/BP_Mebot_Ramms")
 log("=== BP_Mebot_Ramms")
 base = add_component(bp, unreal.RammsRobotBaseComponent, "RobotBase")
+# The robot's control surface: gathers every contributor (drive, MeBot lift,
+# camera...) plus unclaimed registry motors; panels / input maps / remote
+# clients drive the chair through it.
+add_component(bp, unreal.RammsRobotControlSurfaceComponent, "ControlSurface")
 # Explicit Chaos: Auto's "an articulation attached under me" heuristic is not
 # right for a Chaos base that carries a MuJoCo arm child actor (BP_Mebot_Mujoco).
 setp(base, motor_table=dt_chaos, backend=unreal.RammsPhysicsBackend.CHAOS,

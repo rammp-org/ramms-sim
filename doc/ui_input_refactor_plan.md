@@ -233,6 +233,16 @@ two headers. Not a new repo: overkill.
 Phases 1–2 are the load-bearing ones and can be validated headlessly with the
 existing PIE runner scripts; 3 and 4 can proceed in parallel once 2 lands.
 
+Status (2026-09-15): phases 0–1 done (ramms-ui #34, ramms-core #23, ramms-sim
+#43). Phase 2: adapter + diff-drive / MeBot / 5-bar / camera contributors
+done and validated — `run_chaos.sh` and `run_mj_full.sh` now drive, turn and
+lift through `SetControl` on the pawns' `ControlSurface`, and the lift-drive
+pawn lists its unclaimed cranks / wheels as `motor.<id>` axes. The 5-bar's
+height range is derived from the mechanism (`GetReachableHeightRange`), which
+also exposed that the runner's old "lift to 16 cm" had been refused since the
+motor-range check landed. Still open in phase 2: arm / gripper contributors,
+the MuJoCo sim contributor (`sim.reset` etc.), subsystem registration.
+
 ## Decisions (2026-09-15)
 
 1. Shared types: `RammsControl` module inside the ramms-ui plugin.

@@ -213,6 +213,8 @@ def setup_pawn(bp, motor_table, drive_ids, bindings, linkage_rows=None, fivebar_
 
     # N cycles cameras (FollowCamera, TopCamera);
     # right-mouse drag orbits the active camera's arm, wheel zooms, Home resets.
+    # Control surface: every contributor's controls + unclaimed registry motors.
+    add_component(bp, unreal.RammsRobotControlSurfaceComponent, "ControlSurface")
     camctl = add_component(bp, unreal.RammsRobotCameraComponent, "CameraControl")
     # Cycle only the authored cameras: URLab's PossessCamera hangs off Bodies[0]
     # (the static worldbody here), so it never follows the robot.

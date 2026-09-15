@@ -140,6 +140,47 @@ one**: targets above ~12.7 cm are refused as unreachable; lowering the endpoint
 
 ## Control surfaces
 
+### 0. The robot's control surface (`RammsRobotControlSurfaceComponent`)
+
+Every robot actor carries one `ControlSurface` component. On BeginPlay it
+gathers every sibling component that implements `IRammsControlContributor`
+(differential drive, MeBot lift controller, 5-bar linkages, camera control),
+merges the controls they describe into one `FRammsControlSurface` (the shared
+model from the ramms-ui `RammsControl` module), and appends a raw **Motors**
+group for every RobotBase registry motor no contributor claims — so a freshly
+imported robot with only a `RobotBase` is already controllable. Nothing is
+wired by name: add a contributor to the actor and its controls appear.
+
+| Control id | Contributor | Kind / units | Notes |
+|---|---|---|---|
+| `drive.forward`, `drive.turn` | `RammsDifferentialDriveController` | Continuous, normalized ±1 | paired (joystick); refused while an external hold is active |
+| `lift.<constraint>` | `MebotControllerComponent` | Position, deg / cm | groups Lift / Casters; range from the registry, else the constraint limits |
+| `linkage.<name>.height` | `Ramms5BarLinkageController` | Position, cm | range derived from the IK + motor ControlRanges (`GetReachableHeightRange`) unless `EndpointHeightRange` is authored |
+| `camera.next`, `camera.reset` | `RammsRobotCameraComponent` | Action | |
+| `camera.orbit_yaw`, `camera.orbit_pitch`, `camera.zoom` | `RammsRobotCameraComponent` | Continuous rate | integrated per tick |
+| `motor.<id>` | *(unclaimed registry motors)* | from `FRammsMotorSpec` | Position → rad, Velocity → rad/s, Torque → backend units |
+
+API (`BlueprintCallable`, also the `IRammsControlSurfaceProvider` /
+`IRammsControlSink` interfaces): `DescribeControlSurface()`,
+`SetControl(Id, Value, Source)`, `TriggerControl(Id, Source)`,
+`ReleaseControl(Id, Source)`, `GetControlValue(Id)`, `GetControlSurfaceJson()`.
+Values are clamped to the axis range; unknown ids are refused. Sources are
+arbitrated: Autonomy > Remote > local (Keyboard / Gamepad / Touch) > Script,
+and a Remote / Autonomy command holds its axis over local input for
+`ExternalHoldSeconds` (0.3 s). Releasing a Continuous axis springs it to its
+default; releasing a Position axis stops holding the target (`ReleaseMotor`).
+
+```python
+cs = pawn.get_component_by_class(unreal.RammsRobotControlSurfaceComponent)
+for a in cs.describe_control_surface().get_editor_property("axes"): print(a.get_editor_property("id"))
+cs.set_control("drive.forward", 1.0, unreal.RammsControlSource.SCRIPT)
+cs.set_control("linkage.LeftCenterLinkage.height", -9.0, unreal.RammsControlSource.SCRIPT)
+cs.release_control("drive.forward", unreal.RammsControlSource.SCRIPT)
+```
+
+The sections below describe the underlying components; scripts and panels
+should prefer the surface.
+
 ### 1. Blueprint / C++ (the same functions everywhere)
 
 `URammsDifferentialDriveController` (public API unchanged by the migration):
@@ -320,6 +361,18 @@ PUT http://127.0.0.1:30010/remote/object/call
   "objectPath": "/Game/Maps/UEDPIE_0_Map_Demo.Map_Demo:PersistentLevel.BP_Mebot_Ramms_C_0.RammsDifferentialDriveController",
   "functionName": "SetExternalDriveInput",
   "parameters": { "Input": { "X": 0.0, "Y": 1.0 } }
+}
+```
+
+or, preferably, through the control surface (`GetControlSurfaceJson` lists
+the ids and ranges):
+
+```http
+PUT http://127.0.0.1:30010/remote/object/call
+{
+  "objectPath": "/Game/Maps/UEDPIE_0_Map_Demo.Map_Demo:PersistentLevel.BP_Mebot_Ramms_C_0.ControlSurface",
+  "functionName": "SetControl",
+  "parameters": { "Id": "drive.forward", "Value": 1.0, "Source": "Remote" }
 }
 ```
 
