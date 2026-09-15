@@ -28,8 +28,14 @@ elif op == "check":
         raise RuntimeError("[arm] end effector did not move through the surface (%.2f cm)" % moved)
 elif op == "gripper":
     before = cs.get_control_value("gripper.closed")
-    cs_common.set_control(cs, "gripper.closed", 0.0 if before >= 0.5 else 1.0)
-    unreal.log("[arm] gripper.closed %.0f -> commanded %.0f" % (before, 0.0 if before >= 0.5 else 1.0))
+    action = "gripper.open" if before >= 0.5 else "gripper.close"
+    ok = cs.trigger_control(action, cs_common.SRC)
+    if not ok:
+        raise RuntimeError("[arm] %s refused" % action)
+    # gripper.closed is readback-only: a write must be refused.
+    if cs.set_control("gripper.closed", 1.0, cs_common.SRC):
+        raise RuntimeError("[arm] gripper.closed accepted a write; it is read-only")
+    unreal.log("[arm] gripper.closed %.0f -> %s (write to gripper.closed refused as expected)" % (before, action))
 elif op == "gripper_check":
     unreal.log("[arm] gripper.closed now %.0f" % cs.get_control_value("gripper.closed"))
 elif op == "resync":

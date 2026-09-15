@@ -160,10 +160,10 @@ wired by name: add a contributor to the actor and its controls appear.
 | `camera.orbit_yaw`, `camera.orbit_pitch`, `camera.zoom` | `RammsRobotCameraComponent` | Continuous rate | integrated per tick |
 | `arm.forward`, `arm.strafe`, `arm.up`, `arm.yaw`, `arm.pitch`, `arm.roll` | `RammsEndEffectorTeleopComponent` (Chaos Kinova) / `RammsMjArmTeleopComponent` (MuJoCo) | Continuous rate, normalized ±1 | integrated per tick at the teleop speeds; same ids on both backends |
 | `arm.resync` | same | Action | snap the IK target to the live end effector |
-| `gripper.open`, `gripper.close`, `gripper.toggle`; `gripper.closed` | same (when a gripper is present) | Actions; Position 0/1 with readback | `gripper.closed` is also writable |
+| `gripper.open`, `gripper.close`, `gripper.toggle`; `gripper.closed` | same (when a gripper is present) | Actions; Position 0/1, read-only | `gripper.closed` is state only (`bReadOnly`): change it through the actions |
 | `sim.reset`, `sim.pause`, `sim.step`; `sim.running` | `RammsMjSimControlComponent` (MuJoCo scenes) | Actions; Position 0/1 with readback | what URLab's `UMjInputHandler` hotkeys R / P do, without the key collisions |
 | `sim.debug.<contacts\|visuals\|collisions\|joints\|quick_convert_collisions\|shader_mode\|tendons>` | `RammsMjSimControlComponent` | Action | the URLab 1–7 debug toggles |
-| `motor.<id>` | *(unclaimed registry motors)* | from `FRammsMotorSpec` | Position → rad, Velocity → rad/s, Torque → backend units |
+| `motor.<id>` | *(unclaimed registry motors)* | from `FRammsMotorSpec` | Position → rad, Velocity → rad/s, Torque → backend units; an unset `ControlRange` stays unbounded (no clamp, the panel picks a display range) |
 
 API (`BlueprintCallable`, also the `IRammsControlSurfaceProvider` /
 `IRammsControlSink` interfaces): `DescribeControlSurface()`,
