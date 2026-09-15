@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Sets up the Plugins/unreal-robotics-lab submodule for building RAMMS on
 # macOS/Linux: applies the one nested patch upstream does not carry, builds
-# its third-party dependencies, and regenerates project files.
+# its third-party dependencies (plus, on Linux, ProtoSpec and the runtime
+# library staging), and regenerates project files.
 #
 # Idempotent — safe to re-run any time.
 #
@@ -103,6 +104,42 @@ if [ "$BUILD_THIRDPARTY" = 1 ]; then
 	fi
 	bash "$SUBMODULE/third_party/build_all.sh" "${THIRDPARTY_ARGS[@]}"
 	log "third-party build finished"
+fi
+
+# --- 3b. build ProtoSpec (Linux) ---
+# URLab's generated MuJoCo profile (Source/URLab/*/MuJoCo/Gen) includes
+# ProtoSpec headers even when URLab.Build.cs reports ProtoSpec as not
+# installed, so the editor build fails with "'protospec/profile.h' file not
+# found" until protospec/build.sh has staged third_party/install/protospec.
+# Its static libraries link into the URLab module, so build them with the same
+# UE clang/libc++ environment that build_all.sh --engine uses.
+if [ "$BUILD_THIRDPARTY" = 1 ] && [ "$(uname -s)" = Linux ]; then
+	UE_TC=$(ls -d "$UE_ROOT"/Engine/Extras/ThirdPartyNotUE/SDKs/HostLinux/Linux_x64/v*_clang-*/x86_64-unknown-linux-gnu 2>/dev/null | sort -V | tail -1)
+	if [ -z "$UE_TC" ] || [ ! -x "$UE_TC/bin/clang++" ]; then
+		log "ERROR: no UE clang toolchain found under '$UE_ROOT' (set UE_ROOT to your UE install)"
+		exit 1
+	fi
+	log "building ProtoSpec with $UE_TC..."
+	(
+		export CC="$UE_TC/bin/clang" CXX="$UE_TC/bin/clang++"
+		export AR="$UE_TC/bin/llvm-ar" RANLIB="$UE_TC/bin/llvm-ranlib"
+		export CFLAGS="-fPIC -Qunused-arguments -Wno-unknown-warning-option"
+		export CXXFLAGS="-stdlib=libc++ -nostdinc++ -isystem $UE_TC/include/c++/v1 -fPIC -Qunused-arguments -Wno-unknown-warning-option"
+		export LDFLAGS="-stdlib=libc++ -fuse-ld=lld -L$UE_TC/lib64 -Wl,-rpath,$UE_TC/lib64"
+		bash "$SUBMODULE/protospec/build.sh"
+	)
+	log "ProtoSpec build finished"
+fi
+
+# --- 3c. stage URLab runtime libraries (Linux) ---
+# UBT copies URLab's runtime dependencies into Binaries/Linux, but the copy of
+# the versioned .so symlinks (libmujoco.so, libzmq.so, libzmq.so.5) fails with
+# "cp: skipping file ..., as it was replaced while being copied", which fails
+# the editor build. Staging them first with URLab's own script leaves those
+# copies up to date, so UBT skips them.
+if [ "$(uname -s)" = Linux ] && [ -d "$SUBMODULE/third_party/install" ]; then
+	mkdir -p "$SUBMODULE/Binaries/Linux"
+	bash "$SUBMODULE/Scripts/setup_runtime_linux.sh"
 fi
 
 # --- 4. regenerate project files ---
