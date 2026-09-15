@@ -290,6 +290,21 @@ HUD spawn members) after one release; the `IRammsRobotController` shim stays
 (decision 2); the `DefaultInput.ini` legacy mappings go with the vehicle
 layer.
 
+Follow-up (2026-09-15, after the first PIE try-out): the HUD was visible but
+not clickable — the vehicle template's `DefaultTouchInterface` virtual
+joystick (shown whenever `bUseMouseForTouch` fakes touch in PIE) sat above
+every widget, and the viewport captured the mouse. `URammsControlHUDSubsystem`
+now deactivates the engine touch interface and switches the player to
+Game-and-UI input mode with a visible cursor (`bReplaceEngineTouchInterface`,
+`bGameAndUIInputMode` in the settings). `BP_Mebot_Ramms` still carried direct
+input wiring the export revealed — keys 1–8 / + / − to MeBot motor presets,
+`IA_Throttle` / `IA_Steering` reads feeding a per-tick `SetDriveInput` — all
+stripped with `URammsBlueprintCleanupLibrary::RemoveLegacyInputNodes`
+(RammsCoreEditor; `Scripts/pie_tests/base_component/strip_bp_input.py`), so
+the chair is driven only through the surface. The vehicle mapping context
+(`IMC_Vehicle_Default`) is still added by `BP_VehicleAdvPlayerController` and
+goes with the vehicle layer.
+
 ## Decisions (2026-09-15)
 
 1. Shared types: `RammsControl` module inside the ramms-ui plugin.

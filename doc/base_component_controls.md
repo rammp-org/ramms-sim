@@ -199,7 +199,10 @@ Joystick / Status) and pools a `URammsControlSurfacePanel` and a
 `URammsSurfaceJoystick` — for the chair's controller, the MuJoCo test game
 mode's plain controller, any controller. Project Settings > Plugins > Ramms
 Control HUD (`URammsControlHUDSettings`) turns it off, swaps the layout,
-picks a theme. The panel renders whatever the surface describes: one
+picks a theme, and controls the two things that make it reachable in PIE:
+it removes the engine's `DefaultTouchInterface` virtual joystick (which
+overlays the viewport whenever `bUseMouseForTouch` fakes touch) and puts the
+player in Game-and-UI input mode with the cursor shown. The panel renders whatever the surface describes: one
 collapsible section per group, a joystick per paired Continuous axes
 (drive, arm move / rotate, camera orbit), hold buttons for lone rate axes
 (`arm.up`, `camera.zoom`), a slider row (`URammsAxisControl`) per Position /

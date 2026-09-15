@@ -56,6 +56,10 @@ doesn't. `move_private_assets.py` is the one-shot migration that put them there.
   (`control_input_check.py`).
 - `cs_common.py` — the runners' helpers: find the pawn's surface, pause the
   per-tick local input writers, `set_control` that raises when refused.
+- `strip_bp_input.py` — removes a robot Blueprint's direct input wiring (key
+  events, input-action reads, the per-tick `SetDriveInput` write) via
+  `RammsBlueprintCleanupLibrary` (RammsCoreEditor); run once on
+  `BP_Mebot_Ramms` on 2026-09-15.
 - `access_send.py` — host-side sender of ramms-access v1 intent packets (UDP
   JSON: `--drive X Y`, `--ee-lin`, `--ee-ang`, `--event`); `access_check.py`
   asserts the surface's owner (`expect_owner drive.forward Autonomy`).
