@@ -40,7 +40,8 @@ ci inject IA_Ramms_MotorGroupA 1 0 0 1.0; sleep 1.5; ci expect lift.motor_swing_
 ci inject IA_Ramms_GripperOpen 1 0 0 0.2; sleep 0.5; ci expect gripper.closed -0.1 0.1
 ci inject IA_Ramms_GripperClose 1 0 0 0.2; sleep 0.5; ci expect gripper.closed 0.9 1.1
 python3 Scripts/editor_remote_exec.py --code "unreal._ramms_arm_op='start'" >/dev/null 2>&1; f "$S/chaos_arm.py" >/dev/null; python3 Scripts/editor_remote_exec.py --code "unreal.log('')" >/dev/null 2>&1
-ci inject IA_Ramms_ArmMove 0 0 1 1.5; ci expect arm.up 0.99 1.01; sleep 2; ci expect arm.up -0.01 0.01
+# 4 s hold, as above: the assertion must land inside it.
+ci inject IA_Ramms_ArmMove 0 0 1 4.0; ci expect arm.up 0.99 1.01; sleep 4; ci expect arm.up -0.01 0.01
 python3 Scripts/editor_remote_exec.py --code "unreal._ramms_arm_op='check'" >/dev/null 2>&1; f "$S/chaos_arm.py"
 echo "--- control HUD (ramms-ui panel + joystick, auto-spawned) ---"
 hud(){ python3 Scripts/editor_remote_exec.py --code "unreal._ramms_hud_op='$*'" >/dev/null 2>&1; f "$S/hud_check.py"; }
