@@ -49,8 +49,9 @@ hud row lift.motor_swing_arm_r 20; sleep 2.5; python3 Scripts/editor_remote_exec
 hud action gripper.open; sleep 0.5; python3 Scripts/editor_remote_exec.py --code "unreal._ramms_cs_op='read gripper.closed'" >/dev/null 2>&1; f "$S/control_surface_check.py"
 echo "--- RammsAccess (UDP intents) -> surface, Source = Autonomy ---"
 acc(){ python3 Scripts/editor_remote_exec.py --code "unreal._ramms_access_op='$*'" >/dev/null 2>&1; f "$S/access_check.py"; }
-python3 "$S/access_send.py" --drive 0 1 --seconds 1.5 --hz 30 & sleep 0.7; acc expect_owner drive.forward Autonomy; f "$S/chaos_sample.py"; wait; sleep 0.8; f "$S/chaos_sample.py"
-python3 "$S/access_send.py" --event gripper_close --seconds 0.2 --hz 10; sleep 1; python3 Scripts/editor_remote_exec.py --code "unreal._ramms_cs_op='read gripper.closed'" >/dev/null 2>&1; f "$S/control_surface_check.py"
+python3 "$S/access_send.py" --drive 0 1 --seconds 1.5 --hz 30 & SENDER=$!; sleep 0.7; acc expect_owner drive.forward Autonomy; f "$S/chaos_sample.py"
+wait "$SENDER" || { echo "!! access_send.py (drive stream) failed"; FAIL=1; }; sleep 0.8; f "$S/chaos_sample.py"
+python3 "$S/access_send.py" --event gripper_close --seconds 0.2 --hz 10 || { echo "!! access_send.py (event) failed"; FAIL=1; }; sleep 1; python3 Scripts/editor_remote_exec.py --code "unreal._ramms_cs_op='read gripper.closed'" >/dev/null 2>&1; f "$S/control_surface_check.py"
 echo "--- MebotController API through the base ---"
 python3 Scripts/editor_remote_exec.py --code "unreal._ramms_mc_op='cmd'" >/dev/null 2>&1; f "$S/chaos_mc_api.py"; sleep 3
 python3 Scripts/editor_remote_exec.py --code "unreal._ramms_mc_op='read'" >/dev/null 2>&1; f "$S/chaos_mc_api.py"; sleep 2

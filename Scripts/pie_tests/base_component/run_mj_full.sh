@@ -36,8 +36,8 @@ ci inject IA_Ramms_SimReset 1 0 0 0.2; sleep 1.5; f "$S/mj_state.py"
 echo "--- control HUD (ramms-ui panel + joystick, auto-spawned) ---"
 hud(){ python3 Scripts/editor_remote_exec.py --code "unreal._ramms_hud_op='$*'" >/dev/null 2>&1; f "$S/hud_check.py"; }
 hud status
-hud joystick 0 -1; sleep 1.5; f "$S/mj_state.py"; hud joystick_release; sleep 0.5
-hud action sim.pause; sleep 0.5; python3 Scripts/editor_remote_exec.py --code "unreal._ramms_cs_op='read sim.running'" >/dev/null 2>&1; f "$S/control_surface_check.py"; hud action sim.pause; sleep 0.5
+hud joystick 0 -1; ci expect drive.forward 0.99 1.01; sleep 1.5; f "$S/mj_state.py"; hud joystick_release; ci expect drive.forward -0.01 0.01; sleep 0.5
+hud action sim.pause; sleep 0.5; ci expect sim.running -0.1 0.1; hud action sim.pause; sleep 0.5; ci expect sim.running 0.9 1.1
 echo "--- sim controls: pause, resume, reset ---"
 python3 Scripts/editor_remote_exec.py --code "unreal._ramms_cs_op='trigger sim.pause'" >/dev/null 2>&1; f "$S/control_surface_check.py"; sleep 1
 python3 Scripts/editor_remote_exec.py --code "unreal._ramms_cs_op='read sim.running'" >/dev/null 2>&1; f "$S/control_surface_check.py"

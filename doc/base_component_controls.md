@@ -183,7 +183,7 @@ so panels and input components find every controllable robot without naming it.
 cs = pawn.get_component_by_class(unreal.RammsRobotControlSurfaceComponent)
 for a in cs.describe_control_surface().get_editor_property("axes"): print(a.get_editor_property("id"))
 cs.set_control("drive.forward", 1.0, unreal.RammsControlSource.SCRIPT)
-cs.set_control("linkage.LeftCenterLinkage.height", -9.0, unreal.RammsControlSource.SCRIPT)
+cs.set_control("linkage.LeftCenterLinkage.height", 8.0, unreal.RammsControlSource.SCRIPT)  # within the range the linkage reports
 cs.release_control("drive.forward", unreal.RammsControlSource.SCRIPT)
 ```
 

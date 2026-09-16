@@ -61,7 +61,11 @@ elif op[0] == "row":
     if not row:
         raise RuntimeError("[hud] no row for %s" % op[1])
     row.simulate_value(float(op[2]))
-    log("row %s -> %s ; surface now %.3f" % (op[1], op[2], cs.get_control_value(op[1])))
+    r = cs.get_control_target(op[1])
+    tgt = None if r is None else (r[1] if isinstance(r, tuple) else r)
+    log("row %s -> %s ; surface target=%s live=%.3f" % (op[1], op[2], "none" if tgt is None else "%.3f" % tgt, cs.get_control_value(op[1])))
+    if tgt is None or abs(tgt - float(op[2])) > 1e-3:
+        raise RuntimeError("[hud] row %s: surface target %s != commanded %s" % (op[1], tgt, op[2]))
 elif op[0] == "action":
     row = panel.find_row(op[1])
     if not row:

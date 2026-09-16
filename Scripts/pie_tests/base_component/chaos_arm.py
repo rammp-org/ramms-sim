@@ -35,9 +35,14 @@ elif op == "gripper":
     # gripper.closed is readback-only: a write must be refused.
     if cs.set_control("gripper.closed", 1.0, cs_common.SRC):
         raise RuntimeError("[arm] gripper.closed accepted a write; it is read-only")
+    unreal._ramms_arm_gripper_expect = 0.0 if before >= 0.5 else 1.0  # gripper_check asserts the flip
     unreal.log("[arm] gripper.closed %.0f -> %s (write to gripper.closed refused as expected)" % (before, action))
 elif op == "gripper_check":
-    unreal.log("[arm] gripper.closed now %.0f" % cs.get_control_value("gripper.closed"))
+    now = cs.get_control_value("gripper.closed")
+    expected = getattr(unreal, "_ramms_arm_gripper_expect", None)
+    unreal.log("[arm] gripper.closed now %.0f (expected %s)" % (now, expected))
+    if expected is not None and abs(now - expected) > 0.01:
+        raise RuntimeError("[arm] gripper.closed = %.0f, expected %.0f after the action" % (now, expected))
 elif op == "resync":
     ok = cs.trigger_control("arm.resync", cs_common.SRC)
     unreal.log("[arm] arm.resync -> %s" % ok)
