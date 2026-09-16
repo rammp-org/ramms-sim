@@ -1,16 +1,21 @@
-"""Turn the two MuJoCo lift_drive bases into keyboard-driveable pawns.
+"""Turn the two MuJoCo lift_drive bases into player-driveable pawns.
 
 For each base a child Blueprint of the imported URLab articulation (which is an
 APawn) gets: RobotBase (MuJoCo) + motor table, a differential drive on the centre
-wheels, 5-bar controllers (linkage base only), a RammsKeyboardTeleopComponent
-with key bindings, a follow camera (spring arm + camera parented to the
-`base_link` body so it tracks the simulated body), and AutoPossessPlayer =
-Player 0 so a placed instance is driven by the player as soon as PIE starts.
+wheels, 5-bar controllers (linkage base only), a ControlSurface (the robot's
+control surface), a SimControl (the MuJoCo scene's sim.* controls), a
+ControlInput carrying the family's URammsControlInputMap, a follow camera
+(spring arm + camera parented to the `base_link` body so it tracks the simulated
+body) with a CameraControl, and AutoPossessPlayer = Player 0 so a placed
+instance is driven by the player as soon as PIE starts. The polled
+RammsKeyboardTeleopComponent these pawns used to carry is removed on sight:
+keys arrive through Enhanced Input and the surface now.
 
-Keys (both pawns): W/S drive, A/D turn, E/Q linkage/leg endpoint up/down (linkage
-base), R/F front cranks|hips, T/G rear cranks|hips, Y/H + U/J holonomic cranks.
-Camera: N cycles follow / top-down cameras; right-mouse drag
-orbits, wheel zooms, Home resets.
+Keys live in the input assets, not here — `make_input_assets.py` owns
+IMC_RammsRobot and the DA_RammsInput_* maps (W/S drive, A/D turn, E/Q linkage
+endpoint, Y/H T/B Z/X C/V motor groups, N camera / Home reset, P pause,
+Backspace reset, 1-7 debug). Mouse orbit and wheel zoom stay on the camera
+component.
 
 Idempotent: re-running updates existing components / tables.
 """
