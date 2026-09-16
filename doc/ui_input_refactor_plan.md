@@ -233,8 +233,12 @@ two headers. Not a new repo: overkill.
 Phases 1–2 are the load-bearing ones and can be validated headlessly with the
 existing PIE runner scripts; 3 and 4 can proceed in parallel once 2 lands.
 
-Status (2026-09-15): phases 0–1 done (ramms-ui #34, ramms-core #23, ramms-sim
-#43). Phase 2: adapter + diff-drive / MeBot / 5-bar / camera contributors
+Status (2026-09-16): ramms-ui #34, ramms-core #23, ramms-mujoco-support #5,
+ramms-access #1 and ramms-private-assets #1 are merged; this superproject
+branch pins their mains, except RammsCore, which is pinned at the head of the
+still-open ramms-core #24 (`ReadTarget`, so panels show a target set directly
+on a controller). #24 merges first, then the gitlink moves to the resulting
+main commit. Phases 0–1 done (ramms-ui #34, ramms-core #23, ramms-sim #43). Phase 2: adapter + diff-drive / MeBot / 5-bar / camera contributors
 done and validated — `run_chaos.sh` and `run_mj_full.sh` now drive, turn and
 lift through `SetControl` on the pawns' `ControlSurface`, and the lift-drive
 pawn lists its unclaimed cranks / wheels as `motor.<id>` axes. The 5-bar's

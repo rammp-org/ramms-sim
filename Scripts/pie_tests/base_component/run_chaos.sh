@@ -40,18 +40,21 @@ ci inject IA_Ramms_MotorGroupA 1 0 0 1.0; sleep 1.5; ci expect lift.motor_swing_
 ci inject IA_Ramms_GripperOpen 1 0 0 0.2; sleep 0.5; ci expect gripper.closed -0.1 0.1
 ci inject IA_Ramms_GripperClose 1 0 0 0.2; sleep 0.5; ci expect gripper.closed 0.9 1.1
 python3 Scripts/editor_remote_exec.py --code "unreal._ramms_arm_op='start'" >/dev/null 2>&1; f "$S/chaos_arm.py" >/dev/null; python3 Scripts/editor_remote_exec.py --code "unreal.log('')" >/dev/null 2>&1
-ci inject IA_Ramms_ArmMove 0 0 1 1.5; sleep 2
+ci inject IA_Ramms_ArmMove 0 0 1 1.5; ci expect arm.up 0.99 1.01; sleep 2; ci expect arm.up -0.01 0.01
 python3 Scripts/editor_remote_exec.py --code "unreal._ramms_arm_op='check'" >/dev/null 2>&1; f "$S/chaos_arm.py"
 echo "--- control HUD (ramms-ui panel + joystick, auto-spawned) ---"
 hud(){ python3 Scripts/editor_remote_exec.py --code "unreal._ramms_hud_op='$*'" >/dev/null 2>&1; f "$S/hud_check.py"; }
 hud status
 hud row lift.motor_swing_arm_r 20; sleep 2.5; python3 Scripts/editor_remote_exec.py --code "unreal._ramms_cs_op='read lift.motor_swing_arm_r'" >/dev/null 2>&1; f "$S/control_surface_check.py"
-hud action gripper.open; sleep 0.5; python3 Scripts/editor_remote_exec.py --code "unreal._ramms_cs_op='read gripper.closed'" >/dev/null 2>&1; f "$S/control_surface_check.py"
+hud action gripper.open; sleep 0.5; ci expect gripper.closed -0.1 0.1
 echo "--- RammsAccess (UDP intents) -> surface, Source = Autonomy ---"
 acc(){ python3 Scripts/editor_remote_exec.py --code "unreal._ramms_access_op='$*'" >/dev/null 2>&1; f "$S/access_check.py"; }
-python3 "$S/access_send.py" --drive 0 1 --seconds 1.5 --hz 30 & SENDER=$!; sleep 0.7; acc expect_owner drive.forward Autonomy; f "$S/chaos_sample.py"
-wait "$SENDER" || { echo "!! access_send.py (drive stream) failed"; FAIL=1; }; sleep 0.8; f "$S/chaos_sample.py"
-python3 "$S/access_send.py" --event gripper_close --seconds 0.2 --hz 10 || { echo "!! access_send.py (event) failed"; FAIL=1; }; sleep 1; python3 Scripts/editor_remote_exec.py --code "unreal._ramms_cs_op='read gripper.closed'" >/dev/null 2>&1; f "$S/control_surface_check.py"
+# 4 s of stream: each remote-exec assertion below costs ~0.7 s, and the
+# watchdog releases 250 ms after the last packet — a shorter stream ends
+# mid-check and the value assertion reads the released 0.
+python3 "$S/access_send.py" --drive 0 1 --seconds 4.0 --hz 30 & SENDER=$!; sleep 0.7; acc expect_owner drive.forward Autonomy; ci expect drive.forward 0.99 1.01; f "$S/chaos_sample.py"
+wait "$SENDER" || { echo "!! access_send.py (drive stream) failed"; FAIL=1; }; sleep 0.8; ci expect drive.forward -0.01 0.01; f "$S/chaos_sample.py"
+python3 "$S/access_send.py" --event gripper_close --seconds 0.2 --hz 10 || { echo "!! access_send.py (event) failed"; FAIL=1; }; sleep 1; ci expect gripper.closed 0.9 1.1
 echo "--- MebotController API through the base ---"
 python3 Scripts/editor_remote_exec.py --code "unreal._ramms_mc_op='cmd'" >/dev/null 2>&1; f "$S/chaos_mc_api.py"; sleep 3
 python3 Scripts/editor_remote_exec.py --code "unreal._ramms_mc_op='read'" >/dev/null 2>&1; f "$S/chaos_mc_api.py"; sleep 2
