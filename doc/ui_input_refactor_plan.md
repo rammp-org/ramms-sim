@@ -305,9 +305,13 @@ input wiring the export revealed — keys 1–8 / + / − to MeBot motor presets
 `IA_Throttle` / `IA_Steering` reads feeding a per-tick `SetDriveInput` — all
 stripped with `URammsBlueprintCleanupLibrary::RemoveLegacyInputNodes`
 (RammsCoreEditor; `Scripts/pie_tests/base_component/strip_bp_input.py`), so
-the chair is driven only through the surface. The vehicle mapping context
-(`IMC_Vehicle_Default`) is still added by `BP_VehicleAdvPlayerController` and
-goes with the vehicle layer.
+the chair is driven only through the surface. Its C++ parent
+(`ARammsPawn`, the vehicle template) also bound `IA_Throttle` / `IA_Steering`
+straight to the Chaos vehicle movement, and `BP_VehicleAdvPlayerController`
+still adds `IMC_Vehicle_Default` for the real vehicles, so W / S drove both
+that and the surface: `ARammsPawn::bUseLegacyVehicleInput` (default true,
+**false** on `BP_Mebot_Ramms`) skips those bindings, which also frees the
+template's R / Tab. The mapping context itself goes with the vehicle layer.
 
 Second try-out: the wheel over the panel didn't scroll it (the collapsible
 groups forced `ConsumeMouseWheel = Always`; the panel now handles the wheel

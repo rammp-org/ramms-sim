@@ -1,8 +1,10 @@
 """Kinova arm + gripper through the chair's control surface.
 
 unreal._ramms_arm_op: 'start' (record the end-effector pose, arm.forward=1),
-'check' (release, assert the end effector moved forward), 'gripper' (toggle and
-read gripper.closed), 'resync' (arm.resync)."""
+'check' (release, assert the end effector moved), 'mark' (resync and record the
+pose without commanding anything — for testing one axis in isolation),
+'check_z' (assert the end effector rose, i.e. the arm.up binding did it),
+'gripper' / 'gripper_check' (actions + readback assertion), 'resync'."""
 import unreal, sys
 sys.path.insert(0, __import__("os").path.dirname(__file__))
 import importlib, cs_common; importlib.reload(cs_common)
@@ -26,6 +28,17 @@ elif op == "check":
     unreal.log("[arm] released; end effector moved %.2f cm (delta %s)" % (moved, d))
     if moved < 2.0:
         raise RuntimeError("[arm] end effector did not move through the surface (%.2f cm)" % moved)
+elif op == "mark":
+    # No command: whatever moves the arm next is the thing under test.
+    cs.trigger_control("arm.resync", cs_common.SRC)
+    unreal._ramms_arm_ee0 = ee()
+    unreal.log("[arm] mark ee0=%s (resynced, nothing commanded)" % unreal._ramms_arm_ee0)
+elif op == "check_z":
+    e0, e1 = unreal._ramms_arm_ee0, ee()
+    dz = e1.z - e0.z
+    unreal.log("[arm] end effector rose %.2f cm (delta %s)" % (dz, e1 - e0))
+    if dz < 2.0:
+        raise RuntimeError("[arm] arm.up did not raise the end effector (%.2f cm)" % dz)
 elif op == "gripper":
     before = cs.get_control_value("gripper.closed")
     action = "gripper.open" if before >= 0.5 else "gripper.close"

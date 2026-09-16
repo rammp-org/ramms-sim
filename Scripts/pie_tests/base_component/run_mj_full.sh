@@ -27,9 +27,9 @@ python3 Scripts/editor_remote_exec.py --code "unreal._ramms_cs_op='registry'" >/
 echo "--- Enhanced Input -> surface (injected actions): W, Q, N, P, Backspace ---"
 ci(){ python3 Scripts/editor_remote_exec.py --code "unreal._ramms_ci_op='$*'" >/dev/null 2>&1; f "$S/control_input_check.py"; }
 ci status; ci urlab
-# 4 s holds: a value assertion costs one remote-exec round trip (~1 s under
-# editor load), so a 1.5 s hold could lapse before the check and read 0.
-ci inject IA_Ramms_Drive 0 1 0 4.0; sleep 0.3; ci expect drive.forward 0.99 1.01; sleep 4; ci expect drive.forward -0.01 0.01; f "$S/mj_state.py"
+# 6 s hold: a value assertion costs one remote-exec round trip (0.5-2 s under
+# editor load), so a shorter hold can lapse before the check and read 0.
+ci inject IA_Ramms_Drive 0 1 0 6.0; sleep 0.3; ci expect drive.forward 0.99 1.01; sleep 6; ci expect drive.forward -0.01 0.01; f "$S/mj_state.py"
 ci inject IA_Ramms_LinkageHeight -1 0 0 1.0; sleep 2.5; ci expect linkage.LeftCenterLinkage.height 2 8; ci expect linkage.RightCenterLinkage.height 2 8
 ci camera; ci inject IA_Ramms_CameraNext 1 0 0 0.2; sleep 0.5; ci camera; ci camera_changed
 ci inject IA_Ramms_SimPause 1 0 0 0.2; sleep 0.6; ci expect sim.running -0.1 0.1

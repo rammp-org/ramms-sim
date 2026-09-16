@@ -140,6 +140,12 @@ base = add_component(bp, unreal.RammsRobotBaseComponent, "RobotBase")
 # clients drive the chair through it.
 add_component(bp, unreal.RammsRobotControlSurfaceComponent, "ControlSurface")
 # Enhanced Input -> the surface (IMC_RammsRobot + the chair's input map).
+# The chair derives from the vehicle template's ARammsPawn, which binds
+# IA_Throttle / IA_Steering straight to the Chaos vehicle movement; the
+# project still adds IMC_Vehicle_Default for the real vehicles, so leaving
+# those bindings on would let W/S drive both that and the control surface.
+cdo = unreal.get_default_object(bp.generated_class())
+cdo.set_editor_property("use_legacy_vehicle_input", False)
 ctrl_in = add_component(bp, unreal.RammsControlInputComponent, "ControlInput")
 setp(ctrl_in, input_maps=[EAL.load_asset("/Game/Input/Ramms/DA_RammsInput_Mebot")], log_commands=True)
 # Explicit Chaos: Auto's "an articulation attached under me" heuristic is not
