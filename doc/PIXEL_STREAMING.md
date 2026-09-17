@@ -36,10 +36,10 @@ sim → browser. Multiple browsers can watch the same streamer.
 ## One-time setup: signalling server
 
 Requires **Node.js** (18+). Clone Epic's infrastructure at the branch
-matching the engine (**UE5.7**) and build it:
+matching the engine (**UE5.8**) and build it:
 
 ```bash
-git clone -b UE5.7 https://github.com/EpicGamesExt/PixelStreamingInfrastructure
+git clone -b UE5.8 https://github.com/EpicGamesExt/PixelStreamingInfrastructure
 cd PixelStreamingInfrastructure
 npm install && npm run build
 ```
@@ -66,7 +66,7 @@ packaged) launch. Any map works; `Map_Demo` shown here.
 **Windows (PowerShell):**
 
 ```powershell
-$UE = "C:\Program Files\Epic Games\UE_5.7"
+$UE = "C:\Program Files\Epic Games\UE_5.8"
 & "$UE\Engine\Binaries\Win64\UnrealEditor.exe" "$PWD\Ramms.uproject" Map_Demo `
   -game -windowed -resx=1280 -resy=720 `
   -PixelStreamingConnectionURL=ws://127.0.0.1:8888 -log
@@ -75,7 +75,7 @@ $UE = "C:\Program Files\Epic Games\UE_5.7"
 **macOS:**
 
 ```bash
-UE="/Users/Shared/Epic Games/UE_5.7"
+UE="/Users/Shared/Epic Games/UE_5.8"
 "$UE/Engine/Binaries/Mac/UnrealEditor.app/Contents/MacOS/UnrealEditor" \
   "$PWD/Ramms.uproject" Map_Demo -game -windowed -resx=1280 -resy=720 \
   -PixelStreamingConnectionURL=ws://127.0.0.1:8888 -log
@@ -132,7 +132,7 @@ spectator configuration (see plan doc, use case A).
 
 ## How RAMMS hardens the video path
 
-Stock Pixel Streaming 2 (UE 5.7) captures **every Slate window's backbuffer,
+Stock Pixel Streaming 2 (UE 5.8) captures **every Slate window's backbuffer,
 unfiltered**. Any extra window — e.g. a persistent notification toast such
 as the AssetGuideline "Missing Project Settings!" popup — alternates with
 the game viewport in the capture pipeline, forcing it to rebuild every frame.

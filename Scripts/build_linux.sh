@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds RAMMS for Linux (native — run this ON a Linux machine with a UE 5.7
+# Builds RAMMS for Linux (native — run this ON a Linux machine with a UE 5.8
 # source/installed build; Mac→Linux cross-compilation is not supported by UE).
 #
 # Builds both targets:
@@ -42,7 +42,7 @@ fi
 
 BUILD_SH="$UE_ROOT/Engine/Build/BatchFiles/Linux/Build.sh"
 if [ ! -f "$BUILD_SH" ]; then
-	log "ERROR: engine not found at '$UE_ROOT' (set UE_ROOT to your UE 5.7 root)"
+	log "ERROR: engine not found at '$UE_ROOT' (set UE_ROOT to your UE 5.8 root)"
 	exit 1
 fi
 

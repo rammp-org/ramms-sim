@@ -24,7 +24,7 @@ engines agree on the physics.
 ## Requirements
 
 - **Blender 5.1** (bundled `pxr` USD python is used for the `.usda` emitter).
-- **UE 5.7** with Python enabled. To push scripts remotely, either UE Python
+- **UE 5.8** with Python enabled. To push scripts remotely, either UE Python
   Remote Execution (`Scripts/editor_remote_exec.py`, port 6776) or the
   Remote Control API (port 30010, needs *Enable Remote Python Execution* in
   Project Settings → Remote Control).
@@ -132,7 +132,7 @@ first run; expose `Tint`, `RoughnessScale`, `MetallicScale`, glass
 
 ### Importer gotchas (hard-won — do not "simplify" these away)
 
-1. **UE 5.7 Interchange ignores `FbxImportUI` options and `UCX_` meshes.**
+1. **UE 5.8 Interchange ignores `FbxImportUI` options and `UCX_` meshes.**
    The script sets `Interchange.FeatureFlags.Import.FBX 0` (session-scoped)
    to route through the legacy FBX importer.
 2. **The legacy importer defaults `convert_scene_unit` off** and reads the

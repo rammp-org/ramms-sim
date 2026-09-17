@@ -1,7 +1,7 @@
 # RAMMS-Sim
 
 Robotic Assistive Mobility and Manipulation Simulation (RAMMS) — An Unreal
-Engine 5.7 simulation environment for robotic assistive technologies.
+Engine 5.8 simulation environment for robotic assistive technologies.
 
 <!-- markdown-toc start - Don't edit this section. Run M-x markdown-toc-refresh-toc -->
 **Table of Contents**
@@ -54,7 +54,7 @@ https://github.com/user-attachments/assets/fdc96795-279f-4ccf-a092-382f6755a65d
 
 RAMMS-Sim provides a high-fidelity simulation environment for developing and
 testing robotic assistive mobility and manipulation systems. Built on Unreal
-Engine 5.7, it offers:
+Engine 5.8, it offers:
 
 - **Physics-based robotics** — Differential drive wheelchair, 7-DOF robotic
   arm with three IK solvers, two-finger gripper
@@ -71,10 +71,10 @@ Engine 5.7, it offers:
 
 ## Prerequisites
 
-- **Unreal Engine 5.7**
+- **Unreal Engine 5.8**
 - **Windows** with DirectX 12 (recommended) or **Linux** with Vulkan SM6
 - **Visual Studio 2022** (Windows) — with the *Game development with C++*
-  workload (MSVC toolchain), required both by UE 5.7 and to compile the
+  workload (MSVC toolchain), required both by UE 5.8 and to compile the
   native third-party dependencies
 - **CMake** — On your `PATH`, for building the unreal-robotics-lab
   third-party dependencies
@@ -134,7 +134,7 @@ one nested patch that can't live on our fork, builds the third-party
 dependencies, and regenerates project files:
 
 ```bash
-UE_ROOT="/Users/Shared/Epic Games/UE_5.7" Scripts/setup_urlab.sh
+UE_ROOT="/Users/Shared/Epic Games/UE_5.8" Scripts/setup_urlab.sh
 ```
 
 Our fixes to unreal-robotics-lab (the `nil` macro clash between Apple's
@@ -150,7 +150,7 @@ our fork because we don't own CoACD's repo — so re-run `setup_urlab` after a
 
 The script is idempotent — re-run it any time. Flags: `--no-thirdparty` skips
 the dependency build, `--no-projectfiles` skips project file generation;
-`UE_ROOT` defaults to `/Users/Shared/Epic Games/UE_5.7`.
+`UE_ROOT` defaults to `/Users/Shared/Epic Games/UE_5.8`.
 
 #### The unreal-robotics-lab fork
 
@@ -202,7 +202,7 @@ proxy meshes.
 
 ### 4. Open the project
 
-Open `Ramms.uproject` in Unreal Engine 5.7. The plugins are automatically
+Open `Ramms.uproject` in Unreal Engine 5.8. The plugins are automatically
 detected and compiled (or build from the command line — see the next
 section).
 
@@ -218,7 +218,7 @@ generating IDE project files is optional (see the last subsection).
 
 > Prerequisites: submodules initialized and the unreal-robotics-lab
 > third-party dependencies built (see [Installation](#installation)), plus a
-> full UE 5.7 installation. The required .NET toolchain ships with the engine.
+> full UE 5.8 installation. The required .NET toolchain ships with the engine.
 
 The project defines two targets:
 
@@ -232,27 +232,27 @@ Valid build configurations: `Debug`, `DebugGame`, `Development` (default),
 
 ### Locate your engine installation
 
-Set a variable pointing at your UE 5.7 root, then reuse it below. Adjust the
+Set a variable pointing at your UE 5.8 root, then reuse it below. Adjust the
 path to match your install.
 
 **Windows (PowerShell):**
 ```powershell
-$UE = "C:\Program Files\Epic Games\UE_5.7"
+$UE = "C:\Program Files\Epic Games\UE_5.8"
 ```
 
 **Windows (cmd):**
 ```bat
-set "UE=C:\Program Files\Epic Games\UE_5.7"
+set "UE=C:\Program Files\Epic Games\UE_5.8"
 ```
 
 **macOS (zsh/bash):**
 ```bash
-UE="/Users/Shared/Epic Games/UE_5.7"
+UE="/Users/Shared/Epic Games/UE_5.8"
 ```
 
 **Linux (bash):**
 ```bash
-UE="$HOME/UnrealEngine"   # your UE 5.7 install/build root (no Epic launcher on Linux)
+UE="$HOME/UnrealEngine"   # your UE 5.8 install/build root (no Epic launcher on Linux)
 ```
 
 Run the commands below from the repository root (the folder containing
@@ -323,7 +323,7 @@ using Epic's standard Windows→Linux cross-compilation workflow. This needs a
 
 1. Download the **native toolchain** installer for your engine version from
    Epic's [Linux Development Requirements](https://dev.epicgames.com/documentation/en-us/unreal-engine/linux-development-requirements-for-unreal-engine)
-   page — for **UE 5.7** that is **v26 clang-20.1.8 rockylinux8**
+   page — for **UE 5.8** that is **v26 clang-20.1.8 rockylinux8**
    (`v26_clang-20.1.8-rockylinux8.exe`).
 2. Run the installer. It is fully automated: it unpacks the clang/lld
    cross-toolchain and sysroot (default: `C:\UnrealToolchains\<version>\`)
@@ -539,7 +539,7 @@ Quick start (two processes + a browser):
 
 ```bash
 # 1. Signalling server (one-time setup: clone Epic's PixelStreamingInfrastructure
-#    at the UE5.7 branch, `npm install && npm run build`)
+#    at the UE5.8 branch, `npm install && npm run build`)
 cd PixelStreamingInfrastructure/SignallingWebServer
 node ./dist/index.js --serve --http_root ./www --player_port 8080 --streamer_port 8888
 ```
@@ -556,7 +556,7 @@ the chair. Other devices on the LAN use the host's IP; extra viewers are
 just extra tabs.
 
 RAMMS automatically hardens the video path at startup (it swaps the default
-streamer to a viewport-only capture producer — stock UE 5.7 captures every
+streamer to a viewport-only capture producer — stock UE 5.8 captures every
 window and goes silently black if e.g. a notification toast is open).
 
 See **[doc/PIXEL_STREAMING.md](doc/PIXEL_STREAMING.md)** for macOS/Linux

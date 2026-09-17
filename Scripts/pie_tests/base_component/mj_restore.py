@@ -9,7 +9,7 @@ DEFAULT_PAWN = PRIVATE + "/Robots/BP_LiftDriveHolonomic_Ramms"
 
 gm = unreal.EditorAssetLibrary.load_asset(GAME_MODE)
 pkg = gm.get_outermost()
-# UE 5.7 returns (any_packages_reloaded: bool, error_message: str).
+# UE 5.8 returns (any_packages_reloaded: bool, error_message: str).
 result = unreal.EditorLoadingAndSavingUtils.reload_packages([pkg], unreal.ReloadPackagesInteractionMode.ASSUME_POSITIVE)
 reloaded, error = (result[0], result[1]) if isinstance(result, (tuple, list)) else (bool(result), "")
 if not reloaded:
