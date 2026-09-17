@@ -135,6 +135,19 @@ dt_chaos = make_table("DT_Mebot_ChaosMotors", unreal.RammsMotorSpec.static_struc
 bp = EAL.load_asset("/Game/Robots/BP_Mebot_Ramms")
 log("=== BP_Mebot_Ramms")
 base = add_component(bp, unreal.RammsRobotBaseComponent, "RobotBase")
+# The robot's control surface: gathers every contributor (drive, MeBot lift,
+# camera...) plus unclaimed registry motors; panels / input maps / remote
+# clients drive the chair through it.
+add_component(bp, unreal.RammsRobotControlSurfaceComponent, "ControlSurface")
+# Enhanced Input -> the surface (IMC_RammsRobot + the chair's input map).
+# The chair derives from the vehicle template's ARammsPawn, which binds
+# IA_Throttle / IA_Steering straight to the Chaos vehicle movement; the
+# project still adds IMC_Vehicle_Default for the real vehicles, so leaving
+# those bindings on would let W/S drive both that and the control surface.
+cdo = unreal.get_default_object(bp.generated_class())
+cdo.set_editor_property("use_legacy_vehicle_input", False)
+ctrl_in = add_component(bp, unreal.RammsControlInputComponent, "ControlInput")
+setp(ctrl_in, input_maps=[EAL.load_asset("/Game/Input/Ramms/DA_RammsInput_Mebot")], log_commands=True)
 # Explicit Chaos: Auto's "an articulation attached under me" heuristic is not
 # right for a Chaos base that carries a MuJoCo arm child actor (BP_Mebot_Mujoco).
 setp(base, motor_table=dt_chaos, backend=unreal.RammsPhysicsBackend.CHAOS,

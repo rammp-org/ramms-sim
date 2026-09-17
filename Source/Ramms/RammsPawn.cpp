@@ -57,6 +57,15 @@ void ARammsPawn::SetupPlayerInputComponent(class UInputComponent* PlayerInputCom
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 
+	if (!bUseLegacyVehicleInput)
+	{
+		// A robot pawn: its control surface owns the keys (see RammsControl /
+		// URammsControlInputComponent). Binding the vehicle actions as well
+		// would drive the Chaos vehicle movement in parallel.
+		UE_LOG(LogRamms, Log, TEXT("'%s': legacy vehicle input bindings skipped (bUseLegacyVehicleInput=false)."), *GetNameSafe(this));
+		return;
+	}
+
 	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent))
 	{
 		// steering

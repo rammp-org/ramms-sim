@@ -44,6 +44,18 @@ class ARammsPawn : public AWheeledVehiclePawn
 	TObjectPtr<UChaosWheeledVehicleMovementComponent> ChaosVehicleMovement;
 
 protected:
+	/** Bind the vehicle-template input actions (throttle, steering, brake,
+	 *  handbrake, look, toggle camera, reset) on this pawn.
+	 *
+	 *  Off for robots that derive from this pawn but drive through their
+	 *  control surface (BP_Mebot_Ramms): the project still adds
+	 *  IMC_Vehicle_Default for the actual vehicles, and binding it here too
+	 *  would let one key drive both the Chaos vehicle movement and the
+	 *  surface, bypassing the surface's arbitration. Goes away with the rest
+	 *  of the vehicle template. */
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	bool bUseLegacyVehicleInput = true;
+
 	/** Steering Action */
 	UPROPERTY(EditAnywhere, Category = "Input")
 	UInputAction* SteeringAction;

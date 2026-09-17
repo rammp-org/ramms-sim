@@ -43,8 +43,8 @@ mode) is public in `ramms-core` / `ramms-mujoco-support`; the chair
 | Asset | Backend | Components (in the Blueprint) | Tables |
 |---|---|---|---|
 | `/Game/Robots/BP_Mebot_Ramms` (the powered chair pawn) | Chaos — `RobotBase` (Backend=**Chaos**, `ChaosSkeletalMeshComponentName=VehicleMesh`) | `RammsDifferentialDriveController` (`LeftMotorId=left_motor`, `RightMotorId=right_motor`), `MebotController` (elevators / translators / caster arms, routed through the base), `RammsAccessInput`, `KinovaGen3Controller`, … | `DT_Mebot_ChaosMotors` (wheels + 6 constraint Position motors) |
-| `/RammsPrivateAssets/Robots/BP_LiftDriveLinkage_Ramms` (**pawn**, child of the imported `lift_drive_linkage` articulation, so a reimport doesn't clobber it; `AutoPossessPlayer=Player0`) | MuJoCo — `RobotBase` (Backend=**Mujoco**) | `DifferentialDrive` (centre wheels, radius 12.7 cm, measured track), `LeftCenterLinkage`, `RightCenterLinkage` (`Ramms5BarLinkageController`), `KeyboardTeleop`, `FollowArm`+`FollowCamera` on `base_link` | `DT_LiftDriveLinkage_Motors`, `DT_LiftDriveLinkage_5Bar` |
-| `/RammsPrivateAssets/Robots/BP_LiftDriveHolonomic_Ramms` (**pawn**, child of `lift_drive_holonomic`; `AutoPossessPlayer=Player0`) | MuJoCo — `RobotBase` (Backend=**Mujoco**) | `DifferentialDrive` (centre wheels), `KeyboardTeleop` (hips R/F T/G, cranks Y/H U/J), `FollowArm`+`FollowCamera` | `DT_LiftDriveHolonomic_Motors` (all 14 actuators parsed from the MJCF) |
+| `/RammsPrivateAssets/Robots/BP_LiftDriveLinkage_Ramms` (**pawn**, child of the imported `lift_drive_linkage` articulation, so a reimport doesn't clobber it; `AutoPossessPlayer=Player0`) | MuJoCo — `RobotBase` (Backend=**Mujoco**) | `DifferentialDrive` (centre wheels, radius 12.7 cm, measured track), `LeftCenterLinkage`, `RightCenterLinkage` (`Ramms5BarLinkageController`), `ControlSurface`, `ControlInput`, `SimControl`, `CameraControl`, `FollowArm`+`FollowCamera` on `base_link` | `DT_LiftDriveLinkage_Motors`, `DT_LiftDriveLinkage_5Bar` |
+| `/RammsPrivateAssets/Robots/BP_LiftDriveHolonomic_Ramms` (**pawn**, child of `lift_drive_holonomic`; `AutoPossessPlayer=Player0`) | MuJoCo — `RobotBase` (Backend=**Mujoco**) | `DifferentialDrive` (centre wheels), `ControlSurface`, `ControlInput`, `SimControl`, `CameraControl`, `FollowArm`+`FollowCamera` | `DT_LiftDriveHolonomic_Motors` (all 14 actuators parsed from the MJCF) |
 | `/Game/Robots/BP_Mebot_Mujoco` | *not migrated* — a Chaos chair carrying a MuJoCo arm child actor. If it gets a base component, set Backend=**Chaos** explicitly: `Auto` would find the arm articulation attached under it. | | |
 
 All tables live in `/Game/Robots/Data`. `Scripts/pie_tests/base_component/make_assets.py`
@@ -140,13 +140,96 @@ one**: targets above ~12.7 cm are refused as unreachable; lowering the endpoint
 
 ## Control surfaces
 
+### 0. The robot's control surface (`RammsRobotControlSurfaceComponent`)
+
+Every robot actor carries one `ControlSurface` component. On BeginPlay it
+gathers every sibling component that implements `IRammsControlContributor`
+(differential drive, MeBot lift controller, 5-bar linkages, camera control),
+merges the controls they describe into one `FRammsControlSurface` (the shared
+model from the ramms-ui `RammsControl` module), and appends a raw **Motors**
+group for every RobotBase registry motor no contributor claims — so a freshly
+imported robot with only a `RobotBase` is already controllable. Nothing is
+wired by name: add a contributor to the actor and its controls appear.
+
+| Control id | Contributor | Kind / units | Notes |
+|---|---|---|---|
+| `drive.forward`, `drive.turn` | `RammsDifferentialDriveController` | Continuous, normalized ±1 | paired (joystick); refused while an external hold is active |
+| `lift.<constraint>` | `MebotControllerComponent` | Position, deg / cm | groups Lift / Casters; range from the registry, else the constraint limits |
+| `linkage.<name>.height` | `Ramms5BarLinkageController` | Position, cm | range derived from the IK + motor ControlRanges (`GetReachableHeightRange`) unless `EndpointHeightRange` is authored |
+| `camera.next`, `camera.reset` | `RammsRobotCameraComponent` | Action | |
+| `camera.orbit_yaw`, `camera.orbit_pitch`, `camera.zoom` | `RammsRobotCameraComponent` | Continuous rate | integrated per tick |
+| `arm.forward`, `arm.strafe`, `arm.up`, `arm.yaw`, `arm.pitch`, `arm.roll` | `RammsEndEffectorTeleopComponent` (Chaos Kinova) / `RammsMjArmTeleopComponent` (MuJoCo) | Continuous rate, normalized ±1 | integrated per tick at the teleop speeds; same ids on both backends |
+| `arm.resync` | same | Action | snap the IK target to the live end effector |
+| `gripper.open`, `gripper.close`, `gripper.toggle`; `gripper.closed` | same (when a gripper is present) | Actions; Position 0/1, read-only | `gripper.closed` is state only (`bReadOnly`): change it through the actions |
+| `sim.reset`, `sim.pause`, `sim.step`; `sim.running` | `RammsMjSimControlComponent` (MuJoCo scenes) | Actions; Position 0/1 with readback | what URLab's `UMjInputHandler` hotkeys R / P do, without the key collisions |
+| `sim.debug.<contacts\|visuals\|collisions\|joints\|quick_convert_collisions\|shader_mode\|tendons>` | `RammsMjSimControlComponent` | Action | the URLab 1–7 debug toggles |
+| `motor.<id>` | *(unclaimed registry motors)* | from `FRammsMotorSpec` | Position → rad, Velocity → rad/s, Torque → backend units; an unset `ControlRange` stays unbounded (no clamp, the panel picks a display range) |
+
+API (`BlueprintCallable`, also the `IRammsControlSurfaceProvider` /
+`IRammsControlSink` interfaces): `DescribeControlSurface()`,
+`SetControl(Id, Value, Source)`, `TriggerControl(Id, Source)`,
+`ReleaseControl(Id, Source)`, `GetControlValue(Id)`, `GetControlSurfaceJson()`.
+Values are clamped to the axis range; unknown ids are refused. Sources are
+arbitrated: Autonomy > Remote > local (Keyboard / Gamepad / Touch) > Script,
+and a Remote / Autonomy command holds its axis over local input for
+`ExternalHoldSeconds` (0.3 s). Releasing a Continuous axis springs it to its
+default; releasing a Position axis stops holding the target (`ReleaseMotor`).
+Every surface registers with `RammsUISubsystem` (ramms-ui) on BeginPlay —
+`GetAllControlSurfaces()` / `FindControlSurfaceByRobotName()`, or from Python
+`unreal.RammsRobotControlSurfaceComponent.find_control_surfaces(any_actor)` —
+so panels and input components find every controllable robot without naming it.
+
+```python
+cs = pawn.get_component_by_class(unreal.RammsRobotControlSurfaceComponent)
+for a in cs.describe_control_surface().get_editor_property("axes"): print(a.get_editor_property("id"))
+cs.set_control("drive.forward", 1.0, unreal.RammsControlSource.SCRIPT)
+cs.set_control("linkage.LeftCenterLinkage.height", 8.0, unreal.RammsControlSource.SCRIPT)  # within the range the linkage reports
+cs.release_control("drive.forward", unreal.RammsControlSource.SCRIPT)
+```
+
+The sections below describe the underlying components; scripts and panels
+should prefer the surface.
+
+### 0b. The HUD (ramms-ui panels)
+
+`URammsControlHUDSubsystem` (a local-player subsystem in ramms-ui) is the one
+spawn path for the sim's UI: as soon as a robot registers a control surface
+it creates a `URammsLayoutHost` with `URammsSimLayout` (slots SurfacePanel /
+Joystick / Status) and pools a `URammsControlSurfacePanel` and a
+`URammsSurfaceJoystick` — for the chair's controller, the MuJoCo test game
+mode's plain controller, any controller. Project Settings > Plugins > Ramms
+Control HUD (`URammsControlHUDSettings`) turns it off, swaps the layout,
+picks a theme, and controls the two things that make it reachable in PIE:
+it removes the engine's `DefaultTouchInterface` virtual joystick (which
+overlays the viewport whenever `bUseMouseForTouch` fakes touch) and puts the
+player in Game-and-UI input mode with the cursor shown. The panel renders whatever the surface describes: one
+collapsible section per group, a joystick per paired Continuous axes
+(drive, arm move / rotate, camera orbit), hold buttons for lone rate axes
+(`arm.up`, `camera.zoom`), a slider row (`URammsAxisControl`) per Position /
+Velocity axis, a button per Action, and a plain value for read-only state
+(`gripper.closed`); it rebuilds when the surface's version changes. On a
+slider row the slider and its value are the **target** (it tracks the live
+pose until the row is first commanded, then holds the target) and a separate
+"live" column follows the motor. The wheel over the panel scrolls it; the
+groups size to their content (no inner scrollbars). Everything goes through `SetAxis` /
+`TriggerAction` / `ReleaseAxis` with `Source = Touch`, so it arbitrates like
+any other driver. From Python (`hud_check.py`):
+
+```python
+hud = unreal.RammsControlHUDSubsystem.get(pawn)
+panel, joy = hud.get_surface_panel(), hud.get_joystick()
+joy.simulate_input(unreal.Vector2D(0.0, -1.0))          # thumb up = forward
+panel.find_row("linkage.LeftCenterLinkage.height").simulate_value(-5.0)
+panel.find_row("sim.pause").simulate_action()
+```
+
 ### 1. Blueprint / C++ (the same functions everywhere)
 
 `URammsDifferentialDriveController` (public API unchanged by the migration):
 
 | Function | Meaning |
 |---|---|
-| `SetDriveInput(FVector2D)` | player path — X turn, Y forward, ±1; the pawn writes this every tick from Enhanced Input |
+| `SetDriveInput(FVector2D)` | player path — X turn, Y forward, ±1; reached through the surface's `drive.forward` / `drive.turn` (the legacy per-tick write from the vehicle template is gone) |
 | `SetExternalDriveInput(FVector2D)` | access devices / autonomy; wins over the player path for `ExternalInputHoldSeconds` (0.3 s) after each call |
 | `IsExternalDriveActive()` | true while that hold is live |
 | `GetOdometry()` / `ResetOdometry(pos, rot)` | integrated from wheel velocity |
@@ -168,28 +251,62 @@ one**: targets above ~12.7 cm are refused as unreachable; lowering the endpoint
 `GetMotorTransform(Id, out)`, `GetMotorSeparation(IdA, IdB)`, `HasMotor`,
 `GetMotorType`, `HasBackend`.
 
-### 2. Player input (keyboard / gamepad / touch, incl. Pixel Streaming)
+### 2. Player input: Enhanced Input -> the control surface
 
-The chair pawn's Enhanced Input mapping feeds `SetDriveInput` every tick, so
-WASD / a gamepad stick — or the touch sticks on the Pixel Streaming player page
-(`http://<host>/`, embedded signalling on `:80`/`:8888`) — drive it with no
-changes. The MuJoCo bases are keyboard-driveable pawns too — see §2b, and
-§2c for the ready-made test map.
+Keys and gamepad reach the robot through `RammsControlInputComponent`
+("ControlInput" on the pawn) and its `URammsControlInputMap` assets — no
+component polls keys any more. The map (`/Game/Input/Ramms/DA_RammsInput_*`)
+names the mapping context to add and binds each `UInputAction` to control
+Ids; `make_input_assets.py` authors all of it and is the place to change a
+key. Binding modes: **Axis** (value × Scale sets the axis, Completed
+releases it — 2-D / 3-D actions feed `ControlId` / `ControlIdY` /
+`ControlIdZ`), **Action** (Started fires it), **Increment at rate** (a held
+key moves a Position target at RatePerSecond, clamped to the axis range; the
+motor holds where you let go). Ids may be wildcards (`linkage.*.height`,
+`motor.*_front_crank`), so one map serves a robot family.
 
+`IMC_RammsRobot` (shared by every map):
 
-### 2b. Player-controlled pawns for the MuJoCo bases (keyboard)
+| Keys | Action | Binds to |
+|---|---|---|
+| W / S, A / D, left stick | `IA_Ramms_Drive` (2-D) | `drive.forward` / `drive.turn` |
+| E / Q | `IA_Ramms_LinkageHeight` | `linkage.*.height` (6 cm/s) |
+| Y / H, T / B, Z / X, C / V | `IA_Ramms_MotorGroupA..D` | per family: cranks / hips (0.6 rad/s), chair elevators / translators / caster arms |
+| N, Home | `IA_Ramms_CameraNext` / `CameraReset` | `camera.next` / `camera.reset` |
+| I / K, J / L, U / O | `IA_Ramms_ArmMove` (3-D) | `arm.forward` / `arm.strafe` / `arm.up` |
+| ← →, ↑ ↓, M / . | `IA_Ramms_ArmRotate` (3-D) | `arm.yaw` / `arm.pitch` / `arm.roll` |
+| R | `IA_Ramms_ArmResync` | `arm.resync` |
+| [ , ] , G | `IA_Ramms_Gripper*` | `gripper.open` / `close` / `toggle` |
+| P, Backspace, / | `IA_Ramms_SimPause` / `SimReset` / `SimStep` | `sim.pause` / `sim.reset` / `sim.step` |
+| 1 – 7 | `IA_Ramms_SimDebug1..7` | `sim.debug.*` |
+
+The chair's vehicle-template parent (`ARammsPawn`) bound throttle / steering
+straight to the Chaos vehicle movement; `bUseLegacyVehicleInput` is false on
+`BP_Mebot_Ramms`, so those keys reach only the surface.
+
+Mouse drag orbit and wheel zoom stay on `RammsRobotCameraComponent` (its
+per-frame mouse deltas don't map onto rate axes). In RAMMS MuJoCo game modes
+(`RammsMujocoTestGameMode`, `bDisableUrlabHotkeys`) URLab's `UMjInputHandler`
+and its simulate widget are disabled, so R / P / O / 1-7 / Tab are ours; the
+sim functions come back as the `sim.*` controls above. Pixel Streaming
+keyboard events reach Enhanced Input like local ones (spike in
+`ui_input_refactor_plan.md`). Touch panels and tests use the same path:
+`ControlInput.InjectActionByName("IA_Ramms_Drive", (0, 1, 0), hold_s)`.
+
+### 2b. Player-controlled pawns for the MuJoCo bases
 
 `BP_LiftDriveLinkage_Ramms` and `BP_LiftDriveHolonomic_Ramms` are **pawns**
 (the imported URLab articulation is an `APawn`) with `AutoPossessPlayer =
 Player 0`, a follow camera on `base_link` (spring arm, yaw-only inheritance so
 the view stays level), a top-down camera, a **`RammsRobotCameraComponent`**
-(N to switch cameras, mouse to orbit/zoom — see *Cameras* below) and a
-**`RammsKeyboardTeleopComponent`**. Place one in a
-level and PIE / launch: the player possesses it and drives it with the keyboard
-— locally or through the Pixel Streaming page. The component polls keys
-(`APlayerController::IsInputKeyDown`), so no input-mapping assets are needed and
-it coexists with Enhanced Input; everything is data on the component (keys,
-motor Ids, rates), created by `Scripts/pie_tests/base_component/make_pawns.py`.
+(N to switch cameras, mouse to orbit/zoom — see *Cameras* below), a
+**`ControlSurface`**, a **`SimControl`** and a **`ControlInput`** carrying the
+family's input map. Place one in a level and PIE / launch: the player
+possesses it and drives it with the keyboard — locally or through the Pixel
+Streaming page — through Enhanced Input and the control surface (§2); the
+polled `RammsKeyboardTeleopComponent` it used to carry is gone.
+`Scripts/pie_tests/base_component/make_pawns.py` builds all of it, and
+`make_input_assets.py` owns the keys.
 
 | Key | Linkage pawn | Holonomic pawn |
 |---|---|---|
@@ -201,17 +318,17 @@ motor Ids, rates), created by `Scripts/pie_tests/base_component/make_pawns.py`.
 | Z / X | — | front cranks + / − |
 | C / V | — | rear cranks + / − |
 
-Keys are chosen around what else listens on the same player controller:
-URLab's `UMjInputHandler` owns **1–7** (debug toggles), **P** (pause), **R**
-(reset simulation), **O** (orbit cameras) and **F** (launchers), its simulate
-widget uses **Tab** (input-mode toggle), and the arm teleops own
-I/K/J/L/U/O/M/./arrows/[/]/G/R — so none of those are used here (R/F, T/G,
-U/J and Tab were, until the R = reset collision showed up).
+Those keys live in `IMC_RammsRobot` (§2), which also owns the keys URLab's
+`UMjInputHandler` used to take: RAMMS MuJoCo game modes disable that handler
+and its simulate widget (`bDisableUrlabHotkeys`), so **1–7**, **P**, **R**,
+**O**, **F** and **Tab** are ours and the sim functions come back as the
+`sim.*` controls.
 
-Position-motor keys move a *target* at `RatePerSecond` (rad/s) clamped to each
-motor's `ControlRange`; the 5-bar keys move the endpoint target at
-`RateCmPerSecond` and only advance when the linkage accepts it (so holding a key
-at a limit doesn't wind the target off into the unreachable). The MuJoCo pawns
+Position-motor keys are "increment at rate" bindings (§2): a held key moves a
+*target* at the binding's `RatePerSecond`, clamped to the control's range; the
+5-bar keys move the endpoint target the same way and only advance when the
+linkage accepts it (so holding a key at a limit doesn't wind the target off
+into the unreachable). The MuJoCo pawns
 use `MaxTorque 20 N·m / MaxRPM 150` on the drive (the actuators allow ±30): the
 chair's 7 N·m default barely moves a base with four undriven, damped wheels and
 position-servo legs.
@@ -296,7 +413,7 @@ for leg in robot.get_components_by_class(unreal.Ramms5BarLinkageController):
 base = robot.get_component_by_class(unreal.RammsRobotBaseComponent)
 base.get_motor_velocity("left_center_wheel"); base.set_motor_command("left_front_crank", 0.5)
 
-# Chaos chair (the pawn writes the joystick every tick; the external path wins for 0.3 s per call)
+# Chaos chair — prefer the surface (§0); the external path still wins for 0.3 s per call
 pawn = unreal.GameplayStatics.get_player_pawn(w, 0)
 pawn.get_component_by_class(unreal.RammsDifferentialDriveController).set_external_drive_input(unreal.Vector2D(0.0, 1.0))
 ```
@@ -305,9 +422,10 @@ Rules learned the hard way: each remote command runs synchronously on the game
 thread (sequence short scripts with local sleeps, from bash); **never
 `set_editor_property` on a live PIE component** — use the `Set*` UFUNCTIONs;
 the MuJoCo scene in `Map_BaseTest_URL` starts **paused** — call
-`manager.set_paused(False)` on the `AMjManager` actor; the chair's
-`RammsAccessInputComponent` re-zeroes external input every tick (disable its
-tick for scripted driving). Ready-made chains: `Scripts/pie_tests/base_component/`.
+`manager.set_paused(False)` on the `AMjManager` actor; the chair pawn's own
+(legacy vehicle-template) Event Tick still writes its joystick, so disable the
+actor's tick for scripted driving (`cs_common.quiet_local_input`).
+Ready-made chains: `Scripts/pie_tests/base_component/`.
 
 ### 4. Remote Control API (HTTP, `:30010`; Web UI on `:30000`)
 
@@ -323,10 +441,38 @@ PUT http://127.0.0.1:30010/remote/object/call
 }
 ```
 
+or, preferably, through the control surface (`GetControlSurfaceJson` lists
+the ids and ranges) — `Plugins/RammsCore/Scripts/unreal_remote/control_surface.py`
+wraps it:
+
+```python
+from unreal_remote import UnrealRemote
+from unreal_remote.control_surface import ControlSurface
+cs = ControlSurface.find(UnrealRemote())[0]
+cs.describe()["axes"]; cs.set("drive.forward", 1.0); cs.trigger("gripper.toggle"); cs.get("lift.motor_swing_arm_l")
+```
+
+```http
+PUT http://127.0.0.1:30010/remote/object/call
+{
+  "objectPath": "/Game/Maps/UEDPIE_0_Map_Demo.Map_Demo:PersistentLevel.BP_Mebot_Ramms_C_0.ControlSurface",
+  "functionName": "SetControl",
+  "parameters": { "Id": "drive.forward", "Value": 1.0, "Source": "Remote" }
+}
+```
+
 Call the `Set*` functions; do not write properties of live components through
 `/remote/object/property` (array-valued `TOptional`s and live URLab components
 get cleared). Object paths differ between PIE (`UEDPIE_0_` prefix) and
 `-game`.
+
+### 4b. RammsAccess (UDP intents, `:30040`)
+
+`RammsAccessInputComponent` (the ramms-access plugin) consumes the v1 intent
+stream and drives the surface with `Source = Autonomy` — `drive.*`, the
+`arm.*` rate axes, `gripper.*` / `arm.resync` actions — which outranks local
+input for the surface's hold window; watchdog / estop release everything.
+`Scripts/pie_tests/base_component/access_send.py` streams test packets.
 
 ### 5. URLab bridge (ZMQ, `:5559`) — coexistence
 
