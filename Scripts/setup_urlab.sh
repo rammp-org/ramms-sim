@@ -123,6 +123,21 @@ if [ "$BUILD_THIRDPARTY" = 1 ] && [ "$(uname -s)" = Linux ]; then
 		log "ERROR: no UE clang toolchain found under '$UE_ROOT' (set UE_ROOT to your UE install)"
 		exit 1
 	fi
+	# CMake reads CC / CXX / CFLAGS / CXXFLAGS only when it first configures a
+	# build tree, then bakes them into CMakeCache.txt and ignores the
+	# environment on every later run. protospec/build.sh always reuses the one
+	# tree at lib/build-urlab, so a tree left over from a host-gcc/libstdc++
+	# configure would silently ignore everything exported below and hand the
+	# URLab module ABI-incompatible archives — the same undefined-std::* class
+	# of failure the --engine flag above exists to prevent. Drop the tree when
+	# its cached compiler is not the one we are about to export; an already
+	# matching tree is left alone so the rebuild stays incremental.
+	PROTOSPEC_BUILD="$SUBMODULE/protospec/lib/build-urlab"
+	if [ -f "$PROTOSPEC_BUILD/CMakeCache.txt" ] &&
+		! grep -qxF "CMAKE_CXX_COMPILER:FILEPATH=$UE_TC/bin/clang++" "$PROTOSPEC_BUILD/CMakeCache.txt"; then
+		log "ProtoSpec build tree was configured with a different compiler — clearing it"
+		rm -rf "$PROTOSPEC_BUILD"
+	fi
 	log "building ProtoSpec with $UE_TC..."
 	(
 		export CC="$UE_TC/bin/clang" CXX="$UE_TC/bin/clang++"
