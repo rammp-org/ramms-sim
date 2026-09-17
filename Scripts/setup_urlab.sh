@@ -114,7 +114,11 @@ fi
 # Its static libraries link into the URLab module, so build them with the same
 # UE clang/libc++ environment that build_all.sh --engine uses.
 if [ "$BUILD_THIRDPARTY" = 1 ] && [ "$(uname -s)" = Linux ]; then
-	UE_TC=$(ls -d "$UE_ROOT"/Engine/Extras/ThirdPartyNotUE/SDKs/HostLinux/Linux_x64/v*_clang-*/x86_64-unknown-linux-gnu 2>/dev/null | sort -V | tail -1)
+	# `|| true` matters: with `set -euo pipefail` an unmatched toolchain glob
+	# makes `ls` exit 2, pipefail propagates that through the pipeline, and the
+	# failed assignment kills the script silently — before the check below can
+	# print an actionable error. Let the lookup come back empty instead.
+	UE_TC=$(ls -d "$UE_ROOT"/Engine/Extras/ThirdPartyNotUE/SDKs/HostLinux/Linux_x64/v*_clang-*/x86_64-unknown-linux-gnu 2>/dev/null | sort -V | tail -1 || true)
 	if [ -z "$UE_TC" ] || [ ! -x "$UE_TC/bin/clang++" ]; then
 		log "ERROR: no UE clang toolchain found under '$UE_ROOT' (set UE_ROOT to your UE install)"
 		exit 1
