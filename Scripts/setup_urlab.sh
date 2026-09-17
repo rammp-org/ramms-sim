@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Sets up the Plugins/unreal-robotics-lab submodule for building RAMMS on
 # macOS/Linux: applies the one nested patch upstream does not carry, builds
-# its third-party dependencies, and regenerates project files.
+# its third-party dependencies (plus, on Linux, ProtoSpec and the runtime
+# library staging), and regenerates project files.
 #
 # Idempotent — safe to re-run any time.
 #
@@ -103,6 +104,61 @@ if [ "$BUILD_THIRDPARTY" = 1 ]; then
 	fi
 	bash "$SUBMODULE/third_party/build_all.sh" "${THIRDPARTY_ARGS[@]}"
 	log "third-party build finished"
+fi
+
+# --- 3b. build ProtoSpec (Linux) ---
+# URLab's generated MuJoCo profile (Source/URLab/*/MuJoCo/Gen) includes
+# ProtoSpec headers even when URLab.Build.cs reports ProtoSpec as not
+# installed, so the editor build fails with "'protospec/profile.h' file not
+# found" until protospec/build.sh has staged third_party/install/protospec.
+# Its static libraries link into the URLab module, so build them with the same
+# UE clang/libc++ environment that build_all.sh --engine uses.
+if [ "$BUILD_THIRDPARTY" = 1 ] && [ "$(uname -s)" = Linux ]; then
+	# `|| true` matters: with `set -euo pipefail` an unmatched toolchain glob
+	# makes `ls` exit 2, pipefail propagates that through the pipeline, and the
+	# failed assignment kills the script silently — before the check below can
+	# print an actionable error. Let the lookup come back empty instead.
+	UE_TC=$(ls -d "$UE_ROOT"/Engine/Extras/ThirdPartyNotUE/SDKs/HostLinux/Linux_x64/v*_clang-*/x86_64-unknown-linux-gnu 2>/dev/null | sort -V | tail -1 || true)
+	if [ -z "$UE_TC" ] || [ ! -x "$UE_TC/bin/clang++" ]; then
+		log "ERROR: no UE clang toolchain found under '$UE_ROOT' (set UE_ROOT to your UE install)"
+		exit 1
+	fi
+	# CMake reads CC / CXX / CFLAGS / CXXFLAGS only when it first configures a
+	# build tree, then bakes them into CMakeCache.txt and ignores the
+	# environment on every later run. protospec/build.sh always reuses the one
+	# tree at lib/build-urlab, so a tree left over from a host-gcc/libstdc++
+	# configure would silently ignore everything exported below and hand the
+	# URLab module ABI-incompatible archives — the same undefined-std::* class
+	# of failure the --engine flag above exists to prevent. Drop the tree when
+	# its cached compiler is not the one we are about to export; an already
+	# matching tree is left alone so the rebuild stays incremental.
+	PROTOSPEC_BUILD="$SUBMODULE/protospec/lib/build-urlab"
+	if [ -f "$PROTOSPEC_BUILD/CMakeCache.txt" ] &&
+		! grep -qxF "CMAKE_CXX_COMPILER:FILEPATH=$UE_TC/bin/clang++" "$PROTOSPEC_BUILD/CMakeCache.txt"; then
+		log "ProtoSpec build tree was configured with a different compiler — clearing it"
+		rm -rf "$PROTOSPEC_BUILD"
+	fi
+	log "building ProtoSpec with $UE_TC..."
+	(
+		export CC="$UE_TC/bin/clang" CXX="$UE_TC/bin/clang++"
+		export AR="$UE_TC/bin/llvm-ar" RANLIB="$UE_TC/bin/llvm-ranlib"
+		export CFLAGS="-fPIC -Qunused-arguments -Wno-unknown-warning-option"
+		export CXXFLAGS="-stdlib=libc++ -nostdinc++ -isystem $UE_TC/include/c++/v1 -fPIC -Qunused-arguments -Wno-unknown-warning-option"
+		export LDFLAGS="-stdlib=libc++ -fuse-ld=lld -L$UE_TC/lib64 -Wl,-rpath,$UE_TC/lib64"
+		bash "$SUBMODULE/protospec/build.sh"
+	)
+	log "ProtoSpec build finished"
+fi
+
+# --- 3c. stage URLab runtime libraries (Linux) ---
+# UBT copies URLab's runtime dependencies into Binaries/Linux, but the copy of
+# the versioned .so symlinks (libmujoco.so, libzmq.so, libzmq.so.5) fails with
+# "cp: skipping file ..., as it was replaced while being copied", which fails
+# the editor build. Staging them first with URLab's own script leaves those
+# copies up to date, so UBT skips them.
+if [ "$(uname -s)" = Linux ] && [ -d "$SUBMODULE/third_party/install" ]; then
+	mkdir -p "$SUBMODULE/Binaries/Linux"
+	bash "$SUBMODULE/Scripts/setup_runtime_linux.sh"
 fi
 
 # --- 4. regenerate project files ---
