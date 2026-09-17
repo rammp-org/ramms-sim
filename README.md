@@ -616,6 +616,57 @@ pip install -r requirements.txt
 Enable **Remote Execution** in the UE Editor: **Edit > Project Settings >
 Plugins > Python > Remote Execution > Enable Remote Execution**.
 
+## MCP Server (AI assistants in the editor)
+
+UE 5.8 ships Epic's **Model Context Protocol** plugin, an MCP server that runs
+inside the editor so an AI assistant can query and drive it. The plugin is
+enabled in `Ramms.uproject`; it does not exist in 5.7.
+
+The project ships the server settings in
+`Config/DefaultEditorPerProjectUserSettings.ini`, so a fresh clone starts the
+server automatically on `http://127.0.0.1:8000/mcp`:
+
+```ini
+[/Script/ModelContextProtocolEngine.ModelContextProtocolSettings]
+ServerUrlPath=/mcp
+ServerPortNumber=8000
+bAutoStartServer=True
+bEnableToolSearch=True
+```
+
+Those are defaults, not locks. **Edit > Editor Preferences > General > Model
+Context Protocol** overrides them per user, and your choice is written to
+`Saved/Config/<Platform>/EditorPerProjectUserSettings.ini`, which is not
+tracked. To start the server for one session without changing any setting,
+launch the editor with `-ModelContextProtocolStartServer` (add
+`-ModelContextProtocolPort=N` to move the port).
+
+**Connecting a client.** `.mcp.json` at the repo root is committed and points
+at the endpoint above, so Claude Code picks it up on startup and asks once
+whether to trust it. Other clients can generate their own config from the
+editor console:
+
+```
+ModelContextProtocol.GenerateClientConfig <ClaudeCode|Cursor|VSCode|Gemini|Codex|All>
+```
+
+Check it is up with `lsof -nP -iTCP:8000 -sTCP:LISTEN`, or look for
+`LogModelContextProtocol: Starting MCP server on port 8000` in the editor log.
+The server only runs while the editor is open.
+
+**What it currently exposes.** Tool search is on, so `tools/list` returns three
+meta-tools — `list_toolsets`, `describe_toolset`, `call_tool` — that front the
+registered toolsets rather than registering every tool natively. Stock 5.8
+provides two: agent-skill create/read/update, and editor context getters. There
+is nothing yet for spawning actors, editing assets, or driving PIE, so the
+Python Remote Execution route above is still the more capable one for test
+automation. Toolsets can be registered from Python against
+`unreal.ToolsetDefinition`, which is the path to exposing RAMMS-specific tools.
+
+> **Note:** Epic's plugin warns that data sent through it to an LLM service is
+> Licensed Technology under the UE EULA, and that you are responsible for
+> ensuring your provider does not train on it. See EULA section 6(e).
+
 ## URDF Interoperability
 
 The project includes URDF (Unified Robot Description Format) files and
