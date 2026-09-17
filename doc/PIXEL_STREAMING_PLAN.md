@@ -1,10 +1,12 @@
 # Pixel Streaming Plan — Cluster Access, rammp-ui Remote HMI, Demos
 
 Plan of record for adopting Unreal Pixel Streaming across RAMMS and rammp-ui.
-Drafted 2026-08-01. Facts below verified against the installed UE 5.7 engine
-plugin (`Engine/Plugins/Media/PixelStreaming2`), not just docs.
+Drafted 2026-08-01 against UE 5.7; re-verified 2026-09-16 against the
+installed UE 5.8 engine plugin (`Engine/Plugins/Media/PixelStreaming2`), not
+just docs. Everything below still holds on 5.8 except the module allowlist,
+which widened (see the platform bullet).
 
-## What Pixel Streaming 2 gives us (UE 5.7)
+## What Pixel Streaming 2 gives us (UE 5.8)
 
 - Engine plugin streams the rendered viewport over WebRTC to any browser and
   feeds browser input (mouse/keyboard/touch/gamepad) back to the engine.
@@ -16,16 +18,18 @@ plugin (`Engine/Plugins/Media/PixelStreaming2`), not just docs.
 - Codecs: H264 / AV1 / VP9 / VP8; hardware encode via NVENC on NVIDIA GPUs
   (our RTX 6000 Pro cluster nodes qualify), software VPx fallback.
 - Launch wiring: `-PixelStreamingConnectionURL=ws://<signalling>:<port>`
-  (legacy `-PixelStreamingURL` also present in 5.7). Compatible with
+  (legacy `-PixelStreamingURL` also present in 5.8). Compatible with
   `-RenderOffscreen` — the headless-but-rendering mode our cluster plan
   already uses.
 - **Platform limit (verified in the .uplugin module allowlists): Win64,
-  Linux (x64), Mac only — NO LinuxArm64.** Stock Pixel Streaming cannot
-  ship in an Orin build regardless of encoder hardware. Note the encoder
-  side is NOT the blocker on our hardware: Orin NX / AGX Orin have NVENC
+  Linux (x64), Mac, Android, IOS — NO LinuxArm64.** 5.8 added Android and
+  IOS to every PixelStreaming2 module (5.7 listed only the three desktop
+  platforms), but LinuxArm64 is still absent, so stock Pixel Streaming
+  still cannot ship in an Orin build regardless of encoder hardware. Note
+  the encoder side is NOT the blocker on our hardware: Orin NX / AGX Orin have NVENC
   units (only the Orin Nano lacks them), and JetPack 6 exposes both the
   V4L2/Multimedia API path and the desktop-style NVENCODE API on Jetson.
-  The barrier is narrower than it first looks, though: in the 5.7 SOURCE
+  The barrier is narrower than it first looks, though: in the 5.8 SOURCE
   tree, EpicRtc.Build.cs already resolves LinuxArm64 binaries
   (Lib/Linux/aarch64/libepicrtc.a) — only the .uplugin module allowlists
   exclude the platform. Since rammp-ui already requires a LinuxArm64
@@ -134,7 +138,7 @@ parallel-sim files in this repo (`Scripts/`, `containers/`, ramms-tools).
 > (streamer reconnects; frontend retries).
 
 Two processes; order doesn't matter (the streamer reconnects). Signalling:
-`PixelStreamingInfrastructure` @ `UE5.7` branch, `npm install && npm run
+`PixelStreamingInfrastructure` @ `UE5.8` branch, `npm install && npm run
 build`, then `node ./dist/index.js --serve --http_root ./www --player_port
 8080 --streamer_port 8888`. Sim: any map, `-game`, with
 `-PixelStreamingConnectionURL=ws://127.0.0.1:8888` on the command line
@@ -148,7 +152,7 @@ The Fab CitySampleCrowd pack ships an AssetGuideline
 demanding `r.VirtualTextures=True`; this project deliberately sets it
 False, so every `-game` launch (editor binaries; `UnrealEd` owns
 AssetGuideline, so packaged builds are immune) spawns a persistent
-notification toast — a second Slate window. UE 5.7's
+notification toast — a second Slate window. UE 5.8's
 `FVideoProducerBackBuffer` pushes **every** Slate window's backbuffer
 unfiltered, so the 1146x161 toast alternates with the 1280x720 viewport
 each frame; `FVideoCapturer` treats each alternation as an input resolution

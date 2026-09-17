@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-RAMMS-Sim (Robotic Assistive Mobility and Manipulation Simulation) is an Unreal Engine 5.7 project that provides a high-fidelity simulation environment for robotic assistive technologies. The project simulates:
+RAMMS-Sim (Robotic Assistive Mobility and Manipulation Simulation) is an Unreal Engine 5.8 project that provides a high-fidelity simulation environment for robotic assistive technologies. The project simulates:
 
 - **MeBot** - Mobile robotic wheelchair base with differential drive, articulated caster arms, and elevation systems
 - **Kinova Jaco Gen 3** - Robotic manipulator arm with skeletal mesh and joint constraints
@@ -100,11 +100,11 @@ Always check for `bEnabled` and `bInvertDirection` flags when adding motor types
 
 ### Building the Project
 
-Open `Ramms.uproject` in Unreal Engine 5.7 or build via Visual Studio:
+Open `Ramms.uproject` in Unreal Engine 5.8 or build via Visual Studio:
 
 ```powershell
 # Generate project files
-& "C:\Program Files\Epic Games\UE_5.7\Engine\Build\BatchFiles\Build.bat" Ramms Win64 Development
+& "C:\Program Files\Epic Games\UE_5.8\Engine\Build\BatchFiles\Build.bat" Ramms Win64 Development
 
 # Build in Visual Studio
 & "C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe" Ramms.sln /t:Build /p:Configuration=Development

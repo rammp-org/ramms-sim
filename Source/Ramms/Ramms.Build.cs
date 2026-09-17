@@ -24,7 +24,7 @@ public class Ramms : ModuleRules
 			"Ramms",
 			"Ramms/SportsCar",
 			"Ramms/OffroadCar",
-			"Ramms/Variant_Offroad",
+			"Ramms/Variant_OffRoad",
 			"Ramms/Variant_TimeTrial",
 			"Ramms/Variant_TimeTrial/UI"
 		});

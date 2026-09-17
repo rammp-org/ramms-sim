@@ -10,7 +10,7 @@
 #
 # Environment:
 #   UE_ROOT   Unreal Engine install root
-#             (default: /Users/Shared/Epic Games/UE_5.7)
+#             (default: /Users/Shared/Epic Games/UE_5.8)
 #
 # Our URLab fixes now live on our FORK, not in a patch:
 #   git@github.com:rammp-org/UnrealRoboticsLab  branch ramms/v0.6.0-beta
@@ -39,7 +39,7 @@ SUBMODULE="$REPO_ROOT/Plugins/unreal-robotics-lab"
 COACD_SRC="$SUBMODULE/third_party/CoACD/src"
 COACD_PATCH="$REPO_ROOT/Scripts/patches/coacd-src-local-fixes.patch"
 UPROJECT="$REPO_ROOT/Ramms.uproject"
-UE_ROOT="${UE_ROOT:-/Users/Shared/Epic Games/UE_5.7}"
+UE_ROOT="${UE_ROOT:-/Users/Shared/Epic Games/UE_5.8}"
 
 BUILD_THIRDPARTY=1
 GEN_PROJECTFILES=1

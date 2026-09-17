@@ -5,7 +5,7 @@
 #   powershell -ExecutionPolicy Bypass -File Scripts\build_linux_cross.ps1 [-Package] [-Config Development|Shipping] [-Maps "Map_A+Map_B"]
 #
 # Environment:
-#   UE_ROOT               UE 5.7 root (default: C:\Program Files\Epic Games\UE_5.7)
+#   UE_ROOT               UE 5.8 root (default: C:\Program Files\Epic Games\UE_5.8)
 #   LINUX_MULTIARCH_ROOT  set by the UE Linux cross-toolchain installer
 #
 # Order of operations for a fresh checkout on Windows:
@@ -27,7 +27,7 @@ $ErrorActionPreference = "Stop"
 
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $UProject = Join-Path $RepoRoot "Ramms.uproject"
-$UERoot = if ($env:UE_ROOT) { $env:UE_ROOT } else { "C:\Program Files\Epic Games\UE_5.7" }
+$UERoot = if ($env:UE_ROOT) { $env:UE_ROOT } else { "C:\Program Files\Epic Games\UE_5.8" }
 
 function Log($msg) { Write-Host "[build_linux_cross] $msg" -ForegroundColor Cyan }
 
@@ -42,7 +42,7 @@ LINUX_MULTIARCH_ROOT is not set - the UE Linux cross-compile toolchain is missin
 To install it (fully automated):
   1. Download the 'native toolchain' installer for your engine version from
      https://dev.epicgames.com/documentation/en-us/unreal-engine/linux-development-requirements-for-unreal-engine
-     (UE 5.7 -> v26_clang-20.1.8-rockylinux8.exe).
+     (UE 5.8 -> v26_clang-20.1.8-rockylinux8.exe).
   2. Run the installer (installs to C:\UnrealToolchains\<version>\ and sets
      LINUX_MULTIARCH_ROOT machine-wide).
   3. Open a NEW terminal so the environment variable is visible, and re-run

@@ -12,7 +12,7 @@ RAMMS repos; updated as phases land.
   line-trace fallback is a degraded mode (different trace semantics), not a
   target.
 - **No Epic container-registry dependency.** Engine comes from a self-managed
-  UE 5.7 source/installed build on a Linux build machine (Epic GitHub source
+  UE 5.8 source/installed build on a Linux build machine (Epic GitHub source
   access exists today but is not assumed in general). The cluster image
   (`containers/ramms.def`) bundles our own packaged build — no external
   registries.
@@ -92,7 +92,7 @@ Both routes produce the same `Packaged/Linux` output.
 - `containers/ramms.def` bundles it — self-contained Apptainer image (ubuntu
   base + Vulkan loader + NVIDIA ICD manifest; run with `--nv`).
 - Risk: RammsCore's sensor tracer includes engine **Renderer private
-  headers** — build machine needs the exact UE 5.7 tree; engine upgrades will
+  headers** — build machine needs the exact UE 5.8 tree; engine upgrades will
   bite here first.
 - Cross-route status (**verified on Windows 2026-07-17** through
   build+cook+stage+pak of `Map_GraspTest`+`Map_GraspTestURL`): shakeout fixes

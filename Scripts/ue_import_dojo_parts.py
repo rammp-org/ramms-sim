@@ -487,7 +487,7 @@ def main():
             return
     except Exception:
         pass
-    # UE 5.7 routes FBX through Interchange by default, which ignores the
+    # UE 5.8 routes FBX through Interchange by default, which ignores the
     # legacy FbxImportUI options AND the UCX_ collision meshes -- route these
     # imports through the legacy FBX importer instead (session-scoped).
     unreal.SystemLibrary.execute_console_command(

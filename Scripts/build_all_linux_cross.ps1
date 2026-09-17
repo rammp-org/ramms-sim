@@ -50,7 +50,7 @@ The UE Linux cross-compile toolchain is required (same prerequisite as
 Windows->Linux packaging). To install it (fully automated):
   1. Download the 'native toolchain' installer for your engine version from
      https://dev.epicgames.com/documentation/en-us/unreal-engine/linux-development-requirements-for-unreal-engine
-     (UE 5.7 -> v26_clang-20.1.8-rockylinux8.exe).
+     (UE 5.8 -> v26_clang-20.1.8-rockylinux8.exe).
   2. Run the installer (installs to C:\UnrealToolchains\<version>\ and sets
      LINUX_MULTIARCH_ROOT machine-wide).
   3. Open a NEW terminal so the environment variable is visible, and re-run

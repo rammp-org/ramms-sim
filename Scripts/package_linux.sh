@@ -29,7 +29,7 @@ fi
 
 RUNUAT="$UE_ROOT/Engine/Build/BatchFiles/RunUAT.sh"
 if [ ! -f "$RUNUAT" ]; then
-	log "ERROR: engine not found at '$UE_ROOT' (set UE_ROOT to your UE 5.7 root)"
+	log "ERROR: engine not found at '$UE_ROOT' (set UE_ROOT to your UE 5.8 root)"
 	exit 1
 fi
 
