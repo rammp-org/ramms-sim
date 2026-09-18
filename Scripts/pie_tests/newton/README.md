@@ -49,18 +49,30 @@ in the world body. Building the tree live and entering play without saving
 works; the saved asset does not. Until that is understood, treat this script as
 the source of truth and re-run it rather than relying on the `.umap`.
 
-**URLab-side state resets do not reach the worker.** `reset_to_keyframe` writes
-`qpos` into Unreal's `mjData`, and Newton overwrites it on the next step, so the
-pose silently snaps back. No resync fires, because sim time keeps advancing
-normally and the solver's external-change detector only looks at time. This is
-the `set_state` wiring the plan tracks as the next Newton item; until it lands,
-re-enter play rather than resetting to change the starting pose. Activation
-*is* handled: the solver resets the sim when the worker finishes loading, so
-Newton takes over from the model's initial state rather than from wherever
-URLab had already stepped to —
+**Mid-run state pushes reach the worker.** A snapshot restore is detected and
+injected, so Newton resumes from the restored state rather than overwriting it:
 
-    [NewtonSolver] Sim advanced to t=459.284s during worker load —
-    resetting so Newton takes over from the initial state
+    [NewtonSolver] Snapshot restore — injecting state into Newton worker
+    [NewtonSolver] Newton stepping active (snapshot restored via set_state)
+
+Measured on the gen3: captured at `t=191.56` with `joint_2=2.2401`, drove the
+arm away to `2.3393`, restored — time rolled back to `193.80` and `joint_2`
+returned to `2.2400`, on exactly one injection.
+
+`RestoreSnapshot` **takes the snapshot object**. Calling `restore_snapshot()`
+with no argument is a silent no-op, which is what made this look broken for a
+while:
+
+```python
+snap = mgr.capture_snapshot()   # keep it
+...
+mgr.restore_snapshot(snap)      # not restore_snapshot()
+```
+
+A keyframe *hold* needs no injection at all: `ApplyControls` writes
+`HeldKeyframeCtrl` into `ctrl`, not `qpos`, so it reaches Newton through the
+ordinary control path. Holding one therefore shows zero injections, which is
+correct rather than a failure.
 
 **`SetActuatorControl` is silently ignored when a controller is bound.** This
 looked like a Newton problem and is not one — it reproduces with Newton off,
