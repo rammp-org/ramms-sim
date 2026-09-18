@@ -290,55 +290,97 @@ class RammsToolset(unreal.ToolsetDefinition):
 
     @toolset_registry.tool_call
     @staticmethod
-    def newton_settings() -> str:
-        """Report the Newton plugin settings that decide whether its bridge can start.
+    def newton_probe(force_reprobe: bool) -> str:
+        """Ask the Newton subsystem whether its out-of-process worker is usable.
 
-        The interpreter path is the usual culprit: it is platform specific and
-        is not existence-checked before the worker is launched, so a wrong value
-        surfaces only as a failed launch.
+        This runs the plugin's real capability probe — it launches the worker
+        and reports what it found — rather than inspecting configuration, so a
+        true answer here means Newton can actually load and step on this
+        machine. Also reports the pinned virtual environment the plugin
+        resolves its interpreter from when no override is set.
+
+        Args:
+            force_reprobe: Re-run the probe instead of reusing a cached result.
 
         Returns:
-            JSON with the configured interpreter and worker script, and whether
-            each exists on disk.
+            JSON with the probe capabilities and the interpreter it would use.
         """
         import os
 
-        settings = unreal.get_default_object(unreal.RammsNewtonPhysicsSettings)
-        exe = str(settings.get_editor_property("python_executable_path"))
-        script = str(settings.get_editor_property("python_worker_script_path"))
+        sub = unreal.get_engine_subsystem(unreal.RammsNewtonPhysicsSubsystem)
+        if sub is None:
+            raise RuntimeError("RammsNewtonPhysicsSubsystem is not available")
+
+        caps = sub.probe_availability(bool(force_reprobe))
+        payload = {"probing": bool(sub.is_probing())}
+        for name in ("probed", "available", "newton_version", "python_version",
+                     "cuda_available", "error", "solvers"):
+            try:
+                value = caps.get_editor_property(name)
+                payload[name] = [str(v) for v in value] if hasattr(value, "__iter__") and not isinstance(value, str) else value
+            except Exception:
+                pass
+
+        # The plugin falls back to a pinned venv under the plugin's Scripts dir
+        # when the setting is empty, which is the normal configuration. The
+        # settings object itself is not exposed to Python, so report the
+        # filesystem facts that decide whether that fallback resolves.
         project = unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_dir())
+        scripts = os.path.join(project, "Plugins", "RammsNewtonPhysics", "Scripts")
+        pinned = os.path.join(scripts, ".venv", "Scripts" if os.name == "nt" else "bin",
+                              "python.exe" if os.name == "nt" else "python")
+        payload["scripts_dir"] = scripts
+        payload["pinned_venv_interpreter"] = pinned
+        payload["pinned_venv_exists"] = os.path.exists(pinned)
+        return H.dumps(payload)
 
-        def resolve(path):
-            if not path:
-                return ""
-            return path if os.path.isabs(path) else os.path.normpath(os.path.join(project, path))
+    @toolset_registry.tool_call
+    @staticmethod
+    def newton_status(robot: str) -> str:
+        """Report the Newton solver component's state on a robot.
 
-        # Empty settings are not errors: the backend falls back to a bare
-        # "python3"/"python.exe" on PATH for the interpreter, and to the
-        # plugin's own Scripts/ramms_newton_worker.py for the worker. Report
-        # what will actually be used, or a blank "exists" reads as broken when
-        # the default is fine.
-        plugin_scripts = os.path.join(project, "Plugins", "RammsNewtonPhysics", "Scripts")
-        exe_effective = exe or ("python.exe" if os.name == "nt" else "python3")
-        script_effective = script or os.path.join(plugin_scripts, "ramms_newton_worker.py")
+        The solver binds to URLab's physics engine and takes over stepping by
+        installing a custom step handler, so "is it stepping" is the question
+        that matters; the status text carries the reason when it is not.
 
-        exe_abs = resolve(exe) if exe else ""
-        script_abs = resolve(script) if script else script_effective
+        Args:
+            robot: Partial actor name. Pass "" for the only robot present, or
+                "*" to report every actor that carries a solver component.
 
-        return H.dumps(
-            {
-                "project_dir": project,
-                "python_executable_path": exe,
-                "python_executable_effective": exe_effective,
-                "python_executable_resolved": exe_abs,
-                # A configured path is checked on disk; a PATH fallback cannot be,
-                # so say so rather than guessing.
-                "python_executable_exists": os.path.exists(exe_abs) if exe_abs else None,
-                "python_executable_from_default": not bool(exe),
-                "python_worker_script_path": script,
-                "python_worker_script_effective": script_effective,
-                "python_worker_script_resolved": script_abs,
-                "python_worker_script_exists": bool(script_abs) and os.path.exists(script_abs),
-                "python_worker_script_from_default": not bool(script),
+        Returns:
+            JSON with each solver's stepping state, status text and model info.
+        """
+        if robot == "*":
+            world = H.active_world()
+            actors = []
+            if world is not None:
+                for a in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.Actor):
+                    if H.component_named(a, "RammsNewtonSolverComponent") is not None:
+                        actors.append(a)
+        else:
+            actors = [H.find_robot(robot)]
+
+        out = []
+        for actor in actors:
+            solver = H.component_named(actor, "RammsNewtonSolverComponent")
+            if solver is None:
+                out.append({"actor": actor.get_name(), "solver": None})
+                continue
+            entry = {
+                "actor": actor.get_name(),
+                "component": solver.get_name(),
+                "stepping": bool(solver.is_newton_stepping()),
+                "status": str(solver.get_status_text()),
             }
-        )
+            try:
+                info = solver.get_model_info()
+                entry["model"] = {
+                    "solver": str(info.get_editor_property("solver")),
+                    "timestep": info.get_editor_property("timestep"),
+                    "nq": info.get_editor_property("nq"),
+                    "nv": info.get_editor_property("nv"),
+                }
+            except Exception as exc:
+                entry["model_error"] = str(exc)
+            out.append(entry)
+        return H.dumps({"solvers": out, "count": len(out)})
