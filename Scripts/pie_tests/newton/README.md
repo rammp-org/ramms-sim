@@ -29,7 +29,11 @@ MuJoCo rejects the model with `joint found in world body`.
 positive in geom`. They do set from Python through `set_editor_property`, so
 set them explicitly on every element you add.
 
-![Gen3 arm simulated by Newton inside Unreal](../../../doc/images/newton_gen3_unreal.gif)
+![Gen3 arm commanded under Newton inside Unreal](../../../doc/images/newton_gen3_commanded.gif)
+
+The arm above is being *commanded*: the end-effector controller traces a circle
+while Newton integrates the dynamics. A passive-settling capture is in
+`newton_gen3_unreal.gif` alongside it.
 
 The Kinova Gen3 with its 2F-85 gripper, stepped by Newton through URLab's custom
 step handler and rendered by Unreal. `run_newton_capture.py` swaps the pendulum
@@ -50,12 +54,32 @@ the source of truth and re-run it rather than relying on the `.umap`.
 pose silently snaps back. No resync fires, because sim time keeps advancing
 normally and the solver's external-change detector only looks at time. This is
 the `set_state` wiring the plan tracks as the next Newton item; until it lands,
-re-enter play rather than resetting to change the starting pose.
+re-enter play rather than resetting to change the starting pose. Activation
+*is* handled: the solver resets the sim when the worker finishes loading, so
+Newton takes over from the model's initial state rather than from wherever
+URLab had already stepped to —
 
-**Actuator commands do not stick either**, for the same reason: the worker owns
-the state it integrates, so a `SetActuatorControl` written into Unreal's `ctrl`
-is not what Newton stepped. Joint readouts still update live, because those are
-Newton's own state written back.
+    [NewtonSolver] Sim advanced to t=459.284s during worker load —
+    resetting so Newton takes over from the initial state
+
+**`SetActuatorControl` is silently ignored when a controller is bound.** This
+looked like a Newton problem and is not one — it reproduces with Newton off,
+stepping locally. `AMjArticulation::ApplyControls` hands `ctrl` to a bound,
+enabled controller and *returns early*, so the value staged by
+`SetActuatorControl` never reaches `d->ctrl`. The call still returns true.
+
+The gen3 blueprint carries `RammsMjEndEffectorController`, enabled, so that
+component owns `ctrl`. Command the arm through it instead:
+
+```python
+ee.resync_target_to_current_pose()
+ee.move_target_by(unreal.Vector(0.0, 0.0, 0.03), unreal.Rotator(0, 0, 0), False)
+```
+
+Its inverse kinematics writes the actuator values, Newton integrates them, and
+the joints track. `EControlSource` on the articulation (0 = external ZMQ,
+1 = internal UI) only matters on the path *after* that early return, so
+flipping it does not rescue `SetActuatorControl` while a controller is bound.
 
 **Subobject handles go stale.** A handle from an earlier gather is invalid once
 the next add reshapes the tree, and using one silently attaches to the root
