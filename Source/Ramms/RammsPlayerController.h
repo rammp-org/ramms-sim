@@ -54,7 +54,13 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Vehicle|Respawn")
 	TSubclassOf<ARammsPawn> VehiclePawnClass;
 
-	/** Pointer to the controlled vehicle pawn */
+	/** Pointer to the controlled vehicle pawn.
+	 *  UPROPERTY is load-bearing, not decoration: without it this is not a
+	 *  tracked reference, so once the pawn is destroyed the pointer dangles and
+	 *  the IsValid() in Tick reads a freed object's index —
+	 *  "Assertion failed: Index >= 0 [UObjectArray.h]", which is a crash in
+	 *  Tick rather than a null check doing its job. */
+	UPROPERTY()
 	TObjectPtr<ARammsPawn> VehiclePawn;
 
 	/** Type of the UI to spawn */
