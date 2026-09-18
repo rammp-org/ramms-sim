@@ -114,6 +114,50 @@ capsule.set_editor_property("type", unreal.MjGeomType.CAPSULE)
 capsule.set_editor_property("size", [0.05, 0.3])      # radius, half-length (m)
 capsule.set_editor_property("pos", [0.3, 0.0, 0.0])   # out along +X, not straight down
 
+# The project's default game mode spawns the MeBot chair and a crowd character,
+# which then sit in front of whatever this level is meant to show. A bare
+# GameModeBase with no default pawn keeps the level to its own contents.
+ws = world.get_world_settings()
+ws.set_editor_property("default_game_mode", unreal.GameModeBase)
+print("[map] game mode override -> GameModeBase (no default pawn)")
+
+# Lighting. A level made with new_level is unlit, which makes a capture of the
+# running sim useless: the robot is there and simulating, and the image is
+# black. Directional light + sky light + atmosphere is the smallest set that
+# reads as a lit scene; the floor gives the eye a ground plane and something
+# for shadows to land on.
+sun = unreal.EditorLevelLibrary.spawn_actor_from_class(
+    unreal.DirectionalLight, unreal.Vector(0, 0, 400), unreal.Rotator(-45, -45, 0))
+sun.set_actor_label("Sun")
+sun.light_component.set_intensity(6.0)
+sun.light_component.set_mobility(unreal.ComponentMobility.MOVABLE)
+
+sky_light = unreal.EditorLevelLibrary.spawn_actor_from_class(
+    unreal.SkyLight, unreal.Vector(0, 0, 400))
+sky_light.set_actor_label("SkyLight")
+sky_light.light_component.set_mobility(unreal.ComponentMobility.MOVABLE)
+sky_light.light_component.set_intensity(1.0)
+
+sky = unreal.EditorLevelLibrary.spawn_actor_from_class(
+    unreal.SkyAtmosphere, unreal.Vector(0, 0, 0))
+sky.set_actor_label("SkyAtmosphere")
+
+floor = unreal.EditorLevelLibrary.spawn_actor_from_class(
+    unreal.StaticMeshActor, unreal.Vector(0, 0, 0))
+floor.set_actor_label("Floor")
+floor.set_actor_scale3d(unreal.Vector(20.0, 20.0, 1.0))
+floor_mesh = unreal.EditorAssetLibrary.load_asset("/Engine/BasicShapes/Plane")
+if floor_mesh:
+    floor.static_mesh_component.set_static_mesh(floor_mesh)
+    floor.static_mesh_component.set_mobility(unreal.ComponentMobility.STATIC)
+
+# A camera to frame the robot, so a capture does not depend on wherever the
+# editor viewport happened to be pointing.
+cam = unreal.EditorLevelLibrary.spawn_actor_from_class(
+    unreal.CameraActor, unreal.Vector(-320, -260, 210), unreal.Rotator(-12, 38, 0))
+cam.set_actor_label("ShowcaseCamera")
+cam.camera_component.set_editor_property("field_of_view", 70.0)
+
 # The component under test. It finds the manager globally, so it can live here.
 solver = add_component(manager, unreal.RammsNewtonSolverComponent, "NewtonSolver")
 print("[map] solver component:", solver.get_name())
