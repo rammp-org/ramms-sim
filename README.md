@@ -36,6 +36,8 @@ Engine 5.8 simulation environment for robotic assistive technologies.
     - [Renderer & Ray Tracing](#renderer--ray-tracing)
     - [Game Settings](#game-settings)
   - [Python Integration](#python-integration)
+  - [MCP Server (AI assistants in the editor)](#mcp-server-ai-assistants-in-the-editor)
+    - [The RAMMS toolset](#the-ramms-toolset)
   - [URDF Interoperability](#urdf-interoperability)
   - [Example Environments](#example-environments)
   - [Developing](#developing)
@@ -615,6 +617,103 @@ pip install -r requirements.txt
 
 Enable **Remote Execution** in the UE Editor: **Edit > Project Settings >
 Plugins > Python > Remote Execution > Enable Remote Execution**.
+
+## MCP Server (AI assistants in the editor)
+
+UE 5.8 ships Epic's **Model Context Protocol** plugin, an MCP server that runs
+inside the editor so an AI assistant can query and drive it. The plugin is
+enabled in `Ramms.uproject`; it does not exist in 5.7.
+
+The project ships the server settings in
+`Config/DefaultEditorPerProjectUserSettings.ini`, so a fresh clone starts the
+server automatically on `http://127.0.0.1:8000/mcp`:
+
+```ini
+[/Script/ModelContextProtocolEngine.ModelContextProtocolSettings]
+ServerUrlPath=/mcp
+ServerPortNumber=8000
+bAutoStartServer=True
+bEnableToolSearch=True
+```
+
+Those are defaults, not locks. **Edit > Editor Preferences > General > Model
+Context Protocol** overrides them per user, and your choice is written to
+`Saved/Config/<Platform>/EditorPerProjectUserSettings.ini`, which is not
+tracked. To start the server for one session without changing any setting,
+launch the editor with `-ModelContextProtocolStartServer` (add
+`-ModelContextProtocolPort=N` to move the port).
+
+**Connecting a client.** `.mcp.json` at the repo root is committed and points
+at the endpoint above, so Claude Code picks it up on startup and asks once
+whether to trust it. Other clients can generate their own config from the
+editor console:
+
+```
+ModelContextProtocol.GenerateClientConfig <ClaudeCode|Cursor|VSCode|Gemini|Codex|All>
+```
+
+Check it is up with `lsof -nP -iTCP:8000 -sTCP:LISTEN`, or look for
+`LogModelContextProtocol: Starting MCP server on port 8000` in the editor log.
+The server only runs while the editor is open.
+
+**If you override the port or path**, the committed `.mcp.json` still points at
+the old endpoint, and the client fails to connect even though the server is
+running. Regenerate it from the editor console after changing either setting:
+
+```
+ModelContextProtocol.GenerateClientConfig ClaudeCode
+```
+
+That rewrites `.mcp.json` from the values actually in effect. Keep the change
+local unless the new endpoint is meant for everyone — the committed file is the
+default the rest of the team gets.
+
+**What it exposes.** Tool search is on, so `tools/list` returns three
+meta-tools — `list_toolsets`, `describe_toolset`, `call_tool` — that front the
+registered toolsets rather than registering every tool natively. Stock 5.8
+contributes two (agent skills, editor context), and this project adds a third.
+
+### The RAMMS toolset
+
+`Content/Python/ramms_toolset/` registers `RammsToolset`, which exposes the
+same surface the PIE runners in `Scripts/pie_tests/base_component/` drive, so an
+assistant can inspect and command a running sim directly:
+
+| Tool | Purpose |
+|------|---------|
+| `sim_status` | Is PIE running, which map, which robots are present |
+| `begin_pie` / `end_pie` | Start play (optionally loading a map first) and stop it |
+| `describe_controls` | A robot's control axes: ids, kinds, units, ranges |
+| `read_control` | Live value, commanded target and arbitration owner, per axis |
+| `set_control` / `release_control` | Command and release an axis as the Script source |
+| `physics_status` | Active backend plus every motor's type, value and velocity |
+| `newton_settings` | The Newton interpreter and worker paths, resolved and existence-checked |
+
+`Content/Python/init_unreal.py` registers it at startup, wired up through
+`StartupScripts` in `Config/DefaultEngine.ini` — the engine only auto-runs
+`init_unreal.py` from *plugin* content directories, not from the project's own,
+so the entry is what makes it load.
+
+Two things to know when calling the tools:
+
+- **Every parameter is required**, even ones with Python defaults; the
+  generated schema marks them all required. Pass `""` for `robot` to mean
+  "the only robot present".
+- **Iterate without restarting the editor.** After editing the module:
+
+  ```python
+  import toolset_registry, ramms_toolset
+  toolset_registry.reload_module(ramms_toolset)
+  ```
+
+  which unregisters, reloads every submodule, and registers again.
+
+For heavier scripting the Python Remote Execution route above is still there,
+and the two agree by construction: the toolset wraps the same calls.
+
+> **Note:** Epic's plugin warns that data sent through it to an LLM service is
+> Licensed Technology under the UE EULA, and that you are responsible for
+> ensuring your provider does not train on it. See EULA section 6(e).
 
 ## URDF Interoperability
 
