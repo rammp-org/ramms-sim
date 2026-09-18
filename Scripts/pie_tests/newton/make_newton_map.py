@@ -112,7 +112,7 @@ hinge.set_editor_property("axis", [0.0, 1.0, 0.0])
 capsule = add_component(art, unreal.MjGeom, "Capsule", link)
 capsule.set_editor_property("type", unreal.MjGeomType.CAPSULE)
 capsule.set_editor_property("size", [0.05, 0.3])      # radius, half-length (m)
-capsule.set_editor_property("pos", [0.0, 0.0, -0.3])  # hang below the hinge
+capsule.set_editor_property("pos", [0.3, 0.0, 0.0])   # out along +X, not straight down
 
 # The component under test. It finds the manager globally, so it can live here.
 solver = add_component(manager, unreal.RammsNewtonSolverComponent, "NewtonSolver")
