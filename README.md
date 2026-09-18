@@ -36,6 +36,8 @@ Engine 5.8 simulation environment for robotic assistive technologies.
     - [Renderer & Ray Tracing](#renderer--ray-tracing)
     - [Game Settings](#game-settings)
   - [Python Integration](#python-integration)
+  - [MCP Server (AI assistants in the editor)](#mcp-server-ai-assistants-in-the-editor)
+    - [The RAMMS toolset](#the-ramms-toolset)
   - [URDF Interoperability](#urdf-interoperability)
   - [Example Environments](#example-environments)
   - [Developing](#developing)
@@ -654,14 +656,60 @@ Check it is up with `lsof -nP -iTCP:8000 -sTCP:LISTEN`, or look for
 `LogModelContextProtocol: Starting MCP server on port 8000` in the editor log.
 The server only runs while the editor is open.
 
-**What it currently exposes.** Tool search is on, so `tools/list` returns three
+**If you override the port or path**, the committed `.mcp.json` still points at
+the old endpoint, and the client fails to connect even though the server is
+running. Regenerate it from the editor console after changing either setting:
+
+```
+ModelContextProtocol.GenerateClientConfig ClaudeCode
+```
+
+That rewrites `.mcp.json` from the values actually in effect. Keep the change
+local unless the new endpoint is meant for everyone — the committed file is the
+default the rest of the team gets.
+
+**What it exposes.** Tool search is on, so `tools/list` returns three
 meta-tools — `list_toolsets`, `describe_toolset`, `call_tool` — that front the
 registered toolsets rather than registering every tool natively. Stock 5.8
-provides two: agent-skill create/read/update, and editor context getters. There
-is nothing yet for spawning actors, editing assets, or driving PIE, so the
-Python Remote Execution route above is still the more capable one for test
-automation. Toolsets can be registered from Python against
-`unreal.ToolsetDefinition`, which is the path to exposing RAMMS-specific tools.
+contributes two (agent skills, editor context), and this project adds a third.
+
+### The RAMMS toolset
+
+`Content/Python/ramms_toolset/` registers `RammsToolset`, which exposes the
+same surface the PIE runners in `Scripts/pie_tests/base_component/` drive, so an
+assistant can inspect and command a running sim directly:
+
+| Tool | Purpose |
+|------|---------|
+| `sim_status` | Is PIE running, which map, which robots are present |
+| `begin_pie` / `end_pie` | Start play (optionally loading a map first) and stop it |
+| `describe_controls` | A robot's control axes: ids, kinds, units, ranges |
+| `read_control` | Live value, commanded target and arbitration owner, per axis |
+| `set_control` / `release_control` | Command and release an axis as the Script source |
+| `physics_status` | Active backend plus every motor's type, value and velocity |
+| `newton_settings` | The Newton interpreter and worker paths, resolved and existence-checked |
+
+`Content/Python/init_unreal.py` registers it at startup, wired up through
+`StartupScripts` in `Config/DefaultEngine.ini` — the engine only auto-runs
+`init_unreal.py` from *plugin* content directories, not from the project's own,
+so the entry is what makes it load.
+
+Two things to know when calling the tools:
+
+- **Every parameter is required**, even ones with Python defaults; the
+  generated schema marks them all required. Pass `""` for `robot` to mean
+  "the only robot present".
+- **Iterate without restarting the editor.** After editing the module:
+
+  ```python
+  import toolset_registry, ramms_toolset
+  toolset_registry.reload_module(ramms_toolset)
+  ```
+
+  which unregisters, reloads every submodule, and registers again.
+
+For heavier scripting the Python Remote Execution route above is still there,
+and the two agree by construction: the toolset wraps the same calls.
 
 > **Note:** Epic's plugin warns that data sent through it to an LLM service is
 > Licensed Technology under the UE EULA, and that you are responsible for
