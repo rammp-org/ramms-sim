@@ -127,6 +127,14 @@ cd Plugins/unreal-robotics-lab/third_party
 ./build_all.ps1
 ```
 
+You then have to build the protospec for the URL module:
+
+**Windows (PowerShell):**
+```powershell
+cd Plugins/unreal-robotics-lab/protospec
+./build.ps1
+```
+
 The script syncs each dependency's source submodule to the expected revision,
 builds it in Release, and installs into `third_party/install/`.
 
