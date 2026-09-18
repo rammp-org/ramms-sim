@@ -41,59 +41,17 @@ for `Content/Robots/URL/gen3_2f85_fixed` and starts play; the solver reports
 
     [NewtonSolver] Newton stepping active (mujoco_cpu, nq=15 nu=8)
 
-## Known gaps
-
-**The saved level does not round-trip.** Re-opening the map drops the outer
-`World` body and reparents its child onto the spec, which puts the joint back
-in the world body. Building the tree live and entering play without saving
-works; the saved asset does not. Until that is understood, treat this script as
-the source of truth and re-run it rather than relying on the `.umap`.
-
-**Mid-run state pushes reach the worker.** A snapshot restore is detected and
-injected, so Newton resumes from the restored state rather than overwriting it:
-
-    [NewtonSolver] Snapshot restore — injecting state into Newton worker
-    [NewtonSolver] Newton stepping active (snapshot restored via set_state)
-
-Measured on the gen3: captured at `t=191.56` with `joint_2=2.2401`, drove the
-arm away to `2.3393`, restored — time rolled back to `193.80` and `joint_2`
-returned to `2.2400`, on exactly one injection.
-
-`RestoreSnapshot` **takes the snapshot object**. Calling `restore_snapshot()`
-with no argument is a silent no-op, which is what made this look broken for a
-while:
-
-```python
-snap = mgr.capture_snapshot()   # keep it
-...
-mgr.restore_snapshot(snap)      # not restore_snapshot()
-```
-
-A keyframe *hold* needs no injection at all: `ApplyControls` writes
-`HeldKeyframeCtrl` into `ctrl`, not `qpos`, so it reaches Newton through the
-ordinary control path. Holding one therefore shows zero injections, which is
-correct rather than a failure.
-
-**`SetActuatorControl` is silently ignored when a controller is bound.** This
-looked like a Newton problem and is not one — it reproduces with Newton off,
-stepping locally. `AMjArticulation::ApplyControls` hands `ctrl` to a bound,
-enabled controller and *returns early*, so the value staged by
-`SetActuatorControl` never reaches `d->ctrl`. The call still returns true.
-
-The gen3 blueprint carries `RammsMjEndEffectorController`, enabled, so that
-component owns `ctrl`. Command the arm through it instead:
-
-```python
-ee.resync_target_to_current_pose()
-ee.move_target_by(unreal.Vector(0.0, 0.0, 0.03), unreal.Rotator(0, 0, 0), False)
-```
-
-Its inverse kinematics writes the actuator values, Newton integrates them, and
-the joints track. `EControlSource` on the articulation (0 = external ZMQ,
-1 = internal UI) only matters on the path *after* that early return, so
-flipping it does not rescue `SetActuatorControl` while a controller is bound.
+## A trap worth knowing
 
 **Subobject handles go stale.** A handle from an earlier gather is invalid once
 the next add reshapes the tree, and using one silently attaches to the root
-instead — which is how an entire body level went missing here. `add_component`
-re-resolves parents by object on every call for that reason.
+instead — which is how an entire body level went missing here, with no error.
+`add_component` re-resolves parents by object on every call for that reason.
+
+That bug also produced a false diagnosis worth recording: the level looked as
+though it did not survive save and reload, because the body it was missing had
+never been created in the first place. `Map_NewtonTest_URL.umap` is committed
+and does round-trip — reloading it from disk gives back
+`Spec -> World -> Link -> (Hinge, Capsule)` and plays straight into
+`Newton stepping active (mujoco_cpu, nq=1 nu=0, pipelined)`. Re-run the script
+to change the scene, not to repair it.
