@@ -7,7 +7,8 @@ tree (URLab beta's "the component tree is the model") — the smallest thing tha
 exercises the path, and what the plugin's own parity harness uses.
 
 Parameterised so a private level can reuse it without any private path
-appearing in this file. Set these on `unreal` before running:
+appearing in this file. Set these on `unreal` before running; they are consumed
+and cleared on read, so they apply to exactly one run:
 
     unreal._ramms_newton_map       target level  (default the public one below)
     unreal._ramms_newton_gamemode  game mode class path; the default spawns no
@@ -22,9 +23,29 @@ Run inside the editor:
 
 import unreal
 
-MAP = getattr(unreal, "_ramms_newton_map", "/Game/Maps/URL/Map_NewtonTest_URL")
-GAME_MODE = getattr(unreal, "_ramms_newton_gamemode", "")
-BUILD_PENDULUM = getattr(unreal, "_ramms_newton_pendulum", True)
+
+def take_param(name, default):
+    """Read an override off the `unreal` module and clear it.
+
+    The module is the editor's, not this script's: it outlives the run and is
+    shared by every script in the session. An override left behind means the
+    next plain `make_newton_map.py` run silently rebuilds whichever level the
+    last parameterised caller wanted — and since this script deletes MAP before
+    rebuilding it, the wrong asset gets recreated rather than merely skipped.
+    Clearing on read keeps each override scoped to one run regardless of
+    whether the caller cleans up after itself.
+    """
+    attr = "_ramms_newton_" + name
+    if not hasattr(unreal, attr):
+        return default
+    value = getattr(unreal, attr)
+    delattr(unreal, attr)
+    return value
+
+
+MAP = take_param("map", "/Game/Maps/URL/Map_NewtonTest_URL")
+GAME_MODE = take_param("gamemode", "")
+BUILD_PENDULUM = take_param("pendulum", True)
 
 les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 ues = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem)
