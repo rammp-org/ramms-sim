@@ -99,10 +99,29 @@ if unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_game_world() is
 
 # Start from nothing: new_level over an existing asset can bring the old one
 # back rather than replacing it, which is how this ended up with two managers.
+#
+# Get off the target level first. delete_asset cannot remove a package that is
+# currently loaded, and new_level onto a path that still exists gives up and
+# makes an untitled temp level instead -- silently. Everything below then
+# authored into /Temp/Untitled, and save_asset(MAP) re-saved whatever stale
+# package was already on disk and returned True. That is how the committed map
+# stopped matching this script, and how a lift-drive actor from an unrelated
+# session stayed in the public map through several "re-authoring" runs.
+les.new_level("/Temp/RammsNewtonScratch")
 if unreal.EditorAssetLibrary.does_asset_exist(MAP):
-    unreal.EditorAssetLibrary.delete_asset(MAP)
+    if not unreal.EditorAssetLibrary.delete_asset(MAP):
+        raise RuntimeError("could not delete %s (is it still open?)" % MAP)
 les.new_level(MAP)
 world = ues.get_editor_world()
+
+# Verify rather than assume: the whole failure above was new_level quietly not
+# doing what it was asked.
+want_world = "%s.%s" % (MAP, MAP.rsplit("/", 1)[-1])
+if world.get_path_name() != want_world:
+    raise RuntimeError(
+        "new_level did not open %s -- the editor is on %s, so authoring here "
+        "would be written somewhere else" % (want_world, world.get_path_name()))
+print("[map] authoring into %s" % world.get_path_name())
 
 # Exactly one manager. AAMjManager::GetManager() resolves globally, so a second
 # would make which engine the solver binds to a coin flip — which is precisely
@@ -225,6 +244,26 @@ print("[map] solver component:", solver.get_name())
 # asset by path and check the result instead.
 if not unreal.EditorAssetLibrary.save_asset(MAP, only_if_is_dirty=False):
     raise RuntimeError("failed to save %s" % MAP)
+
+# ramms-sim is public and /RammsPrivateAssets/ is an optional private submodule,
+# so a public level must not reference private content: it breaks that boundary
+# and fails to load for anyone without access. Checked against the saved
+# package's real dependencies rather than trusting that nothing private was
+# open when this ran -- a lift-drive actor reached the committed public map
+# once, and nothing in this script noticed.
+if MAP.startswith("/Game/"):
+    registry = unreal.AssetRegistryHelpers.get_asset_registry()
+    try:
+        deps = registry.get_dependencies(MAP, unreal.AssetRegistryDependencyOptions())
+    except TypeError:
+        deps = registry.get_dependencies(MAP)
+    private = sorted(str(d) for d in (deps or []) if str(d).startswith("/RammsPrivateAssets"))
+    if private:
+        raise RuntimeError(
+            "%s references private content, which must never happen in this public "
+            "repo: %s. Something private was in the level when it was authored."
+            % (MAP, ", ".join(private)))
+    print("[map] dependency check: no private references")
 print("[map] saved", MAP)
 print("[map] actors:", [a.get_actor_label() for a in
                         unreal.GameplayStatics.get_all_actors_of_class(world, unreal.Actor)])
