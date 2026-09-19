@@ -98,15 +98,24 @@ ws = world.get_world_settings()
 # The property is default_game_type, not default_game_mode. Setting the latter
 # succeeds silently and overrides nothing, which is how the MeBot pawn kept
 # spawning on top of the robot under test long after this looked handled.
-game_mode_class = unreal.GameModeBase
+# Normalise to a UClass on both sides: unreal.GameModeBase is the Python type,
+# and the property reads back as the /Script/Engine.GameModeBase UClass, so
+# comparing them directly always fails.
+game_mode_class = unreal.GameModeBase.static_class()
 if GAME_MODE:
     gm_asset = unreal.EditorAssetLibrary.load_asset(GAME_MODE)
     if not gm_asset:
         raise RuntimeError("game mode not found: %s" % GAME_MODE)
     game_mode_class = gm_asset.generated_class()
 ws.set_editor_property("default_game_type", game_mode_class)
-if ws.get_editor_property("default_game_type") is None:
-    raise RuntimeError("game mode override did not take")
+# Compare identity, not None. A no-op assignment over an existing override
+# leaves a non-null value, so a None check passes while the old game mode — and
+# its pawn — still wins. That is the same silent-success shape this guard was
+# added to catch in the first place.
+applied = ws.get_editor_property("default_game_type")
+if applied != game_mode_class:
+    raise RuntimeError(
+        "game mode override did not take: wanted %s, level has %s" % (game_mode_class, applied))
 print("[map] game mode override -> %s" % (GAME_MODE or "GameModeBase (no default pawn)"))
 
 if BUILD_PENDULUM:
