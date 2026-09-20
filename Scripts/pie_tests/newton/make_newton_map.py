@@ -224,7 +224,13 @@ floor.set_actor_scale3d(unreal.Vector(40.0, 40.0, 1.0))
 floor_mesh = unreal.EditorAssetLibrary.load_asset("/Engine/BasicShapes/Cube")
 if floor_mesh:
     floor.static_mesh_component.set_static_mesh(floor_mesh)
-    floor.static_mesh_component.set_mobility(unreal.ComponentMobility.STATIC)
+    # Movable even though this is a static body in MuJoCo. URLab writes a
+    # transform to every converted body on every step, whether or not the body
+    # can move, and UE refuses to move a Static component -- logging
+    # "Mobility ... has to be 'Movable' if you'd like to move" each time. With
+    # Static set here that came to ~133k lines in a single editor session,
+    # which buries everything else in the log.
+    floor.static_mesh_component.set_mobility(unreal.ComponentMobility.MOVABLE)
 quick_convert = add_component(floor, unreal.MjQuickConvertComponent, "MjQuickConvert")
 quick_convert.set_editor_property("static", True)
 
