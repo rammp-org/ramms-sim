@@ -1,6 +1,10 @@
 """
 ue_import_dojo_parts.py  --  run INSIDE Unreal Engine 5 (Tools > Execute
-Python Script, or push with:  py ue_send.py ue_import_dojo_parts.py).
+Python Script, or push with:
+    python3 Scripts/editor_remote_exec.py --file Scripts/ue_import_dojo_parts.py
+
+SOURCE_DIR below is a machine-specific export path and must be set before this
+will do anything.
 
 Importer for the STATIC-PARTS dojo export (dojo_articulated_export.py with
 export_mode="static_parts"): every asset folder holds one static FBX per
@@ -487,7 +491,7 @@ def main():
             return
     except Exception:
         pass
-    # UE 5.8 routes FBX through Interchange by default, which ignores the
+    # UE 5.7 routes FBX through Interchange by default, which ignores the
     # legacy FbxImportUI options AND the UCX_ collision meshes -- route these
     # imports through the legacy FBX importer instead (session-scoped).
     unreal.SystemLibrary.execute_console_command(
