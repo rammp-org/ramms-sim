@@ -16,6 +16,8 @@ and cleared on read, so they apply to exactly one run:
                                    MjArticulation supplies the robot itself, in
                                    which case set _ramms_newton_pendulum = False.
     unreal._ramms_newton_pendulum  build the pendulum (default True)
+    unreal._ramms_newton_spawn     (x, y, z) for the PlayerStart a game-mode
+                                   robot spawns at (default just above the floor)
 
 Run inside the editor:
     python3 Scripts/editor_remote_exec.py --file Scripts/pie_tests/newton/make_newton_map.py
@@ -48,6 +50,9 @@ def take_param(name, default):
 MAP = take_param("map", "/Game/Maps/URL/Map_NewtonTest_URL")
 GAME_MODE = take_param("gamemode", "")
 BUILD_PENDULUM = take_param("pendulum", True)
+# Where a game-mode-supplied robot starts. The ground's top face is z=0, so the
+# default drops it in just above the floor.
+SPAWN = take_param("spawn", (0.0, 0.0, 20.0))
 
 les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 ues = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem)
@@ -181,6 +186,19 @@ if applied != game_mode_class:
         "game mode override did not take: wanted %s, level has %s" % (game_mode_class, applied))
 print("[map] game mode override -> %s" % (GAME_MODE or "GameModeBase (no default pawn)"))
 
+# A game mode that supplies the robot needs somewhere to put it.
+# ARammsMujocoTestGameMode pre-spawns its default pawn before the MuJoCo scene
+# compiles (a pawn spawned at player login would never be simulated), and with
+# no PlayerStart it has no transform to use, so the robot lands on the world
+# origin and every PIE logs "FindPlayerStart: PATHS NOT DEFINED or NO
+# PLAYERSTART". Matches what Scripts/pie_tests/base_component/make_test_map.py
+# does for Map_BaseTest_URL.
+if GAME_MODE:
+    start = unreal.EditorLevelLibrary.spawn_actor_from_class(
+        unreal.PlayerStart, unreal.Vector(*SPAWN), unreal.Rotator(0, 0, 0))
+    start.set_actor_label("PlayerStart_Robot")
+    print("[map] player start at %s" % (SPAWN,))
+
 if BUILD_PENDULUM:
     # Skipped when a game mode supplies the robot as its default pawn.
     # The articulation: its own model root -> body -> (hinge joint, capsule geom).
@@ -284,8 +302,14 @@ if not unreal.EditorLoadingAndSavingUtils.save_map(world, MAP):
 # once, and nothing in this script noticed.
 if MAP.startswith("/Game/"):
     registry = unreal.AssetRegistryHelpers.get_asset_registry()
+    # Flags set explicitly. They happen to default on in 5.8, but a guard whose
+    # correctness rests on a default nobody stated is one engine upgrade from
+    # passing on a contaminated map while still printing "no private references".
+    options = unreal.AssetRegistryDependencyOptions()
+    options.set_editor_property("include_hard_package_references", True)
+    options.set_editor_property("include_soft_package_references", True)
     try:
-        deps = registry.get_dependencies(MAP, unreal.AssetRegistryDependencyOptions())
+        deps = registry.get_dependencies(MAP, options)
     except TypeError:
         deps = registry.get_dependencies(MAP)
     private = sorted(str(d) for d in (deps or []) if str(d).startswith("/RammsPrivateAssets"))
