@@ -21,6 +21,8 @@ Run inside the editor:
     python3 Scripts/editor_remote_exec.py --file Scripts/pie_tests/newton/make_newton_map.py
 """
 
+import time
+
 import unreal
 
 
@@ -97,31 +99,52 @@ if unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_game_world() is
     les.editor_request_end_play()
     raise RuntimeError("PIE was running — stopped it; re-run this script")
 
-# Start from nothing: new_level over an existing asset can bring the old one
-# back rather than replacing it, which is how this ended up with two managers.
+# Author into a scratch world and write it out with save_map, rather than
+# opening the target level and saving in place.
 #
-# Get off the target level first. delete_asset cannot remove a package that is
-# currently loaded, and new_level onto a path that still exists gives up and
-# makes an untitled temp level instead -- silently. Everything below then
-# authored into /Temp/Untitled, and save_asset(MAP) re-saved whatever stale
-# package was already on disk and returned True. That is how the committed map
-# stopped matching this script, and how a lift-drive actor from an unrelated
-# session stayed in the public map through several "re-authoring" runs.
-les.new_level("/Temp/RammsNewtonScratch")
-if unreal.EditorAssetLibrary.does_asset_exist(MAP):
-    if not unreal.EditorAssetLibrary.delete_asset(MAP):
-        raise RuntimeError("could not delete %s (is it still open?)" % MAP)
-les.new_level(MAP)
+# Three editor APIs on the in-place route report success without doing the
+# work, and between them they kept this script from producing the map it
+# claimed to:
+#   - new_level(MAP) opens an untitled temp level instead, when MAP exists
+#   - delete_asset returns True while deleting nothing, when the package is
+#     still loaded (one PIE session on that level is enough to hold it)
+#   - save_current_level does nothing at all for a plugin-mounted level
+# So every run authored into /Temp/Untitled and then re-saved the stale package
+# already on disk. The committed map had not been this script's output for some
+# time, and an actor from an unrelated session survived in it through several
+# runs that looked like clean rebuilds.
+#
+# save_map is the one that fails honestly: it refuses to overwrite and returns
+# False, which turns "the old asset is still there" into an error instead of a
+# silent wrong result. It also reaches plugin mount points, which new_level
+# cannot, so the private lift-drive level can use this same path.
+# Unique per run. new_level refuses to replace a level that already exists and
+# hands back the old one instead, so a fixed scratch name means the second run
+# in an editor session inherits the first run's actors -- two suns, two grounds,
+# a pendulum in the level that asked for none, and components renamed around the
+# collisions. Same trap as the target path, one level up.
+SCRATCH = "/Temp/RammsNewtonAuthoring_%d" % int(time.time() * 1000)
+les.new_level(SCRATCH)
 world = ues.get_editor_world()
-
-# Verify rather than assume: the whole failure above was new_level quietly not
-# doing what it was asked.
-want_world = "%s.%s" % (MAP, MAP.rsplit("/", 1)[-1])
-if world.get_path_name() != want_world:
+want_scratch = "%s.%s" % (SCRATCH, SCRATCH.rsplit("/", 1)[-1])
+if world.get_path_name() != want_scratch:
     raise RuntimeError(
-        "new_level did not open %s -- the editor is on %s, so authoring here "
-        "would be written somewhere else" % (want_world, world.get_path_name()))
-print("[map] authoring into %s" % world.get_path_name())
+        "new_level did not open the scratch world %s -- the editor is on %s, "
+        "so authoring would go somewhere unintended" % (want_scratch, world.get_path_name()))
+
+# And confirm it really is empty, rather than trusting the name to be unused.
+stowaways = [a.get_actor_label()
+             for a in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.Actor)
+             if isinstance(a, (unreal.StaticMeshActor, unreal.MjArticulation, unreal.AMjManager))]
+if stowaways:
+    raise RuntimeError("scratch world %s is not empty: %s" % (SCRATCH, stowaways))
+
+# Clear the target so save_map will accept it. Whether this worked is not
+# checked here: save_map is the check, below.
+if unreal.EditorAssetLibrary.does_asset_exist(MAP):
+    unreal.SystemLibrary.collect_garbage()
+    unreal.EditorAssetLibrary.delete_asset(MAP)
+print("[map] authoring into %s -> %s" % (world.get_path_name(), MAP))
 
 # Exactly one manager. AAMjManager::GetManager() resolves globally, so a second
 # would make which engine the solver binds to a coin flip — which is precisely
@@ -245,11 +268,13 @@ cam.camera_component.set_editor_property("field_of_view", 70.0)
 solver = add_component(manager, unreal.RammsNewtonSolverComponent, "NewtonSolver")
 print("[map] solver component:", solver.get_name())
 
-# save_current_level() returns nothing and fails silently for a level mounted
-# from a plugin, which left a stale .umap on disk looking like a save. Save the
-# asset by path and check the result instead.
-if not unreal.EditorAssetLibrary.save_asset(MAP, only_if_is_dirty=False):
-    raise RuntimeError("failed to save %s" % MAP)
+# Write the scratch world out to the real path. See the note at the top: this
+# is the one call on the path that refuses rather than pretends.
+if not unreal.EditorLoadingAndSavingUtils.save_map(world, MAP):
+    raise RuntimeError(
+        "save_map refused %s. It will not overwrite, so the previous asset is "
+        "still there -- delete_asset cannot remove a package that is still "
+        "loaded. Stop PIE, open some other level, and re-run." % MAP)
 
 # ramms-sim is public and /RammsPrivateAssets/ is an optional private submodule,
 # so a public level must not reference private content: it breaks that boundary
