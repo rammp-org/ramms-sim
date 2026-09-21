@@ -13,10 +13,11 @@ key cannot be simulated from here. What this asserts instead:
     controls -- run against the same surface API teleop consumes
   * commanding those Ids is accepted, which is the call teleop makes each tick
 
-Set the expected linkage-control count before running (the Holonomic variant
-has none; the Linkage variant has two):
+Set the expected linkage-control count before running. A 5-bar offers TWO
+controls -- height and fore/aft -- so the count is two per linkage: the
+Holonomic variant has none, the Linkage variant has two linkages and so four.
 
-    unreal._ramms_expect_linkages = 2
+    unreal._ramms_expect_linkages = 4
 
 Run inside the editor, with PIE already started on a teleop test level:
     python3 Scripts/editor_remote_exec.py \
