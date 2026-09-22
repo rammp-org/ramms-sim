@@ -78,10 +78,32 @@ try:
           "surface accepts a drive.forward command from the Keyboard source")
     check(surface.set_control(unreal.Name("drive.turn"), 0.0, KB),
           "surface accepts a drive.turn command from the Keyboard source")
+    # The contract is the advertised Range: a panel or an input map only ever
+    # sends a value inside it, so the surface has to accept one. Commanding the
+    # LIVE value instead reads as a coin flip near a limit -- a 5-bar's
+    # reachable set is a curved region, its fore/aft band is about 4.5 cm wide
+    # near the top of the travel, and the live endpoint can sit exactly on the
+    # edge, so the height command just issued moves the band out from under it.
+    by_id = {str(ax.id): ax for ax in described.axes}
     for lid in linkages:
+        ax = by_id[lid]
         live = surface.get_control_value(unreal.Name(lid))
-        ok = surface.set_control(unreal.Name(lid), live, KB)
-        check(ok, "surface accepts a %s command (the linkage path teleop drives)" % lid)
+        lo, hi = float(ax.range.x), float(ax.range.y)
+        if lo >= hi:
+            check(False, "%s advertises a usable range (got %.3f..%.3f)" % (lid, lo, hi))
+            continue
+        mid = 0.5 * (lo + hi)
+        ok = surface.set_control(unreal.Name(lid), mid, KB)
+        check(ok, "surface accepts %s at the middle of its advertised range "
+                  "(%.2f in %.2f..%.2f, live %.2f)" % (lid, mid, lo, hi, live))
+        # The advertised range is a slice of a 2-D reachable region taken at
+        # one pose, so it goes stale as the endpoint moves. A live value
+        # outside the range the surface is publishing means a panel cannot
+        # command the pose the robot is already in.
+        if not (lo - 1e-3 <= live <= hi + 1e-3):
+            print("[teleop-test] NOTE %s reads %.3f, outside its advertised "
+                  "%.3f..%.3f -- the published range is a slice at one pose "
+                  "and has gone stale" % (lid, live, lo, hi))
 finally:
     surface.release_control(unreal.Name("drive.forward"), KB)
     surface.release_control(unreal.Name("drive.turn"), KB)
