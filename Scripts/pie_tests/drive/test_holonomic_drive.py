@@ -11,8 +11,8 @@ Two layers, deliberately separated.
   MOTION -- does the chassis actually go that way? This one depends on traction,
   so a failure here with the kinematics passing means friction, not maths. That
   distinction matters: wheels that spin without moving the base looked like a
-  broken controller once already, so the motion phase measures wheel spin too
-  and reports how much of it reached the ground.
+  broken controller once already, so the motion phase reads the wheels' own
+  speed too and reports how much of that rolling reached the ground.
 
 Run inside the editor with PIE started on a holonomic test level:
     python3 Scripts/editor_remote_exec.py \
@@ -66,15 +66,11 @@ def signs(values, eps=1e-4):
     return "".join("0" if abs(v) < eps else ("+" if v > 0 else "-") for v in values)
 
 
-def spin_between(qa, qb):
-    """Rotation magnitude in radians between two world quaternions.
-
-    Cheaper than composing inverses, and the chassis turns a couple of degrees
-    per leg against tens of degrees of wheel spin, so leaving the body frame in
-    is not worth the arithmetic.
-    """
-    d = abs(qa.x * qb.x + qa.y * qb.y + qa.z * qb.z + qa.w * qb.w)
-    return 2.0 * math.acos(max(-1.0, min(1.0, d)))
+# Wheel speed is read from the motor registry, not integrated from the wheel
+# bodies' orientation. The quaternion route silently under-reports once a wheel
+# turns more than half a revolution between samples -- the angle between two
+# orientations is never more than pi, so the faster a wheel spins the smaller
+# the answer gets, and it read a friction sweep as non-monotonic before this.
 
 
 if PHASE == "kinematics":
@@ -143,18 +139,19 @@ if PHASE == "kinematics":
           "turn splits the wheels two and two (%s)" % signs(turn))
 
     # --- arm the motion run --------------------------------------------------
-    wheel_bodies = [bodies[n] for n in names if n in bodies]
-    if len(wheel_bodies) != len(names):
-        print("[drive] NOTE only %d of %d wheel bodies found; spin will be partial"
-              % (len(wheel_bodies), len(names)))
+    base = pawn.get_component_by_class(unreal.RammsRobotBaseComponent)
+    if base is None:
+        raise RuntimeError("no RammsRobotBaseComponent; wheel speeds unreadable")
+    wheel_ids = [unreal.Name(n) for n in names]
 
     # Stamp the run with the world it was armed in. A PIE restart between the
     # two phases leaves the previous session's samples sitting on the unreal
     # module, and reporting those reads as a perfectly repeatable result --
     # three friction values once came back identical to the last decimal.
-    unreal._ramms_drive_data = {"samples": [], "spin": 0.0, "radius": radius,
+    unreal._ramms_drive_data = {"samples": [], "rolled": 0.0, "radius": radius,
+                                "speed_sum": 0.0, "speed_n": 0, "peak_speed": 0.0,
                                 "error": None, "world": world.get_path_name()}
-    st = {"n": 0, "prev": None}
+    st = {"n": 0}
     HOLD = 45
     # Switching to holonomic raises the centre wheels off the ground, and the
     # base then drops onto the omni wheels. Drive before that settles and the
@@ -187,13 +184,18 @@ if PHASE == "kinematics":
         # leaves the motion phase with an empty sample list.
         yaw = chassis.get_world_rotation().rotator().yaw
 
-        # Mean wheel spin, so a leg can be scored on how much of the rolling the
-        # ground actually took up.
-        quats = [b.get_world_rotation() for b in wheel_bodies]
-        if st["prev"] is not None and n > SETTLE:
-            step = sum(spin_between(a, b) for a, b in zip(st["prev"], quats))
-            unreal._ramms_drive_data["spin"] += step / max(1, len(quats))
-        st["prev"] = quats
+        # Mean wheel speed this frame, so a leg can be scored on how much of
+        # the rolling the ground took up -- and so a loop that never reaches
+        # its commanded rate is visible separately from one that reaches it
+        # and slips.
+        if n > SETTLE and dt > 0.0:
+            speeds = [abs(base.get_motor_velocity(mid)) for mid in wheel_ids]
+            mean = sum(speeds) / max(1, len(speeds))
+            d = unreal._ramms_drive_data
+            d["rolled"] += mean * radius * dt
+            d["speed_sum"] += mean
+            d["speed_n"] += 1
+            d["peak_speed"] = max(d["peak_speed"], max(speeds))
 
         unreal._ramms_drive_data["samples"].append((n, loc.x, loc.y, yaw))
         if n == SETTLE:
@@ -266,12 +268,16 @@ else:
     # How much of the rolling reached the ground? The wheels turning while the
     # base stays put is the traction failure, and it is invisible in the
     # displacement numbers alone.
-    spin = data.get("spin", 0.0)
     radius = data.get("radius") or 7.5
-    rolled = spin * radius
+    rolled = data.get("rolled", 0.0)
+    n_speed = max(1, data.get("speed_n", 1))
+    mean_speed = data.get("speed_sum", 0.0) / n_speed
+    peak_speed = data.get("peak_speed", 0.0)
     travelled = math.hypot(s[-1][1] - s[SETTLE][1], s[-1][2] - s[SETTLE][2])
-    print("[drive] wheels turned %.2f rad (%.1f cm of rolling at r=%.1f cm); "
-          "the base covered %.1f cm" % (spin, rolled, radius, travelled))
+    print("[drive] wheel speed: mean %.2f rad/s, peak %.2f rad/s over %d frames"
+          % (mean_speed, peak_speed, n_speed))
+    print("[drive] that is %.1f cm of rolling at r=%.1f cm; the base covered %.1f cm"
+          % (rolled, radius, travelled))
     if rolled > 1.0:
         print("[drive] traction: %.0f%% of the rolling reached the ground"
               % (100.0 * travelled / rolled))

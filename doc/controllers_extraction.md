@@ -21,16 +21,21 @@ name (`doc/mujoco_sim_roadmap.md:229-242`). Moving it as-is carries an engine
 physics dependency into the new plugin; moving it without the fallback breaks
 the existing Chaos Blueprints.
 
-**This has to be settled before the move, not during it.** Two options:
+**Settled: the Chaos fallback stays.** Retiring it is not on the table yet, so
+`ramms-controllers` will not be backend-neutral, and the scope says so rather
+than discovering it at link time:
 
-  - Retire the Chaos fallback first, once the Chaos-only Blueprints are
-    confirmed dead or migrated to a base component. Then the boundary above is
-    true for both controllers and the new plugin needs no physics dependency.
-  - Keep it, and declare `PhysicsCore` / `Engine` physics as a dependency of
-    `ramms-controllers`, accepting that the plugin is not backend-neutral.
+  - the plugin declares the engine physics it needs — `PhysicsCore`, plus
+    `Engine` for `USkeletalMeshComponent` and `FBodyInstance`;
+  - the boundary claim above holds for the 5-bar only. The differential drive
+    is a two-path controller, and both paths move with it;
+  - `ramms-controllers` therefore cannot be described as "no physics
+    dependency" in its README. It depends on Chaos specifically, not on a
+    backend abstraction.
 
-The first is preferable and is the reason this doc lists the fallback as a
-prerequisite rather than a detail.
+When the Chaos-only Blueprints are eventually migrated to a base component, the
+fallback and those dependencies come out together — that is a later change with
+its own verification, not a precondition for this one.
 
 ## What moves — 10 files, ~2,760 lines
 
