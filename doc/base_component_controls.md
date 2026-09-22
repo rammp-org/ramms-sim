@@ -11,7 +11,8 @@ touches physics itself.
 ```
  controller (diff-drive, 5-bar, …)        motor registry (DataTable)
         │  SetMotorCommand(Id, v)                 │ Id, Type, ChaosName,
-        │  GetMotorVelocity(Id) …                 │ ControlRange, Direction
+        │  SetMotorVelocityCommand(Id, rad/s)     │ ControlRange, Direction,
+        │  GetMotorVelocity(Id) …                 │ VelocityGains
         ▼                                         ▼
  ┌──────────────────────── RammsRobotBaseComponent ───────────────────────┐
  │  clamp to ControlRange · apply Direction · route to the backend        │
@@ -50,6 +51,28 @@ mode) is public in `ramms-core` / `ramms-mujoco-support`; the chair
 All tables live in `/Game/Robots/Data`. `Scripts/pie_tests/base_component/make_assets.py`
 (re)creates the chair setup and the linkage tables; `make_pawns.py` builds both
 MuJoCo pawns. Both are idempotent.
+
+### Commanding a motor: torque, position, or speed
+
+`SetMotorCommand(Id, v)` means whatever the motor's `ERammsActuatorType` says:
+newton-metres for a Torque actuator, a target angle / length for a Position
+one, a target rate for a Velocity one. It is the raw route, and a controller
+using it has to know which kind it is talking to.
+
+`SetMotorVelocityCommand(Id, radPerSec)` is the route a **drive** controller
+should use. It expresses a wheel speed and lets the base work out how to get
+it: passed straight through to a Velocity actuator, or closed as a PI loop over
+`GetMotorVelocity` on a Torque one, with gains from the motor's row
+(`FRammsVelocityGains`) or the base's `DefaultVelocityGains`. The target is
+held until changed; `ClearMotorVelocityCommand`, `ReleaseMotor`, or a direct
+`SetMotorCommand` on the same motor all drop it, so the loop never fights
+another writer.
+
+The distinction is not cosmetic. A wheel rate written into a Torque actuator is
+applied as newton-metres — the holonomic base did this and turned its wheels at
+about 3% of the commanded rate, which reads from outside as bad traction rather
+than as a unit error. `SetDefaultVelocityGains` and `GetPeakVelocityError`
+exist so the loop can be tuned against a running robot.
 
 ### Motor registries (`FRammsMotorSpec` rows)
 

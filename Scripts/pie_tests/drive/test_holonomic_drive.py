@@ -8,11 +8,23 @@ Two layers, deliberately separated.
   frame, so a mirrored strafe is the most likely mistake and the one worth
   catching without anything touching the ground.
 
-  MOTION -- does the chassis actually go that way? This one depends on traction,
-  so a failure here with the kinematics passing means friction, not maths. That
-  distinction matters: wheels that spin without moving the base looked like a
-  broken controller once already, so the motion phase reads the wheels' own
-  speed too and reports how much of that rolling reached the ground.
+  MOTION -- does the chassis actually go that way? Correct kinematics are not
+  enough, and the ways this fails are not all "friction": a rate written into a
+  torque actuator, a wheel radius that does not match the wheel, an input
+  component re-asserting zero every frame over the top of the command. Each of
+  those has happened here, and each looked like poor traction from the outside.
+
+  So the phase reports three things rather than one -- the chassis displacement,
+  the wheels' own speed against what was commanded, and the fraction of the
+  rolling that reached the ground. Speed far below the command is the
+  controller or the loop; speed on target with the base still is traction.
+
+  As of the working configuration, forward and yaw drive the base properly.
+  Strafe does not, and a failure confined to the strafe leg is expected: an omni
+  wheel has to slide along its axle, MuJoCo's per-geom friction is a single
+  isotropic coefficient, and the contact frame is only aligned to the geometry
+  for capsules (these wheels are cylinders). That needs the rollers modelled,
+  not a friction number.
 
 Run inside the editor with PIE started on a holonomic test level:
     python3 Scripts/editor_remote_exec.py \
@@ -298,10 +310,12 @@ else:
           % (tdyaw, yaw_floor))
 
     if failures and rolled > 10.0 and travelled < 0.2 * rolled:
-        print("[drive] NOTE the wheels turned and the base did not follow, so "
-              "this is traction rather than kinematics. The omni wheels are "
-              "angled off horizontal and share one friction class with "
-              "everything else, so they drag each other on any motion.")
+        print("[drive] NOTE the wheels turned and the base did not follow. "
+              "Check the commanded-vs-achieved speed above first: on target "
+              "means traction, well below means the controller or the loop. "
+              "Traction on the strafe leg alone is the known one -- the omni "
+              "rollers are not simulated, so the wheels cannot slide along "
+              "their axles.")
 
     print("[drive] ---- %d motion checks failed ----" % len(failures))
     for f in failures:

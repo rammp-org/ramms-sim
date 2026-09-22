@@ -51,8 +51,15 @@ v_i = di . (v + ω × r_i)
     = dix*vx + diy*vy + ω*(xi*diy - yi*dix)
 ```
 
-and the motor command is `v_i / wheel_radius`. That is the whole controller;
-the rest is configuration and arbitration.
+and the wheel is then commanded at `v_i / wheel_radius` **rad/s**, through
+`URammsRobotBaseComponent::SetMotorVelocityCommand`. That last part matters: the
+omni wheels are torque actuators, so writing the rate as a motor command applies
+it as newton-metres. The base closes a velocity loop over `GetMotorVelocity` for
+exactly this reason.
+
+`wheel_radius` is the axle height above the ground, not a nominal wheel size.
+Nothing can check it — a wrong value scales every rate and the loop tracks the
+wrong target perfectly. The lift-drive ran at 7.5 cm against a real 10.7.
 
 ### Controls
 
@@ -85,15 +92,40 @@ One default class covers every collision geom in the model:
 So the corner omni wheels and the centre wheels have **identical** friction --
 there is no differentiation to tune, which is the reported problem.
 
-MuJoCo friction is isotropic in the contact tangent plane: there is no way to
-say "grips along the roll direction, slides across it", which is exactly what an
-omni wheel does. Without simulating the rollers the behaviour has to be faked by
-choosing a single value, and the right value depends on whether a wheel
-propels.
+### Outcome: friction was not the blocker
 
-With the decision above, the corner omni wheels **propel**, so they want grip.
-The centre pair is then carried by the 5-bar and wants whatever keeps it from
-fighting the drive. Values to be tuned against a driving test, not guessed.
+Worth recording, because the evidence pointed the wrong way for a long time.
+Three other faults were stopping the base, and each one looked like poor
+traction: wheel rates written into torque actuators, the keyboard teleop
+re-asserting zero on the drive axes every frame over the top of any other
+command, and the wheel radius above. Every friction sweep run before those were
+fixed measured noise, including two that came back cleanly non-monotonic.
+
+Swept afterwards, omni slide friction of **0.1** was the best of
+inherited / 0.4 / 0.1 / 0.02 and is what ships. Forward and yaw now drive the
+base properly. Strafe remains weak at every value.
+
+### What a single coefficient cannot do
+
+`geom_friction` is 3 numbers (slide, spin, roll) and its slide term is
+isotropic in the contact tangent plane, so it cannot say "grips along the roll
+direction, slides across it" -- which is what an omni wheel does.
+
+MuJoCo *can* express that: `pair_friction` is 5 numbers,
+`tangent1, tangent2, spin, roll1, roll2`, and the two tangential coefficients
+may differ. The catch is the contact frame. `mju_makeFrame` keeps a tangent the
+collision routine supplied and otherwise falls back to a world axis, and
+`mjc_PlaneCapsule` is the only routine that supplies one -- cylinder, box,
+sphere, convex-mesh and GJK all zero it. **These wheels collide as cylinders**
+(r = 0.10695), so a pair would give anisotropy along a world axis, fixed in the
+world and wrong the moment the robot yaws. A capsule is not a substitute: its
+hemispherical caps would make a 10.7 cm-radius, 4 cm-thick wheel a 25 cm-wide
+blob at hub height.
+
+So strafe needs the rollers represented, not a better number. Either as rigid
+capsule proxies around the rim (tangential axes, one `<pair>` each, no new
+DOFs) or as real free-spinning roller bodies, which makes ordinary isotropic
+friction correct and removes the fake tuning entirely.
 
 Friction is unset on the `MjGeom` components (URLab beta properties are
 `TOptional` and start unset), so it is inherited from the class above. Overrides
