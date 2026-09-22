@@ -9,10 +9,28 @@ Status: **step 1 in progress** (decouple input from concrete controllers).
 ## Why a separate plugin
 
 Convention here is that a new RAMMS system gets its own `rammp-org/ramms-<name>`
-plugin submodule rather than accreting into RammsCore. The controllers already
-satisfy the harder half of that: they depend only on `IRammsControlContributor`
-and `URammsRobotBaseComponent`, and reach the physics backend *only* through the
-base component — so nothing in them is MuJoCo- or Newton-specific.
+plugin submodule rather than accreting into RammsCore. The 5-bar satisfies the
+harder half of that already: it depends only on `IRammsControlContributor` and
+`URammsRobotBaseComponent`, and reaches the physics backend solely through the
+base component, so nothing in it is MuJoCo- or Newton-specific.
+
+The differential drive does not. It keeps a direct Chaos path for robots with
+no base component — `SkeletalMeshComponent`, `FBodyInstance`, `GetWheelBody`,
+`SetMaxAngularVelocityInRadians` — and falls back to driving wheel bones by
+name (`doc/mujoco_sim_roadmap.md:229-242`). Moving it as-is carries an engine
+physics dependency into the new plugin; moving it without the fallback breaks
+the existing Chaos Blueprints.
+
+**This has to be settled before the move, not during it.** Two options:
+
+  - Retire the Chaos fallback first, once the Chaos-only Blueprints are
+    confirmed dead or migrated to a base component. Then the boundary above is
+    true for both controllers and the new plugin needs no physics dependency.
+  - Keep it, and declare `PhysicsCore` / `Engine` physics as a dependency of
+    `ramms-controllers`, accepting that the plugin is not backend-neutral.
+
+The first is preferable and is the reason this doc lists the fallback as a
+prerequisite rather than a detail.
 
 ## What moves — 10 files, ~2,760 lines
 
@@ -35,6 +53,29 @@ RammsControl (types)  <-  RammsCore (contributor iface, robot base)  <-  ramms-c
 which makes `RammsControl` the right home for a shared **control-Id vocabulary** —
 it is already a dependency of everyone who needs to speak it.
 
+### …but that diagram is not what the build says
+
+`RammsControl` is a *module* of the **RammsUI plugin**, and plugin dependencies
+are declared per plugin, not per module. So `RammsCore.uplugin` lists
+`RammsUI`, and through it:
+
+```
+RammsCore  ->  RammsUI (plugin)  ->  RammsStreaming, ProceduralMeshComponent
+```
+
+Nothing in RammsCore uses a widget. It takes the whole UI plugin, its Slate
+surface and its streaming dependency, to get three structs and two enums — and
+a headless or dedicated-server configuration that wants only the robot core
+pulls all of it in.
+
+**Recommendation: promote `RammsControl` to its own plugin
+(`rammp-org/ramms-control`) as part of this work, not after it.** It is the
+same convention every other system here follows, it makes the diagram above
+true instead of aspirational, and it is far cheaper now than once
+`ramms-controllers` has been split out and also depends on it — at that point
+three plugins have to move at once instead of one. The module is small and has
+no dependencies of its own beyond `Core`/`CoreUObject`.
+
 ## The two dependency inversions
 
 Both sit in modules that would otherwise have to depend on the new plugin:
@@ -50,9 +91,13 @@ Driving `SetControl(Id, Value, Source)` instead means a new controller — the
 holonomic one — is picked up by keyboard teleop and the access input with no
 change in either, the same property that makes the UI populate itself.
 
-The Ids are currently file-local literals in the controller `.cpp`
-(`drive.forward`, `drive.turn`), so there is nothing to decouple *against*
-yet. Step 1 promotes them to a shared header in `RammsControl`.
+`drive.forward` and `drive.turn` are already the contract, not something this
+work invents: `doc/base_component_controls.md` documents them as the
+diff-drive axes and the PIE and remote examples set them by name. What was
+missing was a single definition — they were file-local literals in the
+controller `.cpp`, repeated in the consumers. Step 1 promotes them to a shared
+header in `RammsControl` so there is one place to decouple *against*; the Ids
+themselves do not change and are not renamable without breaking those callers.
 
 Per-instance controls cannot be constants: the 5-bar advertises
 `linkage.<component>.height`. Those are discovered by (`Group`, `Kind`) from
@@ -60,8 +105,23 @@ the surface instead — `Group == Linkage && Kind == Position`.
 
 ## Public API leaving RammsCore
 
-Approved as a breaking change: the API landed recently and has no outside
-consumers.
+Approved as a breaking change: the API landed recently and has no consumers
+outside this repository.
+
+Inside it there are several, and they are reflected-name lookups that a move
+breaks silently rather than at compile time — Python asks for
+`unreal.RammsDifferentialDriveController` and gets `None` if the class has
+moved module. They need migrating with the move:
+
+  - `Scripts/pie_tests/base_component/make_assets.py`, `make_pawns.py` — these
+    *author* Blueprints with these component classes, so the assets they
+    produce carry the old class references too;
+  - `chaos_t1.py`, `chaos_sample.py`, `mj_turn.py`, `mj_t3.py`, `mj_state.py`,
+    `mj_lift.py`, `fix_dup_base.py` — `get_component_by_class` lookups.
+
+Existing `.uasset` Blueprints referencing the moved classes need redirectors
+(`[CoreRedirects]` in `Config/DefaultEngine.ini`), and the move is not done
+until those scripts run green against re-saved assets.
 
 `URamms5BarLinkageController`, `URammsDifferentialDriveController`,
 `URammsDifferentialDriveLibrary`, `URamms5BarKinematics` (both
