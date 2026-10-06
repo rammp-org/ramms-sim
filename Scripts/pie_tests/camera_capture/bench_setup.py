@@ -96,7 +96,14 @@ mgr.set_editor_property("auto_start_capture_on_begin_play", False)
 mgr.set_editor_property("auto_start_serialization_on_begin_play", False)
 mgr.set_editor_property("capture_rgb", True)
 mgr.set_editor_property("capture_depth", True)
-mgr.set_editor_property("capture_motion_vectors", True)
+# Single-capture mode has no DMV pass, so motion vectors are not available in
+# it; asking for them anyway would only produce a warning per camera.
+SINGLE = bool(CFG.get("single_capture", False))
+mgr.set_editor_property("capture_motion_vectors", not SINGLE)
+mgr.set_editor_property(
+    "capture_mode",
+    unreal.RammsCaptureMode.SINGLE_CAPTURE_COLOR_DEPTH if SINGLE
+    else unreal.RammsCaptureMode.COLOR_PLUS_DEPTH_MOTION)
 # Manual, not AllInLevel: the demo map's robot carries five cameras of its own,
 # and registering those would mean the measurement is not of COUNT cameras.
 mgr.set_editor_property("registration_mode", unreal.CameraRegistrationMode.MANUAL)
@@ -110,7 +117,7 @@ mgr.set_editor_property("cameras_to_capture", made)
 # the foreground, and every measurement describes the cap instead of the
 # workload -- it shows up as an identical p95 across all phases.
 
-print("[bench-setup] %d camera(s) at %dx%d colour / %dx%d depth (separate_depth=%s)"
-      % (len(made), W, H, DW, DH, SEPARATE_DEPTH))
+print("[bench-setup] %d camera(s) at %dx%d colour / %dx%d depth (separate_depth=%s, single_capture=%s)"
+      % (len(made), W, H, DW, DH, SEPARATE_DEPTH, SINGLE))
 if len(made) != COUNT:
     raise RuntimeError("expected %d cameras, made %d" % (COUNT, len(made)))

@@ -31,7 +31,37 @@ a packaged build.
 
 Capture p95 / max: 127/188, 129/275, 166/232, 324/840 ms.
 
-Two things these say:
+### Single capture vs two renders, 2026-10-06
+
+Both at 640x480 colour **and** 640x480 depth, so the comparison is like for
+like (the table above gave the two-render mode a quarter-resolution depth pass,
+which flattered it).
+
+| cameras | 2 renders | 1 render | saved | reduction |
+|---|---|---|---|---|
+| 1 | +32.09 ms | +17.13 ms | 14.96 ms | 46.6% |
+| 2 | +82.70 ms | +43.07 ms | 39.63 ms | 47.9% |
+| 4 | +118.34 ms | +71.07 ms | 47.27 ms | 39.9% |
+| 8 | +218.70 ms | +120.55 ms | 98.15 ms | 44.9% |
+
+Per camera: 32.1 -> 17.1, 41.4 -> 21.5, 29.6 -> 17.8, 27.3 -> 15.1 ms.
+
+Serialization gets cheaper too, because there is no motion EXR to write: at
+eight cameras it drops from +39.10 ms to +11.46 ms.
+
+`SetCaptureMode(SingleCaptureColorDepth)` uses the engine's
+`SCS_SceneColorSceneDepth`, which writes scene colour to RGB and scene depth to
+alpha in one pass. Verified on a real capture: alpha came back 288.75..501.50
+with 6592 distinct values -- **centimetres**, which is what `FCaptureData` and
+the RMSS metadata have always claimed. The DMV material emits a normalised
+0..1 instead, so this mode is the one whose units match the documentation.
+
+What it costs: no motion vectors at all (they come from the DMV pass), colour is
+linear scene colour rather than tone-mapped `SCS_FinalColorHDR`, and both planes
+share one render target and therefore one resolution -- separate depth
+intrinsics are ignored, with a warning.
+
+### Two things the camera-count tables say:
 
 - **Cost is roughly linear in camera count**, 25-35 ms each. Each camera is
   *two* scene captures -- colour and depth/motion -- so N cameras means 2N extra

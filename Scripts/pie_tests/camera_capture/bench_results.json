@@ -6,28 +6,28 @@
   "frames_per_phase": 90,
   "baseline": {
     "frames": 90,
-    "mean_ms": 43.184,
-    "median_ms": 42.076,
-    "p95_ms": 55.631,
-    "max_ms": 96.158
+    "mean_ms": 46.394,
+    "median_ms": 44.922,
+    "p95_ms": 59.633,
+    "max_ms": 79.844
   },
   "capture": {
     "frames": 90,
-    "mean_ms": 76.983,
-    "median_ms": 79.725,
-    "p95_ms": 126.715,
-    "max_ms": 187.558,
-    "over_baseline_ms": 33.799,
-    "per_camera_ms": 33.799
+    "mean_ms": 78.482,
+    "median_ms": 76.09,
+    "p95_ms": 112.479,
+    "max_ms": 122.688,
+    "over_baseline_ms": 32.088,
+    "per_camera_ms": 32.088
   },
   "serialize": {
     "frames": 90,
-    "mean_ms": 77.598,
-    "median_ms": 87.623,
-    "p95_ms": 133.638,
-    "max_ms": 206.571,
-    "over_baseline_ms": 34.414,
-    "per_camera_ms": 34.414
+    "mean_ms": 80.136,
+    "median_ms": 79.233,
+    "p95_ms": 120.804,
+    "max_ms": 152.175,
+    "over_baseline_ms": 33.742,
+    "per_camera_ms": 33.742
   },
   "throttle_suspected": false
 },
@@ -38,28 +38,28 @@
   "frames_per_phase": 90,
   "baseline": {
     "frames": 90,
-    "mean_ms": 45.157,
-    "median_ms": 43.508,
-    "p95_ms": 59.249,
-    "max_ms": 64.609
+    "mean_ms": 46.235,
+    "median_ms": 44.564,
+    "p95_ms": 61.431,
+    "max_ms": 92.887
   },
   "capture": {
     "frames": 90,
-    "mean_ms": 115.653,
-    "median_ms": 113.844,
-    "p95_ms": 128.986,
-    "max_ms": 275.166,
-    "over_baseline_ms": 70.496,
-    "per_camera_ms": 35.248
+    "mean_ms": 128.932,
+    "median_ms": 127.001,
+    "p95_ms": 145.841,
+    "max_ms": 285.866,
+    "over_baseline_ms": 82.697,
+    "per_camera_ms": 41.348
   },
   "serialize": {
     "frames": 90,
-    "mean_ms": 117.941,
-    "median_ms": 116.11,
-    "p95_ms": 137.356,
-    "max_ms": 268.248,
-    "over_baseline_ms": 72.784,
-    "per_camera_ms": 36.392
+    "mean_ms": 131.761,
+    "median_ms": 130.694,
+    "p95_ms": 143.36,
+    "max_ms": 159.56,
+    "over_baseline_ms": 85.526,
+    "per_camera_ms": 42.763
   },
   "throttle_suspected": false
 },
@@ -70,28 +70,28 @@
   "frames_per_phase": 90,
   "baseline": {
     "frames": 90,
-    "mean_ms": 48.498,
-    "median_ms": 47.718,
-    "p95_ms": 61.579,
-    "max_ms": 65.145
+    "mean_ms": 48.757,
+    "median_ms": 46.99,
+    "p95_ms": 63.977,
+    "max_ms": 82.246
   },
   "capture": {
     "frames": 90,
-    "mean_ms": 150.738,
-    "median_ms": 150.049,
-    "p95_ms": 165.889,
-    "max_ms": 232.447,
-    "over_baseline_ms": 102.24,
-    "per_camera_ms": 25.56
+    "mean_ms": 167.093,
+    "median_ms": 167.108,
+    "p95_ms": 181.827,
+    "max_ms": 238.044,
+    "over_baseline_ms": 118.336,
+    "per_camera_ms": 29.584
   },
   "serialize": {
     "frames": 90,
-    "mean_ms": 161.283,
-    "median_ms": 157.579,
-    "p95_ms": 175.45,
-    "max_ms": 326.028,
-    "over_baseline_ms": 112.785,
-    "per_camera_ms": 28.196
+    "mean_ms": 178.143,
+    "median_ms": 175.117,
+    "p95_ms": 214.801,
+    "max_ms": 291.905,
+    "over_baseline_ms": 129.386,
+    "per_camera_ms": 32.346
   },
   "throttle_suspected": false
 },
@@ -102,28 +102,28 @@
   "frames_per_phase": 90,
   "baseline": {
     "frames": 90,
-    "mean_ms": 44.245,
-    "median_ms": 43.088,
-    "p95_ms": 56.067,
-    "max_ms": 62.383
+    "mean_ms": 46.381,
+    "median_ms": 44.535,
+    "p95_ms": 59.829,
+    "max_ms": 82.635
   },
   "capture": {
     "frames": 90,
-    "mean_ms": 241.557,
-    "median_ms": 236.766,
-    "p95_ms": 324.467,
-    "max_ms": 840.272,
-    "over_baseline_ms": 197.312,
-    "per_camera_ms": 24.664
+    "mean_ms": 265.079,
+    "median_ms": 260.866,
+    "p95_ms": 304.021,
+    "max_ms": 549.595,
+    "over_baseline_ms": 218.698,
+    "per_camera_ms": 27.337
   },
   "serialize": {
     "frames": 90,
-    "mean_ms": 244.362,
-    "median_ms": 243.896,
-    "p95_ms": 257.805,
-    "max_ms": 275.586,
-    "over_baseline_ms": 200.117,
-    "per_camera_ms": 25.015
+    "mean_ms": 304.177,
+    "median_ms": 290.034,
+    "p95_ms": 386.283,
+    "max_ms": 519.356,
+    "over_baseline_ms": 257.796,
+    "per_camera_ms": 32.225
   },
   "throttle_suspected": false
 }]

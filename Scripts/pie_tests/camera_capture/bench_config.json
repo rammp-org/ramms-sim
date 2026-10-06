@@ -1,5 +1,5 @@
 {
-  "camera_count": 8,
+  "camera_count": 1,
   "width": 640,
   "height": 480,
   "depth_width": 320,
@@ -7,5 +7,6 @@
   "separate_depth": true,
   "frames_per_phase": 90,
   "warmup_frames": 30,
-  "output_dir": "camera_capture_bench"
+  "output_dir": "camera_capture_bench",
+  "single_capture": false
 }
