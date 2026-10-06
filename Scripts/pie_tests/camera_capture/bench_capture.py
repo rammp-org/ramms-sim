@@ -92,9 +92,7 @@ def enter_phase(name):
 
 
 def finish():
-    if state["handle"] is not None:
-        unreal.unregister_slate_post_tick_callback(state["handle"])
-        state["handle"] = None
+    _stop()
     mgr.stop_capture()
 
     sub = None
@@ -128,6 +126,12 @@ def finish():
     print("[bench] done -> %s" % RESULT_PATH)
 
 
+def _stop():
+    if state["handle"] is not None:
+        unreal.unregister_slate_post_tick_callback(state["handle"])
+        state["handle"] = None
+
+
 def tick(delta_seconds):
     """Sample wall clock, not the engine's delta.
 
@@ -137,7 +141,14 @@ def tick(delta_seconds):
     hides how slow the slow frames actually are, and it is the slow frames that
     matter. time.perf_counter() is not clamped.
     """
-    if state["done"]:
+    # A slate post-tick callback outlives PIE. Left registered it fires against
+    # a destroyed world and throws every frame, which both floods the log and
+    # adds a per-frame exception to anything measured afterwards -- so any
+    # failure unregisters rather than repeating.
+    if state["done"] or state["handle"] is None:
+        return
+    if unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_game_world() is None:
+        _stop()
         return
     now = time.perf_counter()
     last = state.get("last_time")
@@ -154,10 +165,14 @@ def tick(delta_seconds):
         state["count"] = 0
         state["last_time"] = None  # do not charge the next phase this interval
         state["phase_index"] += 1
-        if state["phase_index"] >= len(PHASES):
-            finish()
-        else:
-            enter_phase(PHASES[state["phase_index"]])
+        try:
+            if state["phase_index"] >= len(PHASES):
+                finish()
+            else:
+                enter_phase(PHASES[state["phase_index"]])
+        except Exception as e:
+            print("[bench] aborting after error: %s" % e)
+            _stop()
 
 
 # Without this the measurement is of the editor's throttle, not of capture.
