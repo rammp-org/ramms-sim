@@ -103,7 +103,7 @@ mgr.set_editor_property("capture_motion_vectors", not SINGLE)
 mgr.set_editor_property(
     "capture_mode",
     unreal.RammsCaptureMode.SINGLE_CAPTURE_COLOR_DEPTH if SINGLE
-    else unreal.RammsCaptureMode.COLOR_PLUS_DEPTH_MOTION)
+    else unreal.RammsCaptureMode.TONEMAPPED_COLOR_PLUS_DEPTH)
 # Manual, not AllInLevel: the demo map's robot carries five cameras of its own,
 # and registering those would mean the measurement is not of COUNT cameras.
 mgr.set_editor_property("registration_mode", unreal.CameraRegistrationMode.MANUAL)

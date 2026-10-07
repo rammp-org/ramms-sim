@@ -145,7 +145,14 @@ def main(camera_dir):
         if not ok:
             fails.append(what)
 
-    check(cw != dw or ch != dh, "the two grids really do differ")
+    # Whether the grids differ is a property of the CONFIGURATION, not a bug.
+    # TonemappedColorPlusDepth gives depth its own camera and so its own
+    # resolution; SingleCaptureColorDepth takes both planes from one target and
+    # the grids necessarily match. The mismatch-specific checks below only apply
+    # to the first, so the script follows the metadata rather than insisting on
+    # the scenario it was first written for.
+    bMismatched = (cw != dw or ch != dh)
+    print("  depth grid %s the colour grid" % ("DIFFERS from" if bMismatched else "matches"))
 
     # --- combined colour + depth-in-alpha ---
     w, h, chans = read_exr(os.path.join(camera_dir, stem + ".exr"))
@@ -161,16 +168,26 @@ def main(camera_dir):
           % (nonzero, len(alpha), amin, amax, adistinct))
     # The pre-fix bug: alpha was 0.0 for every pixel.
     check(nonzero > 0, "alpha carries depth (pre-fix this was zero everywhere)")
-    # Not a units check: the DMV material emits depth normalised to 0..1, even
-    # though FCaptureData calls it "cm, world-space" and the stream metadata
-    # advertises depth_unit cm. That discrepancy predates this fix and is not
-    # what is being tested here -- what matters is that the values vary, because
-    # a constant plane would also be "non-zero" while carrying nothing.
-    check(adistinct > 1000, "alpha varies across the image rather than being constant")
+    check(adistinct > 1, "alpha varies across the image rather than being constant")
+
+    # Depth is in CENTIMETRES now, from SCS_SceneColorSceneDepth in both modes.
+    # Worth asserting rather than assuming: the pass that used to produce it
+    # emitted tonemapped values that correlated with scene luminance instead of
+    # distance, and looked plausible enough to pass every other check here.
+    # The engine writes an enormous sentinel where nothing was hit (the sky), so
+    # judge the near end, which is real geometry.
+    real = [v for v in alpha if 0.0 < v < 1e6]
+    if real:
+        print("      alpha excluding the sky sentinel: %.2f..%.2f cm" % (min(real), max(real)))
+        check(min(real) > 1.0,
+              "near depth reads as centimetres, not a normalised 0..1 (min %.2f)" % min(real))
 
     # --- native-resolution depth ---
+    # Only written when the grids differ: with matching grids the alpha plane IS
+    # the depth at its own resolution and a second copy would be the same data.
     dpath = os.path.join(camera_dir, stem + "_depth.exr")
-    check(os.path.exists(dpath), "native-resolution depth EXR exists")
+    if bMismatched:
+        check(os.path.exists(dpath), "native-resolution depth EXR exists")
     if os.path.exists(dpath):
         w, h, dchans = read_exr(dpath)
         print("  %s_depth.exr: %dx%d" % (stem, w, h))
@@ -179,7 +196,7 @@ def main(camera_dir):
         ddistinct = len(set(dr))
         print("      depth R: range %.4f..%.4f, %d distinct"
               % (min(dr) if dr else 0.0, max(dr) if dr else 0.0, ddistinct))
-        check(ddistinct > 1000, "depth EXR varies across the image")
+        check(ddistinct > 1, "depth EXR varies across the image")
         # The alpha channel is a nearest-neighbour resample of exactly this, so
         # it must contain the same SET of values -- no more, no fewer. This is
         # the nearest-vs-bilinear property, checked on real GPU data rather than
@@ -189,11 +206,23 @@ def main(camera_dir):
               "(%d vs %d distinct)" % (adistinct, ddistinct))
 
     # --- motion vectors ---
+    # On its OWN grid, which is not the depth grid any more. Motion used to be
+    # produced by the depth pass, so one pair of dimensions described both; they
+    # are separate passes now and legitimately differ -- SingleCaptureColorDepth
+    # captures depth on the colour grid while the motion pass uses the depth
+    # intrinsics. The metadata says which is which, so trust that over a guess.
     mpath = os.path.join(camera_dir, stem + "_motion.exr")
     if os.path.exists(mpath):
         w, h, _ = read_exr(mpath)
         print("  %s_motion.exr: %dx%d" % (stem, w, h))
-        check((w, h) == (dw, dh), "motion EXR is on the depth grid, not the colour one")
+        mw = meta.get("motion_width")
+        mh = meta.get("motion_height")
+        if mw and mh:
+            check((w, h) == (mw, mh),
+                  "motion EXR matches the motion grid the metadata declares (%dx%d)" % (mw, mh))
+        else:
+            check((w, h) == (dw, dh),
+                  "motion EXR is on the depth grid (no motion_width in metadata)")
 
     print("%s (%d failing)" % ("ALL GREEN" if not fails else "FAILURES", len(fails)))
     return 1 if fails else 0

@@ -120,7 +120,7 @@ mgr.set_editor_property("auto_start_serialization_on_begin_play", True)
 mgr.set_editor_property("capture_rgb", True)
 mgr.set_editor_property("capture_depth", True)
 mgr.set_editor_property("capture_motion_vectors", True)
-mgr.set_editor_property("capture_mode", unreal.RammsCaptureMode.COLOR_PLUS_DEPTH_MOTION)
+mgr.set_editor_property("capture_mode", unreal.RammsCaptureMode.TONEMAPPED_COLOR_PLUS_DEPTH)
 # Manual: the demo map's robot carries cameras of its own, and registering those
 # would add shapes this test did not choose.
 mgr.set_editor_property("registration_mode", unreal.CameraRegistrationMode.MANUAL)
