@@ -1,0 +1,129 @@
+[
+{
+  "camera_count": 1,
+  "color": "",
+  "depth": "",
+  "frames_per_phase": 90,
+  "baseline": {
+    "frames": 90,
+    "mean_ms": 46.394,
+    "median_ms": 44.922,
+    "p95_ms": 59.633,
+    "max_ms": 79.844
+  },
+  "capture": {
+    "frames": 90,
+    "mean_ms": 78.482,
+    "median_ms": 76.09,
+    "p95_ms": 112.479,
+    "max_ms": 122.688,
+    "over_baseline_ms": 32.088,
+    "per_camera_ms": 32.088
+  },
+  "serialize": {
+    "frames": 90,
+    "mean_ms": 80.136,
+    "median_ms": 79.233,
+    "p95_ms": 120.804,
+    "max_ms": 152.175,
+    "over_baseline_ms": 33.742,
+    "per_camera_ms": 33.742
+  },
+  "throttle_suspected": false
+},
+{
+  "camera_count": 2,
+  "color": "",
+  "depth": "",
+  "frames_per_phase": 90,
+  "baseline": {
+    "frames": 90,
+    "mean_ms": 46.235,
+    "median_ms": 44.564,
+    "p95_ms": 61.431,
+    "max_ms": 92.887
+  },
+  "capture": {
+    "frames": 90,
+    "mean_ms": 128.932,
+    "median_ms": 127.001,
+    "p95_ms": 145.841,
+    "max_ms": 285.866,
+    "over_baseline_ms": 82.697,
+    "per_camera_ms": 41.348
+  },
+  "serialize": {
+    "frames": 90,
+    "mean_ms": 131.761,
+    "median_ms": 130.694,
+    "p95_ms": 143.36,
+    "max_ms": 159.56,
+    "over_baseline_ms": 85.526,
+    "per_camera_ms": 42.763
+  },
+  "throttle_suspected": false
+},
+{
+  "camera_count": 4,
+  "color": "",
+  "depth": "",
+  "frames_per_phase": 90,
+  "baseline": {
+    "frames": 90,
+    "mean_ms": 48.757,
+    "median_ms": 46.99,
+    "p95_ms": 63.977,
+    "max_ms": 82.246
+  },
+  "capture": {
+    "frames": 90,
+    "mean_ms": 167.093,
+    "median_ms": 167.108,
+    "p95_ms": 181.827,
+    "max_ms": 238.044,
+    "over_baseline_ms": 118.336,
+    "per_camera_ms": 29.584
+  },
+  "serialize": {
+    "frames": 90,
+    "mean_ms": 178.143,
+    "median_ms": 175.117,
+    "p95_ms": 214.801,
+    "max_ms": 291.905,
+    "over_baseline_ms": 129.386,
+    "per_camera_ms": 32.346
+  },
+  "throttle_suspected": false
+},
+{
+  "camera_count": 8,
+  "color": "",
+  "depth": "",
+  "frames_per_phase": 90,
+  "baseline": {
+    "frames": 90,
+    "mean_ms": 46.381,
+    "median_ms": 44.535,
+    "p95_ms": 59.829,
+    "max_ms": 82.635
+  },
+  "capture": {
+    "frames": 90,
+    "mean_ms": 265.079,
+    "median_ms": 260.866,
+    "p95_ms": 304.021,
+    "max_ms": 549.595,
+    "over_baseline_ms": 218.698,
+    "per_camera_ms": 27.337
+  },
+  "serialize": {
+    "frames": 90,
+    "mean_ms": 304.177,
+    "median_ms": 290.034,
+    "p95_ms": 386.283,
+    "max_ms": 519.356,
+    "over_baseline_ms": 257.796,
+    "per_camera_ms": 32.225
+  },
+  "throttle_suspected": false
+}]
