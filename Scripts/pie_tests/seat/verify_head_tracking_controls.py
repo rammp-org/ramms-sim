@@ -21,6 +21,7 @@ import unreal
 
 ACTOR = "BP_Mebot_Ramms0"
 CAMERA = "Front Camera"
+TRACKED = "Front Spring Arm"
 # Inside the component's own pitch clamp, so this measures the AXES rather than
 # re-measuring MinPitch/MaxPitch.
 YAW_STEP = 30.0
@@ -59,13 +60,22 @@ for _ in range(4):
     rc.call_method("NextCamera")
 check(cam.is_active(), "%s can still be reached by cycling (discovery intact)" % CAMERA)
 
+# REQUIRE the configuration, do not merely report it. Skipped, this passes just
+# as happily on an ordinary vehicle-mounted camera, which is the one case where
+# correct axes prove nothing about head tracking.
 seat = actor.get_component_by_class(unreal.RammsSeatComponent)
-if seat and seat.get_editor_property("track_occupant_head"):
-    print("[orbit] head tracking is ON, tracking %r, bone %r"
-          % (str(seat.get_editor_property("tracked_component_name")),
-             str(seat.get_resolved_head_bone())))
-    check(str(seat.get_resolved_head_bone()) not in ("None", ""),
-          "a head bone is resolved, so the rig really is on the occupant")
+check(seat is not None, "%s has a seat component" % ACTOR)
+if seat is None:
+    raise SystemExit(1)
+check(bool(seat.get_editor_property("track_occupant_head")), "head tracking is enabled")
+tracked = str(seat.get_editor_property("tracked_component_name"))
+check(tracked == TRACKED, "the seat tracks %s (it tracks %r)" % (TRACKED, tracked))
+bone = str(seat.get_resolved_head_bone())
+check(bone not in ("None", ""), "a head bone is resolved, so the rig really is on the occupant")
+print("[orbit] tracking %r on bone %r" % (tracked, bone))
+if fails:
+    print("[orbit] FAILURES (%d) -- the rig under test is not the head-tracked one" % len(fails))
+    raise SystemExit(1)
 
 
 def rot():

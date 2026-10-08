@@ -61,6 +61,12 @@ seat = add(unreal.RammsSeatComponent, "TestSeat")
 seat.set_editor_property("spawn_on_begin_play", False)
 seat.set_editor_property("track_occupant_head", True)
 seat.set_editor_property("tracked_component_name", "TestEyeCam")
+# This test asserts the FULL transform, rotation included, so it has to ask for
+# the rotation. The shipped default drives location only and deliberately leaves
+# rotation to the vehicle and the controls -- the separate controls test covers
+# that mode. Without this the rotation assertion below could only pass by
+# coincidence of the bone's pose.
+seat.set_editor_property("track_head_rotation", True)
 print("[head] configured seat to track 'TestEyeCam'")
 
 seat.call_method("SpawnOccupant")
@@ -114,15 +120,24 @@ print("[head] placement error: %.3f cm, %.3f deg" % (pos_err, rot_err))
 check(pos_err < 0.1, "camera is exactly at bone x HeadSocketOffset (%.3f cm off)" % pos_err)
 check(rot_err < 0.5, "camera orientation is exactly bone x HeadSocketOffset (%.3f deg off)" % rot_err)
 
+# Nothing is re-parented any more: the component is DRIVEN, not attached, so
+# that its rotation stays the vehicle's business. Assert that explicitly --
+# an earlier version asserted the opposite and would have passed a design that
+# broke the camera controls.
 parent = cam.get_attach_parent()
-check(parent == mesh, "camera is attached to the occupant's mesh (parent=%s)"
+check(parent != mesh,
+      "camera is NOT re-parented onto the occupant (parent=%s)"
       % (parent.get_name() if parent else None))
 check(cam.get_owner() == actor,
       "camera is still OWNED by the seat's actor, so camera discovery still finds it")
 
 seat.call_method("DetachTrackedComponentFromHead")
-check(cam.get_attach_parent() != mesh, "detach returns the camera to its authored parent")
+check(cam.get_world_location() != cam_loc,
+      "detaching returns the camera to its authored place rather than the last head pose")
 
 seat.call_method("ClearOccupant")
 actors.destroy_actor(actor)
 print("[head] %s (%d failing)" % ("ALL GREEN" if not fails else "FAILURES", len(fails)))
+# Remote exec reports the command's success, not the script's conclusions.
+if fails:
+    raise SystemExit(1)
