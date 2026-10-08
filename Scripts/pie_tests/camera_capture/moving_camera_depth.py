@@ -25,6 +25,8 @@ import unreal
 
 SPEED_CM_PER_S = 500.0
 FRAMES = 30
+# Ticks to wait after stopping capture, for readbacks already in flight.
+DRAIN_FRAMES = 30
 
 ues = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem)
 world = ues.get_game_world()
@@ -46,7 +48,35 @@ for a in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.CameraCapt
 if mgr is None:
     raise RuntimeError("no CameraCaptureManager in the PIE world")
 
-state = {"n": 0, "handle": None, "start_x": None, "end_x": None}
+state = {"n": 0, "handle": None, "start_x": None, "end_x": None,
+         "start_time": None, "drain": -1}
+
+
+def _prune_pre_movement():
+    """Drop frames the capture wrote before the camera started moving.
+
+    Clearing the directory up front is not enough: readbacks queued by the
+    manager's own auto-capture are still in flight when this script stops it,
+    and they land in the freshly cleared directory afterwards. They are STATIC
+    frames, and the verifier asks whether depth changed on most frames -- so a
+    handful of them is enough to fail a capture that tracked perfectly.
+    """
+    import os
+
+    start = state.get("start_time")
+    if not start or not OUT_ROOT or not os.path.isdir(OUT_ROOT):
+        return
+    dropped = 0
+    for root, _dirs, files in os.walk(OUT_ROOT):
+        for name in files:
+            path = os.path.join(root, name)
+            try:
+                if os.path.getmtime(path) < start:
+                    os.remove(path)
+                    dropped += 1
+            except OSError:
+                pass
+    print("[moving] pruned %d file(s) written before the movement began" % dropped)
 
 
 def _stop():
@@ -79,13 +109,24 @@ def tick(delta_seconds):
         state["end_x"] = actor.get_actor_location().x
         state["n"] += 1
 
+        if state["drain"] >= 0:
+            # Readbacks already queued when capture stopped are still in flight,
+            # and they belong to the moving window -- wait for them rather than
+            # pruning them away as if they were stale.
+            state["drain"] -= 1
+            if state["drain"] <= 0:
+                _prune_pre_movement()
+                _stop()
+            return
+
         if state["n"] >= FRAMES:
             # Stop capturing, not just moving: every frame written after this
             # point is a static one the verifier would count against the result.
             mgr.stop_capture()
             print("[moving] moved x %.1f -> %.1f over %d frames; capture stopped"
                   % (state["start_x"], state["end_x"], state["n"]))
-            _stop()
+            state["drain"] = DRAIN_FRAMES
+            return
     except Exception as e:
         print("[moving] stopping after error: %s" % e)
         _stop()
@@ -97,16 +138,19 @@ def tick(delta_seconds):
 # whether depth changed on most frames -- then measures a run that is mostly
 # stationary and fails a capture that tracked perfectly.
 mgr.stop_capture()
-out = mgr.get_editor_property("output_directory")
-if out:
+OUT_ROOT = None
+_out = mgr.get_editor_property("output_directory")
+if _out:
     import os
     import shutil
+    import time
 
-    root = out if os.path.isabs(out) else os.path.join(unreal.Paths.project_dir(), out)
-    root = os.path.normpath(root)
-    if os.path.isdir(root):
-        shutil.rmtree(root, ignore_errors=True)
-        print("[moving] cleared %s so only the moving frames land in it" % root)
+    OUT_ROOT = os.path.normpath(
+        _out if os.path.isabs(_out) else os.path.join(unreal.Paths.project_dir(), _out))
+    if os.path.isdir(OUT_ROOT):
+        shutil.rmtree(OUT_ROOT, ignore_errors=True)
+        print("[moving] cleared %s so only the moving frames land in it" % OUT_ROOT)
+    state["start_time"] = time.time()
 
 mgr.set_serialization_enabled(True)
 mgr.start_capture()

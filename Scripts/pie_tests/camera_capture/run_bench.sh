@@ -48,7 +48,9 @@ PY
   # No `timeout`: GNU coreutils, absent on macOS, which BENCH.md documents as a
   # supported platform. editor_remote_exec.py bounds itself.
   if ! $EXEC --code "unreal.log(1)" >/dev/null 2>&1; then
-    echo "  editor not responding -- aborting the sweep"; break
+    # Aborting half way through is a failure, not an early finish: without this
+    # the sweep breaks out, writes a truncated results file and still exits 0.
+    echo "  editor not responding -- aborting the sweep"; FAILED=1; break
   fi
   # Setup failing silently means the next phase measures the wrong camera count
   # and reports it as a result, so its exit status matters.
