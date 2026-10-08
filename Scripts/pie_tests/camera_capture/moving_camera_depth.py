@@ -80,13 +80,33 @@ def tick(delta_seconds):
         state["n"] += 1
 
         if state["n"] >= FRAMES:
-            print("[moving] moved x %.1f -> %.1f over %d frames"
+            # Stop capturing, not just moving: every frame written after this
+            # point is a static one the verifier would count against the result.
+            mgr.stop_capture()
+            print("[moving] moved x %.1f -> %.1f over %d frames; capture stopped"
                   % (state["start_x"], state["end_x"], state["n"]))
             _stop()
     except Exception as e:
         print("[moving] stopping after error: %s" % e)
         _stop()
 
+
+# Start from an empty directory and stop when the movement does, so the frames
+# on disk are exactly the moving ones. Left running, the manager keeps capturing
+# STATIC frames after this script finishes, and the verifier -- which asks
+# whether depth changed on most frames -- then measures a run that is mostly
+# stationary and fails a capture that tracked perfectly.
+mgr.stop_capture()
+out = mgr.get_editor_property("output_directory")
+if out:
+    import os
+    import shutil
+
+    root = out if os.path.isabs(out) else os.path.join(unreal.Paths.project_dir(), out)
+    root = os.path.normpath(root)
+    if os.path.isdir(root):
+        shutil.rmtree(root, ignore_errors=True)
+        print("[moving] cleared %s so only the moving frames land in it" % root)
 
 mgr.set_serialization_enabled(True)
 mgr.start_capture()

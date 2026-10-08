@@ -76,16 +76,24 @@ no longer among the costs; it is available in either mode.
 
 ### Two things the camera-count tables say:
 
-- **Cost is roughly linear in camera count**, 25-35 ms each. Each camera is
-  *two* scene captures -- colour and depth/motion -- so N cameras means 2N extra
-  scene renders. That is rendering, not the capture plumbing.
+- **Cost is roughly linear in camera count**, 25-35 ms each. That is rendering,
+  not the capture plumbing.
+
+  The renders per camera are no longer two. Depth and motion are separate passes
+  now, so a camera costs one render for colour+depth in `SingleCaptureColorDepth`
+  or two in `TonemappedColorPlusDepth`, plus one more if motion is on. With the
+  benchmark's defaults that is **3N** renders for the two-render mode and **2N**
+  for single capture -- the tables above were taken when it was 2N and N, with
+  motion folded into the depth pass rather than costing a render of its own.
 - **Serialization is close to free**: 0.6-10.5 ms on top of capture, for all
   cameras combined. EXR encoding and disk I/O are on background threads via
   ImageWriteQueue, and the measurements agree.
 
 So the lever for multi-camera headroom is the render side: capture rate
-(`CaptureEveryNFrames`), resolution, and whether motion vectors are wanted at
-all -- not the CPU-side readback path.
+(`CaptureEveryNFrames`), resolution, the capture mode, and whether motion
+vectors are wanted at all -- not the CPU-side readback path. Motion being its
+own pass makes that last one a whole render per camera rather than a channel
+that came along for free, which is the single biggest knob here.
 
 There is no before/after here. The subsystem's async readback path asserted on
 its first harvested frame before the fixes in `CameraCapture` 93cbdae, so there

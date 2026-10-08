@@ -54,7 +54,9 @@ def main(camera_dir):
     # the original: byte-identical EXRs across every frame of a moving capture.
     depth_sigs = []
     motion_nonzero = []
+    missing_motion = []
     for stem in stems:
+        meta = json.load(open(os.path.join(camera_dir, stem + ".json")))
         dpath = os.path.join(camera_dir, stem + "_depth.exr")
         src = dpath if os.path.exists(dpath) else os.path.join(camera_dir, stem + ".exr")
         _, _, chans = read_exr(src)
@@ -63,8 +65,16 @@ def main(camera_dir):
             continue
         depth_sigs.append(hash(tuple(plane[::97])))
 
+        # A missing motion file is a failure, not a skip. Skipping left
+        # motion_nonzero empty when every file was absent, and the run then
+        # passed on depth alone -- the same hole that was just closed in
+        # verify_capture_output, reintroduced here by writing this file from
+        # scratch rather than from that one.
         mpath = os.path.join(camera_dir, stem + "_motion.exr")
-        if os.path.exists(mpath):
+        if meta.get("motion_width") and meta.get("motion_height"):
+            if not os.path.exists(mpath):
+                missing_motion.append(stem)
+                continue
             _, _, mch = read_exr(mpath)
             r, g = mch.get("R", []), mch.get("G", [])
             motion_nonzero.append(sum(1 for i in range(0, len(r), 37) if r[i] or g[i]))
@@ -74,6 +84,10 @@ def main(camera_dir):
     check(distinct > 1, "depth changes as the camera moves (frozen depth gave exactly 1)")
     check(distinct >= max(2, len(depth_sigs) // 3),
           "depth changes on most frames, not just once (%d of %d)" % (distinct, len(depth_sigs)))
+
+    check(not missing_motion,
+          "every frame whose metadata declares a motion grid has a motion EXR (%d missing)"
+          % len(missing_motion))
 
     if motion_nonzero:
         total = sum(motion_nonzero)
