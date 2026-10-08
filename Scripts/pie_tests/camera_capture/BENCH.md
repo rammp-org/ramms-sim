@@ -8,7 +8,17 @@ Measures what capture costs per frame as the camera count grows.
   "-ini:EditorSettings:[/Script/UnrealEd.EditorPerformanceSettings]:bThrottleCPUWhenNotForeground=False"
 
 Scripts/pie_tests/camera_capture/run_bench.sh 1 2 4 8
+
+# The mode is pinned per sweep rather than inherited from the config file:
+SWEEP_SINGLE=true SWEEP_MOTION=true Scripts/pie_tests/camera_capture/run_bench.sh 1 2 4 8
 ```
+
+The sweep writes every field the comparison depends on, not just the camera
+count, and restores `bench_config.json` on exit including on Ctrl-C -- setting
+only the count meant a run could inherit the previous one's mode and report the
+wrong comparison. It exits non-zero if any step timed out, failed its setup or
+came back throttled, because a partial sweep used to print a line and still
+report success.
 
 Each step restarts PIE, places exactly N cameras (Manual registration, so the
 demo map's own five robot cameras are not counted), and walks four phases in one
