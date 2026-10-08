@@ -8,5 +8,6 @@
   "frames_per_phase": 90,
   "warmup_frames": 30,
   "output_dir": "camera_capture_bench",
-  "single_capture": false
+  "single_capture": false,
+  "capture_motion": true
 }
