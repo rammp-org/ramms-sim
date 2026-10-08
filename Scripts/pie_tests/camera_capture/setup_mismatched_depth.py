@@ -110,6 +110,12 @@ mgr.set_editor_property("auto_start_capture_on_begin_play", True)
 mgr.set_editor_property("auto_start_serialization_on_begin_play", True)
 mgr.set_editor_property("capture_rgb", True)
 mgr.set_editor_property("capture_depth", True)
+# The whole point of this scenario is a depth plane at its own resolution, and
+# only the two-render mode has a depth camera of its own to give it one. The
+# default is now SingleCaptureColorDepth, which takes both planes from one
+# target and so one resolution -- leaving the mode alone would collapse the
+# mismatch this test exists to exercise and still pass.
+mgr.set_editor_property("capture_mode", unreal.RammsCaptureMode.TONEMAPPED_COLOR_PLUS_DEPTH)
 mgr.set_editor_property("capture_motion_vectors", True)
 mgr.set_editor_property("registration_mode", unreal.CameraRegistrationMode.ALL_IN_LEVEL)
 

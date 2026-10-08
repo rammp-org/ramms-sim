@@ -80,8 +80,19 @@ state = {
 
 
 def enter_phase(name):
-    """Capture/serialization settings for each phase."""
-    if name in ("warmup", "baseline"):
+    """Capture/serialization settings for each phase.
+
+    Warmup CAPTURES. The cold costs this phase exists to discard -- render
+    target creation, shader compilation, the first trip through the readback
+    path -- only happen if capture is actually running, so stopping capture here
+    warmed nothing and pushed every one of them into the measured `capture`
+    phase instead. That inflates the first result and nothing else, which is the
+    hardest kind of benchmark error to notice.
+    """
+    if name == "warmup":
+        mgr.set_serialization_enabled(False)
+        mgr.start_capture()
+    elif name == "baseline":
         mgr.stop_capture()
     elif name == "capture":
         mgr.set_serialization_enabled(False)

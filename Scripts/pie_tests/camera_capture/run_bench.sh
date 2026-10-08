@@ -30,7 +30,9 @@ json.dump(cfg, open(p, "w"), indent=2)
 PY
   $EXEC --code "unreal.get_editor_subsystem(unreal.LevelEditorSubsystem).editor_request_end_play()" >/dev/null 2>&1
   sleep 3
-  if ! timeout 60 $EXEC --code "unreal.log(1)" >/dev/null 2>&1; then
+  # No `timeout`: GNU coreutils, absent on macOS, which BENCH.md documents as a
+  # supported platform. editor_remote_exec.py bounds itself.
+  if ! $EXEC --code "unreal.log(1)" >/dev/null 2>&1; then
     echo "  editor not responding -- aborting the sweep"; break
   fi
   $EXEC --file "$DIR/bench_setup.py" 2>&1 | grep -E "bench-setup\]|Error" || true

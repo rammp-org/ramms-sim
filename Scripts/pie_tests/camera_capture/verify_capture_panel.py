@@ -76,3 +76,7 @@ panel.rebuild_feeds()
 print("[panel] feeds rebuilt without error")
 
 print("[panel] %s (%d failing)" % ("ALL GREEN" if not fails else "FAILURES", len(fails)))
+# Remote exec reports the command's success, not the script's conclusions, so a
+# run with failing checks looked like a pass to anything driving this.
+if fails:
+    raise SystemExit(1)

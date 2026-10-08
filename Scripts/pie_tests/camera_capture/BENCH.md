@@ -49,17 +49,30 @@ Per camera: 32.1 -> 17.1, 41.4 -> 21.5, 29.6 -> 17.8, 27.3 -> 15.1 ms.
 Serialization gets cheaper too, because there is no motion EXR to write: at
 eight cameras it drops from +39.10 ms to +11.46 ms.
 
+> **These numbers are a no-motion comparison, and they predate the depth/motion
+> split.** They were taken when motion could only exist in the two-render mode,
+> so the harness disabled it for single capture only -- the "2 renders" column
+> includes a motion pass and the "1 render" column does not. Part of what reads
+> as the mode's saving is simply the motion render missing from one side, and
+> the serialization figure above is entirely that. Motion is its own pass now,
+> available in either mode and costing its own render in either, and
+> `bench_setup.py` sets it identically for both. **Re-run before quoting these.**
+
 `SetCaptureMode(SingleCaptureColorDepth)` uses the engine's
 `SCS_SceneColorSceneDepth`, which writes scene colour to RGB and scene depth to
 alpha in one pass. Verified on a real capture: alpha came back 288.75..501.50
-with 6592 distinct values -- **centimetres**, which is what `FCaptureData` and
-the RMSS metadata have always claimed. The DMV material emits a normalised
-0..1 instead, so this mode is the one whose units match the documentation.
+with 6592 distinct values -- **centimetres**.
 
-What it costs: no motion vectors at all (they come from the DMV pass), colour is
-linear scene colour rather than tone-mapped `SCS_FinalColorHDR`, and both planes
-share one render target and therefore one resolution -- separate depth
-intrinsics are ignored, with a warning.
+Both modes produce centimetres now, from the same engine path: the depth that
+used to come out of the DMV pass was never a distance at all. Measured against
+`SCS_SceneColorSceneDepth` on one scene with the same cameras, it correlated
+-0.11 with true range and +0.73 with scene LUMINANCE -- it was largely the
+photograph. That is why depth moved to the depth buffer in both modes.
+
+What single capture still costs: colour is linear scene colour rather than
+tone-mapped, and both planes share one render target and therefore one
+resolution -- separate depth intrinsics are ignored, with a warning. Motion is
+no longer among the costs; it is available in either mode.
 
 ### Two things the camera-count tables say:
 

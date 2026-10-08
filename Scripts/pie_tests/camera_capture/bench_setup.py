@@ -96,10 +96,13 @@ mgr.set_editor_property("auto_start_capture_on_begin_play", False)
 mgr.set_editor_property("auto_start_serialization_on_begin_play", False)
 mgr.set_editor_property("capture_rgb", True)
 mgr.set_editor_property("capture_depth", True)
-# Single-capture mode has no DMV pass, so motion vectors are not available in
-# it; asking for them anyway would only produce a warning per camera.
+# Motion is its OWN pass now, available in both modes and costing its own render
+# in either, so it is set the same way for both. It used to be disabled for
+# single capture only -- because that mode genuinely could not produce it -- and
+# leaving that in place after the decoupling would compare a mode WITH motion
+# against a mode WITHOUT it and report the difference as the mode's saving.
 SINGLE = bool(CFG.get("single_capture", False))
-mgr.set_editor_property("capture_motion_vectors", not SINGLE)
+mgr.set_editor_property("capture_motion_vectors", bool(CFG.get("capture_motion", True)))
 mgr.set_editor_property(
     "capture_mode",
     unreal.RammsCaptureMode.SINGLE_CAPTURE_COLOR_DEPTH if SINGLE

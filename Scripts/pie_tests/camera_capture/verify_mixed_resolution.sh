@@ -21,7 +21,10 @@ EXEC="python3 $ROOT/Scripts/editor_remote_exec.py"
 SECONDS_TO_RUN="${1:-10}"
 OUT="$ROOT/camera_capture_mixedres"
 
-if ! timeout 60 $EXEC --code "unreal.log(1)" >/dev/null 2>&1; then
+# No `timeout` here: it is GNU coreutils and macOS does not ship it, which is the
+# platform this script explicitly supports (it knows about ~/Library/Logs).
+# editor_remote_exec.py already bounds its own discovery and execution.
+if ! $EXEC --code "unreal.log(1)" >/dev/null 2>&1; then
   echo "FAIL: no editor responded to remote exec"; exit 1
 fi
 
@@ -63,14 +66,19 @@ echo "=== frames per camera"
 # differs simply because they start later. Their presence is useful -- more
 # shapes in the same pool -- but they are not what this asserts on.
 if [ -d "$OUT" ]; then
+  # Count the per-frame JSON, which is emitted exactly once per frame. Counting
+  # 'frame_*.exr' counted PLANES: the combined, depth and motion EXRs all match
+  # it, so every number was multiplied by however many planes were enabled and
+  # the frame-spread tolerance below was being applied to the wrong quantity --
+  # two frames out of step could read as six.
   COUNTS=$(find "$OUT" -type d -name 'MixedResCam_*' | while read -r d; do
-    n=$(find "$d" -name 'frame_*.exr' | wc -l | tr -d ' ')
+    n=$(find "$d" -name 'frame_*.json' | wc -l | tr -d ' ')
     echo "$n $(basename "$d")"
   done | sort -rn)
   echo "$COUNTS" | sed 's/^/  /'
   echo "  (other cameras in the level, for context:)"
   find "$OUT" -type d -not -name 'MixedResCam_*' -mindepth 2 | while read -r d; do
-    n=$(find "$d" -name 'frame_*.exr' | wc -l | tr -d ' ')
+    n=$(find "$d" -name 'frame_*.json' | wc -l | tr -d ' ')
     [ "$n" -gt 0 ] && echo "    $n $(basename "$d")"
   done
   NUM=$(echo "$COUNTS" | grep -c . || true)

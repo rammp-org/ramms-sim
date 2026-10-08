@@ -211,7 +211,14 @@ def main(camera_dir):
     # are separate passes now and legitimately differ -- SingleCaptureColorDepth
     # captures depth on the colour grid while the motion pass uses the depth
     # intrinsics. The metadata says which is which, so trust that over a guess.
+    # A missing motion EXR used to skip the whole block, so a regression that
+    # stopped writing motion passed silently. The metadata says whether motion
+    # was captured, so it can say whether the file is required.
     mpath = os.path.join(camera_dir, stem + "_motion.exr")
+    motion_expected = bool(meta.get("motion_width")) and bool(meta.get("motion_height"))
+    if motion_expected:
+        check(os.path.exists(mpath),
+              "motion EXR exists, as the metadata's motion grid says it should")
     if os.path.exists(mpath):
         w, h, _ = read_exr(mpath)
         print("  %s_motion.exr: %dx%d" % (stem, w, h))
