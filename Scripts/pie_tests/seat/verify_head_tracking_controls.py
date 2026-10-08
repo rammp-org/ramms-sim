@@ -73,6 +73,13 @@ check(seat is not None, "%s has a seat component" % ACTOR)
 if seat is None:
     raise SystemExit(1)
 check(bool(seat.get_editor_property("track_occupant_head")), "head tracking is enabled")
+# And REQUIRE head-rotation tracking to be off, which is the half of the contract
+# this test cannot otherwise see. Every Orbit() call and every read below happens
+# inside one remote-exec turn, so no seat tick lands between them -- with the flag
+# on, the axis checks pass exactly as they do now while the next frame overwrites
+# the spring arm's world rotation from the head bone and throws the orbit away.
+check(not bool(seat.get_editor_property("track_head_rotation")),
+      "head ROTATION tracking is off, so a tick cannot overwrite the orbit")
 tracked = str(seat.get_editor_property("tracked_component_name"))
 check(tracked == TRACKED, "the seat tracks %s (it tracks %r)" % (TRACKED, tracked))
 bone = str(seat.get_resolved_head_bone())
