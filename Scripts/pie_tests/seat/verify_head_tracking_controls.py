@@ -1,15 +1,20 @@
-"""Does orbiting still drive the axes it names, once the arm hangs off a head bone?
+"""Does orbiting still drive the axes it names, once the rig follows a head bone?
 
-Head tracking re-parents a camera rig onto the occupant's head bone. Anything
-that aims that rig does so in its PARENT's space -- URammsRobotCameraComponent's
-Orbit() adds to the spring arm's relative yaw, clamps its relative pitch and
-zeroes its relative roll -- and all of that was written for a parent aligned
-with the vehicle. Parented to a head bone whose axes are permuted, "yaw" turns
-about a sideways axis and "roll = 0" levels against the skull.
+Anything that aims a camera rig does so in its PARENT's space --
+URammsRobotCameraComponent's Orbit() adds to the spring arm's relative yaw,
+clamps its relative pitch and zeroes its relative roll -- and all of that was
+written for a parent aligned with the vehicle. Hang that rig off a head bone
+whose axes are permuted and "yaw" turns about a sideways axis while "roll = 0"
+levels against the skull.
 
-Keeping the tracked component's rotation ABSOLUTE is what preserves those
-controls, and this is the check that it did. Position still comes from the bone;
-only the rotation is world-aligned.
+So the seat component does not re-parent anything. It leaves the rig on its
+authored parent and writes only the tracked component's world LOCATION each
+frame, which moves the rig onto the occupant's head without touching the space
+Orbit() does its arithmetic in. Rotation is written only when bTrackHeadRotation
+is set; with it off the authored parent-relative rotation stands, so the view
+keeps inheriting the vehicle's yaw as well. This is the check that the controls
+survived that -- a sibling test, verify_head_tracking.py, is what proves the rig
+is never re-parented.
 
 Run with PIE running and the Mebot spawned:
 
