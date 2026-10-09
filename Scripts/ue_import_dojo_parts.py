@@ -1,6 +1,10 @@
 """
 ue_import_dojo_parts.py  --  run INSIDE Unreal Engine 5 (Tools > Execute
-Python Script, or push with:  py ue_send.py ue_import_dojo_parts.py).
+Python Script, or push with:
+    python3 Scripts/editor_remote_exec.py --file Scripts/ue_import_dojo_parts.py
+
+SOURCE_DIR below is a machine-specific export path and must be set before this
+will do anything.
 
 Importer for the STATIC-PARTS dojo export (dojo_articulated_export.py with
 export_mode="static_parts"): every asset folder holds one static FBX per
@@ -31,7 +35,36 @@ import re
 import unreal
 
 # --------------------------------------------------------------------------- config
-SOURCE_DIR = r"C:\Users\waemf\data\UE_VAULT_EXPORT\dojo_parts"
+
+
+def _export_dir():
+    """Where dojo_articulated_export.py wrote its static-parts export.
+
+    Was a hardcoded Windows path, which made this runnable on exactly one
+    machine. Set either of:
+
+        unreal._ramms_dojo_export_dir = "/path/to/dojo_parts"   (before running)
+        RAMMS_DOJO_EXPORT_DIR=/path/to/dojo_parts               (in the env)
+    """
+    d = getattr(unreal, "_ramms_dojo_export_dir", None) or os.environ.get(
+        "RAMMS_DOJO_EXPORT_DIR")
+    if not d:
+        raise RuntimeError(
+            "no dojo export directory configured. Set unreal._ramms_dojo_export_dir "
+            "or the RAMMS_DOJO_EXPORT_DIR environment variable to the folder "
+            "dojo_articulated_export.py wrote (the one containing rig_manifest.json).")
+    d = os.path.expanduser(d)
+    if not os.path.isdir(d):
+        raise RuntimeError("dojo export directory does not exist: %s" % d)
+    if not os.path.isfile(os.path.join(d, "rig_manifest.json")):
+        raise RuntimeError(
+            "%s has no rig_manifest.json -- point this at the export root, not an "
+            "asset subfolder" % d)
+    return d
+
+
+SOURCE_DIR = None          # resolved in main(); see _export_dir()
+INTERCHANGE_FBX_CVAR = "Interchange.FeatureFlags.Import.FBX"
 DEST_DIR   = "/Game/DojoParts"
 MAT_DIR    = DEST_DIR + "/Materials"
 MASTER_NAME = "M_Dojo_Master"
@@ -94,8 +127,14 @@ def _run_import(path, dest, options=None):
     return objs[0] if objs else None
 
 
-def import_texture(path, srgb, is_normal):
-    if not os.path.exists(path):
+def import_texture(folder, filename, srgb, is_normal):
+    # A missing key used to arrive here as os.path.join(folder, "") -- the
+    # folder itself, which exists, so the guard passed and the importer was
+    # handed a directory.
+    if not filename:
+        return None
+    path = os.path.join(folder, filename)
+    if not os.path.isfile(path):
         unreal.log_warning("  missing texture: " + path)
         return None
     tex = _run_import(path, DEST_DIR + "/Textures")
@@ -294,6 +333,27 @@ def assign_materials_sm(sm, mic_by_slot):
 
 
 # --------------------------------------------------------------------------- blueprint assembly
+def _root_handle(bp):
+    return SDS.k2_gather_subobject_data_for_blueprint(bp)[0]
+
+
+def _handle_for(bp, obj):
+    """Re-resolve a subobject handle from the object it wraps.
+
+    Handles are not stable: one taken from an earlier gather goes stale as
+    soon as the next add reshapes the subobject tree, and a stale PARENT
+    handle does not error -- it silently attaches the new component to the
+    root instead, so the hierarchy comes out flat and every joint frame is
+    then computed against the wrong parent. Re-resolving on each use is the
+    only way to be sure the parent is the one intended.
+    """
+    for h in SDS.k2_gather_subobject_data_for_blueprint(bp):
+        d = SDS.k2_find_subobject_data_from_handle(h)
+        if SDBFL.get_object(d) == obj:
+            return h
+    return None
+
+
 def add_component(bp, parent_handle, cls, name):
     params = unreal.AddNewSubobjectParams(parent_handle=parent_handle,
                                           new_class=cls, blueprint_context=bp)
@@ -420,9 +480,6 @@ def build_blueprint(name, entry, meshes):
         factory.set_editor_property("parent_class", unreal.Actor)
         bp = assets.create_asset("BP_" + name, bp_dir, unreal.Blueprint, factory)
 
-    gather = SDS.k2_gather_subobject_data_for_blueprint(bp)
-    actor_root = gather[0]
-
     parts = entry["parts"]
     comp_name = {p: ("body" if p == "root" else p) for p in parts}
     handles, comps = {}, {}
@@ -433,7 +490,13 @@ def build_blueprint(name, entry, meshes):
         j = pentry.get("joint")
         parent_part = (j["parent"] if j and j["parent"] in parts else "root") \
             if part != "root" else None
-        parent_handle = handles[parent_part] if parent_part else actor_root
+        if parent_part:
+            parent_handle = _handle_for(bp, comps[parent_part])
+            if parent_handle is None:
+                raise RuntimeError(
+                    "no live handle for parent part '%s' of '%s'" % (parent_part, part))
+        else:
+            parent_handle = _root_handle(bp)
         h, comp = add_component(bp, parent_handle, unreal.StaticMeshComponent,
                                 comp_name[part])
         handles[part], comps[part] = h, comp
@@ -453,7 +516,10 @@ def build_blueprint(name, entry, meshes):
         if not j:
             continue
         parent_part = j["parent"] if j["parent"] in parts else "root"
-        h, ccomp = add_component(bp, handles[part],
+        part_handle = _handle_for(bp, comps[part])
+        if part_handle is None:
+            raise RuntimeError("no live handle for part '%s' when adding its joint" % part)
+        h, ccomp = add_component(bp, part_handle,
                                  unreal.PhysicsConstraintComponent,
                                  "joint_" + part)
         mid = configure_constraint(ccomp, comp_name[part],
@@ -487,11 +553,31 @@ def main():
             return
     except Exception:
         pass
-    # UE 5.8 routes FBX through Interchange by default, which ignores the
-    # legacy FbxImportUI options AND the UCX_ collision meshes -- route these
-    # imports through the legacy FBX importer instead (session-scoped).
+    global SOURCE_DIR
+    SOURCE_DIR = _export_dir()
+    unreal.log("dojo export: " + SOURCE_DIR)
+
+    # 5.7+ routes FBX through Interchange by default, which ignores the legacy
+    # FbxImportUI options AND the UCX_ collision meshes -- so these imports go
+    # through the legacy importer. Confirmed still present and still defaulting
+    # to 1 on 5.8.
+    #
+    # Restored in the finally below: leaving it off silently changed every
+    # later FBX import in the session, including ones nothing to do with this
+    # script.
+    was_interchange = unreal.SystemLibrary.get_console_variable_int_value(
+        INTERCHANGE_FBX_CVAR)
     unreal.SystemLibrary.execute_console_command(
-        None, "Interchange.FeatureFlags.Import.FBX 0")
+        None, "%s 0" % INTERCHANGE_FBX_CVAR)
+    try:
+        _run()
+    finally:
+        unreal.SystemLibrary.execute_console_command(
+            None, "%s %d" % (INTERCHANGE_FBX_CVAR, was_interchange))
+
+
+def _run():
+    # SOURCE_DIR is the module global main() resolved.
     manifest = load_manifest()
     names = find_assets(manifest)
     unreal.log("=== Importing {} static-part dojo assets ===".format(len(names)))
@@ -502,9 +588,9 @@ def main():
         folder = os.path.join(SOURCE_DIR, name)
         for g, info in sorted(manifest[name].get("materials", {}).items()):
             t = info.get("textures", {})
-            b = import_texture(os.path.join(folder, t.get("BaseColor", "")), True, False)
-            o = import_texture(os.path.join(folder, t.get("ORM", "")), False, False)
-            n = import_texture(os.path.join(folder, t.get("Normal", "")), False, True)
+            b = import_texture(folder, t.get("BaseColor"), True, False)
+            o = import_texture(folder, t.get("ORM"), False, False)
+            n = import_texture(folder, t.get("Normal"), False, True)
             tex[(name, g)] = (b, o, n)
             if info.get("translucent"):
                 first_glass = first_glass or b
@@ -554,4 +640,5 @@ def main():
     unreal.log("=== Done: {}/{} assets ===".format(ok, len(names)))
 
 
-main()
+if __name__ == "__main__":
+    main()
