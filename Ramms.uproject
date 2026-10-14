@@ -16,6 +16,10 @@
 			"Enabled": true
 		},
 		{
+			"Name": "MovieRenderPipeline",
+			"Enabled": true
+		},
+		{
 			"Name": "ChaosVehiclesPlugin",
 			"Enabled": true
 		},

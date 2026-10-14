@@ -626,6 +626,25 @@ pip install -r requirements.txt
 Enable **Remote Execution** in the UE Editor: **Edit > Project Settings >
 Plugins > Python > Remote Execution > Enable Remote Execution**.
 
+`Scripts/editor_remote_exec.py` is a dependency-free client for that interface
+(`--code`, `--file`, `--eval`); the PIE test runners under
+`Plugins/RammsPrivateAssets/Scripts/` drive the editor through it.
+
+### Recording a run for video
+
+The physics backend does not run in real time under the Movie Render Queue, so
+to film a simulated behaviour, record it first and play the recording back in a
+Level Sequence afterwards. `Scripts/record_transforms.py` records every visible
+mesh on an actor each editor tick, keyed on the physics clock
+(`RammsRobotBaseComponent.GetSimulationTime`, `mjData.time` on the MuJoCo
+backend), plus the rest of the level's static meshes once, as one JSON file.
+Run it through `editor_remote_exec.py` while PIE is running, `begin <out.json>
+[<actor label>]` before the behaviour and `end` after it (the default actor is
+the first Pawn with a `RammsRobotBaseComponent`). The file's header documents
+the format. The playback side (clustering the meshes into their rigid bodies,
+keying a Level Sequence, rendering) is a consumer's concern; the first one is
+the curb negotiation video.
+
 ## MCP Server (AI assistants in the editor)
 
 UE 5.8 ships Epic's **Model Context Protocol** plugin, an MCP server that runs
