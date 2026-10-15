@@ -67,6 +67,42 @@ def _add_ground(size, material_path):
     return piece
 
 
+def _add_hills(site, ground, material_path, seed):
+    """Rolling grassy hills on the ground outside the generated site, so the horizon is not a flat plane.
+    Mound pieces (cosine bumps) between the site edge plus a margin and the ground slab's edge."""
+    import math
+    import random
+    rng = random.Random(9001 + int(seed))
+    inner = site * 0.5 + 1200.0
+    outer = ground * 0.5 - 300.0
+    if outer - inner < 2000.0:
+        return 0
+    n = 0
+    for k in range(14):
+        ang = (k + rng.uniform(-0.3, 0.3)) * (2.0 * math.pi / 14.0)
+        sx, sy = rng.uniform(2500.0, 6000.0), rng.uniform(2500.0, 6000.0)
+        r_min = inner + max(sx, sy) * 0.5
+        r_max = outer - max(sx, sy) * 0.5
+        if r_max <= r_min:
+            continue
+        r = rng.uniform(r_min, r_max)
+        x, y = math.cos(ang) * r, math.sin(ang) * r
+        # Keep inside the square slab.
+        if abs(x) + sx * 0.5 > ground * 0.5 - 100.0 or abs(y) + sy * 0.5 > ground * 0.5 - 100.0:
+            continue
+        piece = _spawn(unreal.RammsProcPiece, (x, y, -45.0), (0.0, rng.uniform(0.0, 180.0), 0.0), "Hill%02d" % k)
+        if piece:
+            piece.set_editor_property("kind", unreal.RammsProcPieceKind.MOUND)
+            piece.set_editor_property("size_x", sx)
+            piece.set_editor_property("size_y", sy)
+            piece.set_editor_property("rise", rng.uniform(150.0, 650.0))
+            piece.set_editor_property("material_path", material_path)
+            piece.set_editor_property("uv_scale", 400.0)
+            piece.rebuild()
+            n += 1
+    return n
+
+
 def build_level(kind, seed=None, open_after=True, watch=True):
     """Create (or recreate) one example level and start its generation."""
     if kind not in EXAMPLES:
@@ -102,7 +138,10 @@ def build_level(kind, seed=None, open_after=True, watch=True):
     if palette:
         ground_mat = palette.material_path("Mat.Lawn" if not indoor else "Mat.Concrete")
     # Wide enough that the horizon is ground, not the black below-horizon side of the sky atmosphere.
-    _add_ground(max(site * 3.0, 24000.0), ground_mat)
+    ground = max(site * 3.0, 24000.0)
+    _add_ground(ground, ground_mat)
+    if not indoor:
+        _add_hills(site, ground, ground_mat, seed)
 
     gen = _spawn(unreal.RammsWorldGenerator, (0, 0, 0), label="WorldGenerator")
     gen.set_editor_property("preset", preset)
@@ -122,6 +161,18 @@ def build_level(kind, seed=None, open_after=True, watch=True):
         _watch(path)
     H.log("level %s: preset %s seed %d, generating..." % (path, preset_name, seed))
     return path
+
+
+def finish_level(gen):
+    """After generation: PlayerStart on the suggested start, pedestrian lanes and a crowd (RammsCrowd)
+    along the routes. The caller saves the level. Returns the crowd summary (or the error text)."""
+    gen.place_player_start()
+    try:
+        from . import crowd as C
+        return C.build_crowd(gen)
+    except Exception as exc:  # a level without a crowd is still a level
+        H.warn("crowd lanes failed: %s" % exc)
+        return {"error": str(exc)}
 
 
 def _watch(path):
@@ -144,7 +195,7 @@ def _watch(path):
             if gen.is_generating() and state["ticks"] < 3000:
                 return
             finished = True
-            gen.place_player_start()
+            finish_level(gen)
             unreal.EditorLoadingAndSavingUtils.save_current_level()
             m = H.manifest_to_dict(gen)
             H.log("level %s generated: %d features, %d routes, saved." % (path, len(m.get("features", [])), len(m.get("routes", []))))

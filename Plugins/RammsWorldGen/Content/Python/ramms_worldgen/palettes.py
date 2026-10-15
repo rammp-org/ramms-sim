@@ -47,13 +47,15 @@ MESH_SLOTS = {
     "Tree": ["SM_BeechTree02", "SM_BeechTree03", "SM_TreeLarge_Static", "SM_Alder_Desktop_Forest_modded_01_rep",
              "SM_Sycamore_American_Sapling_SF_rep", "SM_SF_Broadleaf_Desktop_Field_rep"],
     # big old street trees for canopy streets (the 300k-triangle oaks only when they are Nanite meshes)
-    "TreeLarge": ["SM_SF_Broadleaf_Desktop_Field_rep", "SM_JacarandaTree", "SM_TreeLarge_Static", "SM_BeechTree03",
+    # (SM_JacarandaTree is left out: its SimpleWind material moves the whole Nanite tree, so it floats and sways)
+    "TreeLarge": ["SM_SF_Broadleaf_Desktop_Field_rep", "SM_TreeLarge_Static", "SM_BeechTree03",
                   "SM_Tree_Q_Rubra_Adult_vertcol_02", "SM_tree_Rubra_old_tall_01"],
     # lawn cover: low clumps (spawned at 60-130% scale), a few weeds
-    "GrassClump": ["SM_Grass_Clump_01_1m", "SM_GrassClump02", "SM_grass_bermuda_01_main", "SM_grass_bermuda_02_main", "SM_Plant_Grass_Small",
+    "GrassClump": ["SM_Grass_Clump_01_1m", "SM_GrassClump02", "SM_Plant_Grass_Medium", "SM_grass_bermuda_01_main", "SM_grass_bermuda_02_main", "SM_Plant_Grass_Small",
                    "SM_grass_bermuda_01_weeds"],
     # a dense, short second layer that hides the lawn texture's flatness (spawned at 45-90% scale)
-    "LawnTuft": ["SM_grass_bermuda_01_main", "SM_grass_bermuda_02_main", "SM_Grass_Clump_01_1m", "SM_GrassClump02"],
+    "LawnTuft": ["SM_Plant_Grass_Tiny", "SM_Plant_Grass_Small", "SM_grass_bermuda_01_main", "SM_grass_bermuda_02_main", "SM_Plant_Grass_Tiny",
+                 "SM_GrassClump01"],
     "Flowers": ["SM_Flowers01", "SM_Flowers02", "SM_Flowers03", "SM_Flower_Red_01", "SM_Flower_Red_02", "SM_Flower_Yellow_01", "SM_grass_bermuda_03_flower",
                 "SM_Plant_FlowersRedBush"],
     "FoundationShrub": ["SM_shrub_03_a", "SM_shrub_03_b", "SM_shrub_03_c", "SM_shrub_03_d", "SM_Plant_Bush_A", "SM_Plant_Bush_B", "SM_Shrub01",
@@ -599,7 +601,7 @@ FACING_FIX = {
     "SM_Classic_Leather_Armchair": 180.0, "SM_Classic_Leather_Sofa": 180.0, "SM_Classic_Leather_sofa_2": 180.0, "SM_Sofa_02a": -90.0,
     "SM_Classic_Cupboard": -90.0, "SM_Modern_Cupboard": 90.0, "SM_Dresser_C": 180.0, "SM_Dresser_large_A": 180.0,
     "SM_VendingMachine_01a": 180.0,
-    "SM_Freezer3": -90.0, "SM_Freezer4": -90.0,
+    "SM_Freezer3": 180.0, "SM_Freezer4": -90.0,  # Freezer3 is the double-wide: its front is the long face
     "SM_Mailbox": 180.0,
 }
 

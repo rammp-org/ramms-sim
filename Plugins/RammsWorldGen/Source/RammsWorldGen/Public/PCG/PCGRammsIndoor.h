@@ -39,6 +39,8 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Indoor", meta = (PCG_Overridable)) double RetailFraction = 0.0;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Indoor", meta = (PCG_Overridable)) double HazardIntrusionChance = 0.5;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Accessibility", meta = (PCG_Overridable)) double DoorClearWidth = 81.3;
+	/** Narrowest door the generator makes, even a deliberately non-compliant one: the MeBot is ~72 cm wide, so 80 cm still lets it through. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Accessibility", meta = (PCG_Overridable)) double MinPassableDoorWidth = 80.0;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Accessibility", meta = (PCG_Overridable)) double DoorThresholdMax = 1.27;
 
 #if WITH_EDITOR

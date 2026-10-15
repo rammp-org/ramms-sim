@@ -83,6 +83,10 @@ public:
 	/** Comma-separated facade styles to draw from (palette styles not listed are ignored); empty = every style the palette has. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Buildings", meta = (PCG_Overridable)) FString FacadeStyles = TEXT("dt01,dt02,dt03");
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Accessibility", meta = (PCG_Overridable)) double DoorClearWidth = 81.3;
+	/** Scales the gentle mounds laid in yards (0 = flat lawns). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Terrain", meta = (PCG_Overridable)) double TerrainVariation = 1.0;
+	/** Narrowest door the generator makes, even a deliberately non-compliant one: the MeBot is ~72 cm wide, so 80 cm still lets it through. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Accessibility", meta = (PCG_Overridable)) double MinPassableDoorWidth = 80.0;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Accessibility", meta = (PCG_Overridable)) double DoorThresholdMax = 1.27;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Accessibility", meta = (PCG_Overridable)) double VerticalChangeMax = 0.64;
 

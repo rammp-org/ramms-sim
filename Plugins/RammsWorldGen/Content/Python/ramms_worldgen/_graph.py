@@ -115,6 +115,12 @@ class GraphBuilder:
         unreal.RammsWorldGenGraphLibrary.configure_mesh_spawner(node.get_settings(), bool(material_attribute))
         return node
 
+    def foliage_spawner(self, title, **kw):
+        """Static Mesh Spawner for ground cover: mesh from "Mesh", no collision, distance culled."""
+        node = self.node(unreal.PCGStaticMeshSpawnerSettings, title=title, **kw)
+        unreal.RammsWorldGenGraphLibrary.configure_foliage_spawner(node.get_settings())
+        return node
+
     def module_spawner(self, title, **kw):
         """Static Mesh Spawner for facade modules: mesh from "Mesh", every material slot from Material0..7."""
         node = self.node(unreal.PCGStaticMeshSpawnerSettings, title=title, **kw)

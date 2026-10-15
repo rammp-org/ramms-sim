@@ -371,8 +371,14 @@ runs it at 0.2, the office at 0.1.
 - **Houses**: whole houses are the captured `ResidentialHouses` blueprints
   (porch, stairs and front door included); the backdrop-only meshes are not
   used, so every house has a door and steps the front walk meets.
-- **Lawns**: grass clumps plus a denser layer of short tufts (`LawnTuft`) in
-  front yards and parks.
+- **Lawns**: ground cover goes out on its own `Grass` pin to a foliage
+  spawner (no collision, culled 40-70 m away, no distance-field or decal
+  cost): grass clumps plus a dense layer of short tufts (`LawnTuft`) over
+  every yard and park lawn, following the terrain.
+- **Terrain**: yards get gentle grassy rises (`TerrainVariation` scales
+  them; back yards and the open side of deep front yards, clear of the
+  house, walk, driveway and planting), and the ground outside the site
+  rolls away in large hills.
 - **Parks**: besides the loop and cross paths, each quarter of a park gets
   grassy mounds (`Mound` pieces, smooth cosine bumps), boulders (`Rock`),
   a patch of gravel, dirt or mud, and one quarter a pond (water in a mud
@@ -412,6 +418,11 @@ bathroom; a picture on the wall. Offices are dense: desks along both long
 walls and, in a deep room, a back-to-back bench down the middle, each desk
 with a chair, a monitor and a keyboard.
 
+Every door, including the deliberately narrow (non-compliant) ones, is at
+least `MinPassableDoorWidth` wide (80 cm: the MeBot is about 72 cm across),
+and the open leaf stands outside the opening so it does not eat the clear
+width.
+
 Bathrooms are kept to a real size: a home bathroom longer than ~3.2 m is cut
 into two bathrooms (a closet takes a third piece). In a workplace or shop the
 bathroom is a restroom: a run of 90 cm toilet stalls (partitions on legs, an
@@ -438,6 +449,29 @@ path at that width is the polyline the manifest carries. Its bottleneck,
 doubled, is the route's clear width; the pieces at the pinch point are the
 ones reported as `Hazard` / `ObstacleInRoute`. With `NonCompliance` > 0 a
 chair, cart or plant is deliberately pulled into an aisle.
+
+## Pedestrians (RammsCrowd)
+
+After a level is generated, `ramms_worldgen.crowd.build_crowd` (run by
+`levels.finish_level`) lays a ZoneGraph network for the RammsCrowd plugin
+(Mass + ZoneGraph) along the manifest's routes:
+
+- outdoors, sidewalk sides and park paths are cut where they cross into a
+  graph; dangling corner stubs are dropped and neighbouring blocks' corners
+  are joined straight across the street (where the crosswalks are);
+- indoors, every room's door-to-door routes (already bent around the
+  furniture) are linked through the doorways, and a shop's aisles become a
+  ladder tied to the door routes.
+
+Branch nodes become polygon `ZoneShape` junctions, the runs between them
+spline `ZoneShape`s on the `PedestrianLanes` profile (2 x 150 cm) outdoors or
+`PedestrianLanesNarrow` (2 x 75 cm, `Config/DefaultPlugins.ini`) indoors.
+The ZoneGraph is rebuilt and a `RammsCrowdSpawner` in ZoneGraphLanes mode is
+placed with `/Game/NPCs/DA_CrowdAgentProfile` (about one pedestrian per 9 m
+of lane outdoors, per 8 m indoors). Everything sits in the `WorldGen/Crowd`
+outliner folder with the tag `RammsCrowd`, so a rebuild replaces it. The
+ZoneGraph is built in the editor, so the crowd comes with levels generated
+and saved there (the example levels), not with runtime regeneration.
 
 ## Design notes and limits
 

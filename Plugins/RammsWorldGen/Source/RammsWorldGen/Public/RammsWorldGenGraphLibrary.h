@@ -28,6 +28,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Ramms|WorldGen|Graph")
 	static void ConfigureMeshSpawner(UPCGStaticMeshSpawnerSettings* Settings, bool bMaterialFromAttribute);
 
+	/** Static Mesh Spawner for ground cover (grass): mesh from the "Mesh" attribute, no collision, culled with
+	 *  distance (fades out 40-70 m away), no distance-field or decal cost. */
+	UFUNCTION(BlueprintCallable, Category = "Ramms|WorldGen|Graph")
+	static void ConfigureFoliageSpawner(UPCGStaticMeshSpawnerSettings* Settings);
+
 	/** Static Mesh Spawner for facade modules: mesh from "Mesh", every material slot from "Material0".."Material7". */
 	UFUNCTION(BlueprintCallable, Category = "Ramms|WorldGen|Graph")
 	static void ConfigureModuleSpawner(UPCGStaticMeshSpawnerSettings* Settings);

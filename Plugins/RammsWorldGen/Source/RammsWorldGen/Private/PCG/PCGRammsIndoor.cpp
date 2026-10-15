@@ -252,8 +252,10 @@ bool FPCGRammsIndoorLayoutElement::ExecuteInternal(FPCGContext* Context) const
 		auto AddDoor = [&](FWallSeg& W)
 		{
 			double Width = RammsPCG::RandNormal(Rng, S->DoorWidthMean, S->DoorWidthStd);
-			if (Rng.FRand() < S->NonCompliance * 0.6) { Width = RammsPCG::RandRange(Rng, 60.0, S->DoorClearWidth - 1.5); }
-			W.DoorWidth = FMath::Clamp(Width, 55.0, 120.0);
+			// Narrow (non-compliant) doors stay wide enough for the wheelchair to pass.
+			const double MinW = FMath::Max(S->MinPassableDoorWidth, 55.0);
+			if (Rng.FRand() < S->NonCompliance * 0.6) { Width = RammsPCG::RandRange(Rng, MinW, FMath::Max(MinW, S->DoorClearWidth - 1.5)); }
+			W.DoorWidth = FMath::Clamp(Width, MinW, 120.0);
 			W.DoorAt = RammsPCG::RandRange(Rng, W.A + 60.0 + W.DoorWidth * 0.5, W.B - 60.0 - W.DoorWidth * 0.5);
 			W.bHasDoor = true;
 			const FVector2D DoorC = W.bAlongX ? FVector2D(W.DoorAt, W.Line) : FVector2D(W.Line, W.DoorAt);
@@ -344,8 +346,9 @@ bool FPCGRammsIndoorLayoutElement::ExecuteInternal(FPCGContext* Context) const
 				FWallSeg& W = Walls[Candidates[Rng.RandRange(0, Candidates.Num() - 1)]];
 				W.RoomA = EntryRoom; W.RoomB = -1;
 				double Width = S->DoorClearWidth + RammsPCG::RandRange(Rng, 5.0, 15.0);
-				if (Rng.FRand() < S->NonCompliance * 0.4) { Width = RammsPCG::RandRange(Rng, 65.0, S->DoorClearWidth - 1.5); }
-				W.DoorWidth = FMath::Clamp(Width, 55.0, 120.0);
+				const double MinW = FMath::Max(S->MinPassableDoorWidth, 55.0);
+				if (Rng.FRand() < S->NonCompliance * 0.4) { Width = RammsPCG::RandRange(Rng, MinW, FMath::Max(MinW, S->DoorClearWidth - 1.5)); }
+				W.DoorWidth = FMath::Clamp(Width, MinW, 120.0);
 				const double Lo = (W.bAlongX ? R.Rect.Min.X : R.Rect.Min.Y) + 50.0 + W.DoorWidth * 0.5;
 				const double Hi = (W.bAlongX ? R.Rect.Max.X : R.Rect.Max.Y) - 50.0 - W.DoorWidth * 0.5;
 				W.DoorAt = RammsPCG::RandRange(Rng, Lo, Hi);
@@ -462,8 +465,9 @@ bool FPCGRammsIndoorLayoutElement::ExecuteInternal(FPCGContext* Context) const
 				// Facing-frame +Y = (-sin yaw, cos yaw) must point along V.
 				double LeafYaw = FMath::RadiansToDegrees(FMath::Atan2(-V.X, V.Y));
 				if (Leaf.HandleSide < 0.0) { LeafYaw += 180.0; } // handle on the free edge, away from the hinge
-				// Thick is the bounds depth, handles included; the leaf panel itself is ~4-5 cm, so sit its face on the jamb.
-				const FVector Centre = Hinge + U * (FMath::Min(Thick, 5.0) * 0.5 + 1.0) + V * (T * 0.5 + 2.5 + LeafW * 0.5) + FVector(0, 0, Thresh);
+				// Thick is the bounds depth, handles included; the leaf panel itself is ~4-5 cm. It stands just
+				// outside the opening, its face on the jamb line, so the open leaf does not eat the clear width.
+				const FVector Centre = Hinge - U * (FMath::Min(Thick, 5.0) * 0.5 + 0.5) + V * (T * 0.5 + 2.5 + LeafW * 0.5) + FVector(0, 0, Thresh);
 				const FRotator YawRot(0.0, LeafYaw, 0.0);
 				const FRotator Rot = (YawRot.Quaternion() * Leaf.RotationOffset.Quaternion()).Rotator();
 				const bool bSwap = FMath::Abs(FMath::Abs(FMath::Fmod(Leaf.RotationOffset.Yaw, 180.0)) - 90.0) < 1.0;

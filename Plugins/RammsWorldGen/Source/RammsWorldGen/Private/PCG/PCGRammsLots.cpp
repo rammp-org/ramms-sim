@@ -305,6 +305,7 @@ TArray<FPCGPinProperties> UPCGRammsBuildingMassingSettings::OutputPinProperties(
 	Pins.Emplace(RammsPCG::PinPrimitives, EPCGDataType::Point);
 	Pins.Emplace(RammsPCG::PinPieces, EPCGDataType::Point);
 	Pins.Emplace(RammsPCG::PinProps, EPCGDataType::Point);
+	Pins.Emplace(RammsPCG::PinGrass, EPCGDataType::Point);
 	Pins.Emplace(RammsPCG::PinModules, EPCGDataType::Point);
 	Pins.Emplace(RammsPCG::PinFeatures, EPCGDataType::Point);
 	return Pins;
@@ -331,7 +332,7 @@ bool FPCGRammsBuildingMassingElement::ExecuteInternal(FPCGContext* Context) cons
 	const FString MatRoof = RammsPCG::Mat(Palette, RammsPaletteSlots::MatRoof);
 	const FString MatStorefront = RammsPCG::Mat(Palette, RammsPaletteSlots::MatStorefront);
 
-	FRammsPointWriter Primitives, Pieces, Props, Modules, Features;
+	FRammsPointWriter Primitives, Pieces, Props, Modules, Features, Grass;
 	int32 Counter = 0;
 	auto NextSeed = [&]() { return RammsPCG::SubSeed(Seed, 2000 + (++Counter)); };
 
@@ -417,7 +418,7 @@ bool FPCGRammsBuildingMassingElement::ExecuteInternal(FPCGContext* Context) cons
 			bool bDoorNarrow = false;
 			if (!bHouseMesh && Rng.FRand() < S->NonCompliance * 0.5)
 			{
-				DoorW = RammsPCG::RandRange(Rng, 60.0, S->DoorClearWidth - 2.0);
+				DoorW = RammsPCG::RandRange(Rng, FMath::Max(S->MinPassableDoorWidth, 55.0), FMath::Max(S->MinPassableDoorWidth, S->DoorClearWidth - 2.0));
 				bDoorNarrow = true;
 			}
 			const bool bStepped = bHouseMesh ? HouseMesh.EntranceRise > 5.0 : Rng.FRand() < FMath::Clamp(S->EntranceStepChance, 0.0, 1.0);
@@ -910,6 +911,51 @@ bool FPCGRammsBuildingMassingElement::ExecuteInternal(FPCGContext* Context) cons
 					Ap.Seed = NextSeed();
 					RammsPCG::WritePiece(Pieces, Ap);
 				}
+				// Yard terrain: gentle grassy rises in the back yard and, in a deep front yard, a low one on the side
+				// away from the walk and driveway, so lawns are not billiard-table flat. Clear of the house, walk,
+				// driveway, fences and foundation planting; the grass below follows them (YardZ).
+				struct FYardMound { FVector2D C; double SX, SY, Hm; };
+				TArray<FYardMound> YardMounds;
+				if (S->TerrainVariation > 0.0)
+				{
+					auto AddMound = [&](double X0, double X1, double Y0, double Y1, double HLo, double HHi)
+					{
+						if (X1 - X0 < 260.0 || Y1 - Y0 < 260.0) { return; }
+						const double SX = RammsPCG::RandRange(Rng, 0.6, 1.0) * (X1 - X0), SY = RammsPCG::RandRange(Rng, 0.6, 1.0) * (Y1 - Y0);
+						const FVector2D C(RammsPCG::RandRange(Rng, X0 + SX * 0.5, X1 - SX * 0.5), RammsPCG::RandRange(Rng, Y0 + SY * 0.5, Y1 - SY * 0.5));
+						const double Hm = FMath::Min(RammsPCG::RandRange(Rng, HLo, HHi) * S->TerrainVariation, FMath::Min(SX, SY) * 0.12);
+						YardMounds.Add({ C, SX, SY, Hm });
+						FRammsPieceDesc Mn;
+						Mn.Kind = ERammsProcPieceKind::Mound;
+						Mn.SizeX = SX; Mn.SizeY = SY; Mn.Rise = Hm; Mn.UVScale = 300.0;
+						Mn.MaterialPath = RammsPCG::Mat(Palette, RammsPaletteSlots::MatLawn);
+						Mn.ManifestKind = FName(TEXT("Terrain")); Mn.ManifestSubtype = FName(TEXT("Mound"));
+						Mn.Measure = Hm * PI / FMath::Min(SX, SY);
+						Mn.Transform = FTransform(FRotator(0.0, Yaw, 0.0), ToWorld(C.X, C.Y, Z0));
+						Mn.Seed = NextSeed();
+						RammsPCG::WritePiece(Pieces, Mn);
+					};
+					const double BX0 = -Depth * 0.5 + 130.0, BX1 = FrontX - HouseDepth - 160.0;
+					const int32 NBack = (BX1 - BX0) * (Width - 260.0) > 900.0 * 900.0 ? 2 : 1;
+					for (int32 k = 0; k < NBack; ++k)
+					{
+						const double YSpan = (Width - 260.0) / NBack;
+						AddMound(BX0, BX1, -Width * 0.5 + 130.0 + YSpan * k, -Width * 0.5 + 130.0 + YSpan * (k + 1), 20.0, 55.0);
+					}
+					const double Away = -DSide; // the side of the walk away from the driveway
+					const double FY0 = EntranceY + Away * (WalkW * 0.5 + 90.0), FY1 = Away * (Width * 0.5 - 90.0);
+					AddMound(FrontX + 190.0, LotFront - 110.0, FMath::Min(FY0, FY1), FMath::Max(FY0, FY1), 12.0, 30.0);
+				}
+				auto YardZ = [&](const FVector2D& P)
+				{
+					double Z = Z0;
+					for (const FYardMound& Mn : YardMounds)
+					{
+						const double E = FMath::Sqrt(FMath::Square(2.0 * (P.X - Mn.C.X) / Mn.SX) + FMath::Square(2.0 * (P.Y - Mn.C.Y) / Mn.SY));
+						if (E < 1.0) { Z = FMath::Max(Z, Z0 + Mn.Hm * 0.5 * (1.0 + FMath::Cos(PI * E)) - 2.0); }
+					}
+					return Z;
+				};
 				// Grass clumps over the yard (sparser behind the house), off the house, walk, entrance and driveway.
 				if (S->GrassDensity > 0.0 && Palette && Palette->HasSlot(RammsPaletteSlots::GrassClump))
 				{
@@ -930,14 +976,15 @@ bool FPCGRammsBuildingMassingElement::ExecuteInternal(FPCGContext* Context) cons
 							for (const FBox2D& B : NoGrass) { if (B.bIsValid && B.IsInside(P)) { bOut = true; break; } }
 							if (bOut) { continue; }
 							FRammsPaletteMesh G; if (!Palette->PickMesh(RammsPaletteSlots::GrassClump, Rng, G)) { break; }
-							RammsPCG::WritePickedMesh(Props, G, ToWorld(P.X, P.Y, Z0), RammsPCG::RandRange(Rng, 0.0, 360.0), NextSeed(), RammsPCG::RandRange(Rng, 0.7, 1.3));
+							RammsPCG::WritePickedMesh(Grass, G, ToWorld(P.X, P.Y, YardZ(P)), RammsPCG::RandRange(Rng, 0.0, 360.0), NextSeed(), RammsPCG::RandRange(Rng, 0.7, 1.3));
 						}
 					}
-					// Short tufts, denser, in the front yard: the lawn reads as grass, not a green texture.
+					// Short tufts, dense, over the whole yard: the lawn reads as grass, not a green texture.
 					if (Palette->HasSlot(RammsPaletteSlots::LawnTuft))
 					{
-						const double TStep = 75.0 / FMath::Sqrt(FMath::Max(S->GrassDensity, 0.05));
-						for (double gx = FrontX + 20.0; gx < LotFront - 20.0; gx += TStep)
+						// Front and back yard alike: the grass spawner culls it with distance and gives it no collision.
+						const double TStep = 50.0 / FMath::Sqrt(FMath::Max(S->GrassDensity, 0.05));
+						for (double gx = -Depth * 0.5 + 20.0; gx < LotFront - 20.0; gx += TStep)
 						{
 							for (double gy = -Width * 0.5 + 20.0; gy < Width * 0.5 - 20.0; gy += TStep)
 							{
@@ -946,7 +993,7 @@ bool FPCGRammsBuildingMassingElement::ExecuteInternal(FPCGContext* Context) cons
 								for (const FBox2D& B : NoGrass) { if (B.bIsValid && B.IsInside(P)) { bOut = true; break; } }
 								if (bOut) { continue; }
 								FRammsPaletteMesh G; if (!Palette->PickMesh(RammsPaletteSlots::LawnTuft, Rng, G)) { break; }
-								RammsPCG::WritePickedMesh(Props, G, ToWorld(P.X, P.Y, Z0), RammsPCG::RandRange(Rng, 0.0, 360.0), NextSeed(), RammsPCG::RandRange(Rng, 0.45, 0.9));
+								RammsPCG::WritePickedMesh(Grass, G, ToWorld(P.X, P.Y, YardZ(P)), RammsPCG::RandRange(Rng, 0.0, 360.0), NextSeed(), RammsPCG::RandRange(Rng, 0.45, 0.9));
 							}
 						}
 					}
@@ -996,7 +1043,7 @@ bool FPCGRammsBuildingMassingElement::ExecuteInternal(FPCGContext* Context) cons
 								const double Py = gy + RammsPCG::RandRange(Rng, -Step * 0.4, Step * 0.4);
 								if (!ClearOfDrive(Py, 30.0)) { continue; }
 								FRammsPaletteMesh G; if (!Palette->PickMesh(RammsPaletteSlots::GrassClump, Rng, G)) { break; }
-								RammsPCG::WritePickedMesh(Props, G, ToWorld(FMath::Clamp(gx + RammsPCG::RandRange(Rng, -Step * 0.3, Step * 0.3), StripX - FZs * 0.5 + 20.0, StripX + FZs * 0.5 - 20.0), Py, Z0),
+								RammsPCG::WritePickedMesh(Grass, G, ToWorld(FMath::Clamp(gx + RammsPCG::RandRange(Rng, -Step * 0.3, Step * 0.3), StripX - FZs * 0.5 + 20.0, StripX + FZs * 0.5 - 20.0), Py, Z0),
 									RammsPCG::RandRange(Rng, 0.0, 360.0), NextSeed(), RammsPCG::RandRange(Rng, 0.6, 1.0));
 							}
 						}
@@ -1085,6 +1132,7 @@ bool FPCGRammsBuildingMassingElement::ExecuteInternal(FPCGContext* Context) cons
 	Primitives.Emit(Context, RammsPCG::PinPrimitives, { TEXT("Building") });
 	Pieces.Emit(Context, RammsPCG::PinPieces, { TEXT("Building") });
 	Props.Emit(Context, RammsPCG::PinProps, { TEXT("Building") });
+	Grass.Emit(Context, RammsPCG::PinGrass, { TEXT("Grass") });
 	Modules.Emit(Context, RammsPCG::PinModules, { TEXT("Building") });
 	Features.Emit(Context, RammsPCG::PinFeatures);
 	return true;

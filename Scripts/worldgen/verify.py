@@ -289,9 +289,14 @@ def _finish_level(name):
     pieces = [a for a in actors if isinstance(a, unreal.RammsProcPiece)]
     preset = gen.get_editor_property("preset")
     indoor = preset.get_editor_property("scene_kind") == unreal.RammsSceneKind.INDOOR if preset else False
-    gen.place_player_start()
+    crowd = L.finish_level(gen)
     unreal.EditorLoadingAndSavingUtils.save_current_level()
+    if isinstance(crowd, dict) and crowd.get("error"):
+        err("level %s: crowd lanes failed: %s" % (name, crowd["error"]))
+    elif isinstance(crowd, dict) and not crowd.get("shapes"):
+        err("level %s: no crowd lanes (%s)" % (name, crowd))
     res = {
+        "crowd": crowd,
         "map": unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world().get_path_name(),
         "seed": gen.get_editor_property("seed"),
         "features": len(feats), "feature_kinds": kinds, "routes": len(m.get("routes", [])),

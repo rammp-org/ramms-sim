@@ -63,6 +63,28 @@ void URammsWorldGenGraphLibrary::ConfigureModuleSpawner(UPCGStaticMeshSpawnerSet
 	Settings->MarkPackageDirty();
 }
 
+void URammsWorldGenGraphLibrary::ConfigureFoliageSpawner(UPCGStaticMeshSpawnerSettings* Settings)
+{
+	if (!Settings)
+	{
+		return;
+	}
+	Settings->Modify();
+	Settings->SetMeshSelectorType(UPCGMeshSelectorByAttribute::StaticClass());
+	if (UPCGMeshSelectorByAttribute* Sel = Cast<UPCGMeshSelectorByAttribute>(Settings->MeshSelectorParameters))
+	{
+		Sel->AttributeName = RammsPCG::Mesh;
+		Sel->TemplateDescriptor.BodyInstance.SetCollisionProfileName(UCollisionProfile::NoCollision_ProfileName);
+		Sel->TemplateDescriptor.InstanceStartCullDistance = 4000;
+		Sel->TemplateDescriptor.InstanceEndCullDistance = 7000;
+		Sel->TemplateDescriptor.bAffectDistanceFieldLighting = false;
+		Sel->TemplateDescriptor.bReceivesDecals = false;
+		Sel->bUseAttributeMaterialOverrides = false;
+		Sel->MaterialOverrideAttributes.Reset();
+	}
+	Settings->MarkPackageDirty();
+}
+
 void URammsWorldGenGraphLibrary::ConfigureMeshSpawner(UPCGStaticMeshSpawnerSettings* Settings, bool bMaterialFromAttribute)
 {
 	if (!Settings)

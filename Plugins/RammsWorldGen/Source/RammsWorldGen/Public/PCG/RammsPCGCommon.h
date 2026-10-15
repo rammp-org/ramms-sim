@@ -81,6 +81,8 @@ namespace RammsPCG
 	inline const FName PinOut(TEXT("Out"));
 	inline const FName PinPrimitives(TEXT("Primitives"));
 	inline const FName PinProps(TEXT("Props"));
+	/** Ground cover (grass clumps, tufts): a foliage spawner with no collision and cull distances. */
+	inline const FName PinGrass(TEXT("Grass"));
 	inline const FName PinPieces(TEXT("Pieces"));
 	inline const FName PinModules(TEXT("Modules"));
 	inline const FName PinRoads(TEXT("Roads"));

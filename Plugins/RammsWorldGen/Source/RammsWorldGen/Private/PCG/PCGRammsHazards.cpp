@@ -258,6 +258,12 @@ bool FPCGRammsHazardPlacerElement::ExecuteInternal(FPCGContext* Context) const
 				else if (Roll < 0.88) { Slot = RammsPaletteSlots::Bollard; }
 				else if (Roll < 0.95 || Length < 2500.0) { Slot = bResidential ? RammsPaletteSlots::Flowerbed : RammsPaletteSlots::InfoBoard; }
 				else { Slot = RammsPaletteSlots::BusStop; }
+				// Park paths get park furniture only (no hydrants, meters or bus stops), and it stands on the lawn
+				// beside the path, never on it.
+				if (bPark)
+				{
+					Slot = Roll < 0.35 ? RammsPaletteSlots::Bench : (Roll < 0.6 ? RammsPaletteSlots::TrashBin : (Roll < 0.9 ? RammsPaletteSlots::StreetLight : RammsPaletteSlots::InfoBoard));
+				}
 
 				FRammsPaletteMesh M;
 				if (!Palette || !Palette->PickMesh(Slot, Rng, M))
@@ -277,10 +283,19 @@ bool FPCGRammsHazardPlacerElement::ExecuteInternal(FPCGContext* Context) const
 				const double fx = FMath::Max(bFaceIn ? M.Footprint.Y : M.Footprint.X, 20.0), fy = FMath::Max(bFaceIn ? M.Footprint.X : M.Footprint.Y, 20.0);
 				// Furniture is never the thing that narrows a route below the minimum: a shelter that does
 				// not fit beside the access route on this sidewalk simply is not placed here.
-				if (fy > SW - S->MinClearWidth) { continue; }
+				if (!bPark && fy > SW - S->MinClearWidth) { continue; }
 				double A; if (!FindFree(Rng, Occ, Length, fx, 200.0, A)) { continue; }
 				Occ.Take(A - 20.0, A + fx + 20.0);
 				double y0, Clear;
+				if (bPark)
+				{
+					// On the lawn along the path's +Y edge (the Park Layout's own benches use the other edge),
+					// seating turned to face the path.
+					y0 = SW + 45.0; Clear = SW;
+					const int32 p = RammsPCG::WritePickedMesh(Props, M, ToWorld(A + fx * 0.5, y0 + fy * 0.5, 0.0), Yaw + (bFaceIn ? -90.0 : 0.0), NextSeed());
+					RammsPCG::WriteManifest(Props, p, FName(TEXT("Prop")), Slot, true, ERammsComplianceIssue::None, Clear, S->MinClearWidth);
+					continue;
+				}
 				PlaceAcross(fy, false, y0, Clear);
 				const int32 p = RammsPCG::WritePickedMesh(Props, M, ToWorld(A + fx * 0.5, y0 + fy * 0.5, 0.0), Yaw + (bFaceIn ? 90.0 : 0.0), NextSeed());
 				RammsPCG::WriteManifest(Props, p, FName(TEXT("Prop")), Slot, Clear >= S->MinClearWidth, Clear >= S->MinClearWidth ? ERammsComplianceIssue::None : ERammsComplianceIssue::ClearWidthBelowMinimum, Clear, S->MinClearWidth);
@@ -401,6 +416,7 @@ TArray<FPCGPinProperties> UPCGRammsParkLayoutSettings::OutputPinProperties() con
 	Pins.Emplace(RammsPCG::PinPrimitives, EPCGDataType::Point);
 	Pins.Emplace(RammsPCG::PinPieces, EPCGDataType::Point);
 	Pins.Emplace(RammsPCG::PinProps, EPCGDataType::Point);
+	Pins.Emplace(RammsPCG::PinGrass, EPCGDataType::Point);
 	Pins.Emplace(RammsPCG::PinSidewalks, EPCGDataType::Point);
 	Pins.Emplace(RammsPCG::PinFeatures, EPCGDataType::Point);
 	return Pins;
@@ -428,7 +444,7 @@ bool FPCGRammsParkLayoutElement::ExecuteInternal(FPCGContext* Context) const
 	const FString MatDirt = MatOr(RammsPaletteSlots::MatDirt, MatPath);
 	const FString MatMud = MatOr(RammsPaletteSlots::MatMud, MatDirt);
 
-	FRammsPointWriter Primitives, Pieces, Props, Paths, Features;
+	FRammsPointWriter Primitives, Pieces, Props, Paths, Features, Grass;
 	int32 Counter = 0;
 	auto NextSeed = [&]() { return RammsPCG::SubSeed(Seed, 6000 + (++Counter)); };
 	const double PW = FMath::Max(S->PathWidth, 90.0);
@@ -455,6 +471,10 @@ bool FPCGRammsParkLayoutElement::ExecuteInternal(FPCGContext* Context) const
 				{ FVector(x1, y1, Z0), FVector(x0, y1, Z0), 180.0 }, { FVector(x0, y1, Z0), FVector(x0, y0, Z0), 270.0 },
 				{ FVector(x0, C.Y, Z0), FVector(x1, C.Y, Z0), 0.0 }, { FVector(C.X, y0, Z0), FVector(C.X, y1, Z0), 90.0 } };
 			TArray<FBox2D> PathBoxes;
+			for (const FPathSeg& Sg : Segs)
+			{
+				PathBoxes.Add(FBox2D(FVector2D(FMath::Min(Sg.A.X, Sg.B.X) - PW, FMath::Min(Sg.A.Y, Sg.B.Y) - PW), FVector2D(FMath::Max(Sg.A.X, Sg.B.X) + PW, FMath::Max(Sg.A.Y, Sg.B.Y) + PW)));
+			}
 			int32 SegIndex = 0;
 			for (const FPathSeg& Sg : Segs)
 			{
@@ -475,7 +495,6 @@ bool FPCGRammsParkLayoutElement::ExecuteInternal(FPCGContext* Context) const
 				{
 					RammsPCG::WriteCube(Primitives, (Sg.A + Sg.B) * 0.5 + FVector(0, 0, -9.6), FMath::IsNearlyEqual(Sg.Yaw, 0.0) || FMath::IsNearlyEqual(Sg.Yaw, 180.0) ? FVector(Len + PW, PW, 20.0) : FVector(PW, Len + PW, 20.0), 0.0, MatPath, NextSeed());
 				}
-				PathBoxes.Add(FBox2D(FVector2D(FMath::Min(Sg.A.X, Sg.B.X) - PW, FMath::Min(Sg.A.Y, Sg.B.Y) - PW), FVector2D(FMath::Max(Sg.A.X, Sg.B.X) + PW, FMath::Max(Sg.A.Y, Sg.B.Y) + PW)));
 				// Path-side record: origin at the path's left edge so the Hazard Placer's +Y spans the width.
 				const FRotator Rot(0.0, Sg.Yaw, 0.0);
 				const FVector Left = Rot.RotateVector(FVector(0.0, -PW * 0.5, 0.0));
@@ -492,10 +511,17 @@ bool FPCGRammsParkLayoutElement::ExecuteInternal(FPCGContext* Context) const
 					RammsPCG::WriteManifest(Features, f, FName(TEXT("Surface")), FName(TEXT("Cobbled")), false, ERammsComplianceIssue::SurfaceUneven, 1.0, 0.64);
 				}
 				// Benches on the lawn beside the path, facing it.
-				for (double a = S->BenchSpacing * 0.5; a < Len - 200.0; a += FMath::Max(S->BenchSpacing, 400.0))
+				// Evenly spaced and centred on the run, clear of the junctions at its ends.
+				const double BS = FMath::Max(S->BenchSpacing, 400.0);
+				const int32 NB = FMath::Max(0, static_cast<int32>((Len - 2.0 * (PW + 150.0)) / BS) + 1);
+				for (int32 bi = 0; bi < NB && Len > 2.0 * (PW + 150.0); ++bi)
 				{
+					const double a = Len * 0.5 + (bi - (NB - 1) * 0.5) * BS;
 					// Bench on the -Y side of the path, its front (+X after the facing offset) turned to +Y = the path.
 					const FVector P = Sg.A + Rot.RotateVector(FVector(a, -PW * 0.5 - 60.0, 0.0));
+					bool bOnPath = false;
+					for (const FBox2D& B : PathBoxes) { if (B.ExpandBy(-PW * 0.5 + 10.0).IsInside(FVector2D(P.X, P.Y))) { bOnPath = true; break; } }
+					if (bOnPath) { continue; }
 					const int32 b = RammsPCG::WritePaletteMesh(Props, Palette, RammsPaletteSlots::Bench, Rng, P, Sg.Yaw + 90.0, NextSeed());
 					if (b >= 0) { RammsPCG::WriteManifest(Props, b, FName(TEXT("Prop")), FName(TEXT("Bench")), true, ERammsComplianceIssue::None, PW, S->MinClearWidth); }
 				}
@@ -526,7 +552,7 @@ bool FPCGRammsParkLayoutElement::ExecuteInternal(FPCGContext* Context) const
 				const int32 r = RammsPCG::WritePickedMesh(Props, Rk, FVector(P.X, P.Y, GroundZ(P) - Rk.Height * K * 0.15), RammsPCG::RandRange(Rng, 0.0, 360.0), NextSeed(), K);
 				if (r >= 0) { RammsPCG::WriteManifest(Props, r, FName(TEXT("Prop")), FName(TEXT("Rock")), true, ERammsComplianceIssue::None, 0.0, 0.0); }
 			};
-			auto Patch = [&](const FVector2D& P, double SX, double SY, double Top, const FString& Mat, FName Sub)
+			auto Patch = [&](const FVector2D& P, double SX, double SY, double Top, const FString& Mat, FName Sub, double PatchYaw = -1.0)
 			{
 				FRammsPieceDesc D;
 				D.Kind = ERammsProcPieceKind::Patch;
@@ -535,7 +561,7 @@ bool FPCGRammsParkLayoutElement::ExecuteInternal(FPCGContext* Context) const
 				D.ManifestKind = Sub == FName(TEXT("Pond")) ? FName(TEXT("Water")) : FName(TEXT("Surface"));
 				D.ManifestSubtype = Sub;
 				D.Measure = FMath::Min(SX, SY);
-				D.Transform = FTransform(FRotator(0.0, RammsPCG::RandRange(Rng, 0.0, 180.0), 0.0), FVector(P.X, P.Y, Z0));
+				D.Transform = FTransform(FRotator(0.0, PatchYaw >= 0.0 ? PatchYaw : RammsPCG::RandRange(Rng, 0.0, 180.0), 0.0), FVector(P.X, P.Y, Z0));
 				D.Seed = NextSeed();
 				RammsPCG::WritePiece(Pieces, D);
 				Avoid.Add(FBox2D(P - FVector2D(FMath::Max(SX, SY) * 0.5), P + FVector2D(FMath::Max(SX, SY) * 0.5)));
@@ -556,8 +582,10 @@ bool FPCGRammsParkLayoutElement::ExecuteInternal(FPCGContext* Context) const
 					{
 						// Pond: water in a ring of mud, edged with boulders.
 						const double SX = Qs.X * RammsPCG::RandRange(Rng, 0.45, 0.7), SY = Qs.Y * RammsPCG::RandRange(Rng, 0.45, 0.7);
-						Patch(Qc, SX + 120.0, SY + 120.0, 0.8, MatMud, FName(TEXT("Mud")));
-						Patch(Qc, SX, SY, 1.6, MatWater, FName(TEXT("Pond")));
+						// Axis-aligned, both: the mud ring and the water must share an orientation, and the rocks
+						// below are laid on the axis-aligned ellipse.
+						Patch(Qc, SX + 120.0, SY + 120.0, 0.8, MatMud, FName(TEXT("Mud")), 0.0);
+						Patch(Qc, SX, SY, 1.6, MatWater, FName(TEXT("Pond")), 0.0);
 						const int32 NR = FMath::Clamp(static_cast<int32>((SX + SY) / 90.0), 6, 30);
 						for (int32 k = 0; k < NR; ++k)
 						{
@@ -659,9 +687,9 @@ bool FPCGRammsParkLayoutElement::ExecuteInternal(FPCGContext* Context) const
 						for (const FBox2D& B : Avoid) { if (B.IsInside(P)) { bOnPath = true; break; } }
 						if (bOnPath) { continue; }
 						FRammsPaletteMesh G; if (!Palette->PickMesh(RammsPaletteSlots::GrassClump, Rng, G)) { break; }
-						RammsPCG::WritePickedMesh(Props, G, FVector(P.X, P.Y, GroundZ(P)), RammsPCG::RandRange(Rng, 0.0, 360.0), NextSeed(), RammsPCG::RandRange(Rng, 0.7, 1.3));
-						// Two short tufts around each clump.
-						for (int32 k = 0; k < 2; ++k)
+						RammsPCG::WritePickedMesh(Grass, G, FVector(P.X, P.Y, GroundZ(P)), RammsPCG::RandRange(Rng, 0.0, 360.0), NextSeed(), RammsPCG::RandRange(Rng, 0.7, 1.3));
+						// Short tufts around each clump: a dense lawn layer.
+						for (int32 k = 0; k < 4; ++k)
 						{
 							FRammsPaletteMesh Tf; if (!Palette->PickMesh(RammsPaletteSlots::LawnTuft, Rng, Tf)) { break; }
 							const FVector2D Q(P.X + RammsPCG::RandRange(Rng, -Step * 0.5, Step * 0.5), P.Y + RammsPCG::RandRange(Rng, -Step * 0.5, Step * 0.5));
@@ -669,7 +697,7 @@ bool FPCGRammsParkLayoutElement::ExecuteInternal(FPCGContext* Context) const
 							for (const FBox2D& B : PathBoxes) { if (B.ExpandBy(-PW * 0.35).IsInside(Q)) { bBad = true; break; } }
 							for (const FBox2D& B : Avoid) { if (B.IsInside(Q)) { bBad = true; break; } }
 							if (bBad) { continue; }
-							RammsPCG::WritePickedMesh(Props, Tf, FVector(Q.X, Q.Y, GroundZ(Q)), RammsPCG::RandRange(Rng, 0.0, 360.0), NextSeed(), RammsPCG::RandRange(Rng, 0.45, 0.9));
+							RammsPCG::WritePickedMesh(Grass, Tf, FVector(Q.X, Q.Y, GroundZ(Q)), RammsPCG::RandRange(Rng, 0.0, 360.0), NextSeed(), RammsPCG::RandRange(Rng, 0.45, 0.9));
 						}
 					}
 				}
@@ -696,6 +724,7 @@ bool FPCGRammsParkLayoutElement::ExecuteInternal(FPCGContext* Context) const
 	Primitives.Emit(Context, RammsPCG::PinPrimitives, { TEXT("Park") });
 	Pieces.Emit(Context, RammsPCG::PinPieces, { TEXT("Park") });
 	Props.Emit(Context, RammsPCG::PinProps, { TEXT("Park") });
+	Grass.Emit(Context, RammsPCG::PinGrass, { TEXT("Grass") });
 	Paths.Emit(Context, RammsPCG::PinSidewalks);
 	Features.Emit(Context, RammsPCG::PinFeatures);
 	return true;
