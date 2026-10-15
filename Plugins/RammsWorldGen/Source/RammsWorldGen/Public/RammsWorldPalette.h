@@ -63,6 +63,26 @@ struct RAMMSWORLDGEN_API FRammsPaletteMesh
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Palette")
 	TArray<FName> MaterialSlots;
 
+	/** Shelving: heights (cm above the base, at the entry's scale) of the shelf boards, measured from the mesh. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Palette")
+	TArray<double> ShelfHeights;
+
+	/** Composite houses: the front door's offset across the facade (facing frame, cm from the footprint
+	 *  centre) and the porch floor's height above the base, so walks and manifest records meet the door. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Palette")
+	double EntranceOffsetY = 0.0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Palette")
+	double EntranceRise = 0.0;
+
+	/** Composite houses with a garage door on the front: the door's centre (facing frame, cm from the
+	 *  footprint centre; X toward the front) and its width. GarageWidth 0 = no front garage. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Palette")
+	FVector2D GarageDoor = FVector2D::ZeroVector;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Palette")
+	double GarageWidth = 0.0;
+
 	/** Composite entries (Mesh unset): every part is spawned with the entry's placement applied. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Palette")
 	TArray<FRammsPalettePart> Parts;
@@ -207,6 +227,14 @@ namespace RammsPaletteSlots
 	inline const FName FurnitureOfficeStorage(TEXT("Furniture.OfficeStorage"));
 	inline const FName FurnitureOfficeProp(TEXT("Furniture.OfficeProp"));
 	inline const FName FurnitureWhiteboard(TEXT("Furniture.Whiteboard"));
+	inline const FName StoreShelf(TEXT("Store.Shelf"));
+	inline const FName StoreFridge(TEXT("Store.Fridge"));
+	inline const FName StoreChestFreezer(TEXT("Store.ChestFreezer"));
+	inline const FName StoreCounter(TEXT("Store.Counter"));
+	inline const FName StoreRegister(TEXT("Store.Register"));
+	inline const FName StoreCart(TEXT("Store.Cart"));
+	inline const FName StoreDisplay(TEXT("Store.Display"));
+	inline const FName StoreProduct(TEXT("Store.Product"));
 	// building dressing
 	inline const FName RoofUnit(TEXT("RoofUnit"));
 	inline const FName MatMarking(TEXT("Mat.Marking"));

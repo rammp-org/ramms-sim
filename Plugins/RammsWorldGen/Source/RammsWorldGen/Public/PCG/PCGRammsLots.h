@@ -61,6 +61,13 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Buildings", meta = (PCG_Overridable)) double WindowSpacing = 300.0;
 	/** Probability that a lot with open ground beside or behind the building gets a yard tree; 0 for dense downtown lots. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Buildings", meta = (PCG_Overridable)) double YardTreeChance = 0.0;
+	/** House lots: probability of a driveway beside the house (sometimes with a car on it). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Buildings", meta = (PCG_Overridable)) double DrivewayChance = 0.0;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Buildings", meta = (PCG_Overridable)) double DrivewayWidth = 360.0;
+	/** House lots: probability of a hedge or picket fence along the front, with gaps for the walk and driveway. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Buildings", meta = (PCG_Overridable)) double FrontBoundaryChance = 0.6;
+	/** Non-house lots with open ground behind the building: probability of a striped rear car park with parked cars. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Buildings", meta = (PCG_Overridable)) double RearParkingChance = 0.0;
 	/** Dress non-house buildings with the palette's modular facade kits (Facade.<style>.* slots) instead of the cube shell dressing. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Buildings", meta = (PCG_Overridable)) bool bFacadeModules = true;
 	/** Comma-separated facade styles to draw from (palette styles not listed are ignored); empty = every style the palette has. */

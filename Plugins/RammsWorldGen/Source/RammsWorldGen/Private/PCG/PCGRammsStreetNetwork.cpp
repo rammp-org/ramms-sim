@@ -429,25 +429,37 @@ bool FPCGRammsStreetNetworkElement::ExecuteInternal(FPCGContext* Context) const
 				}
 			}
 		}
-		// Curbs along the curb line, skipping ramp keepouts.
-		for (double a = CurbStep * 0.5; a < Sd.Length; a += CurbStep)
+		// Curbs along the curb line, skipping ramp keepouts: one mesh per step when the palette has a curb
+		// mesh, otherwise one continuous procedural piece per uninterrupted run.
+		if (bCurbMesh)
 		{
-			bool bSkip = false;
-			for (const FVector2D& K : Sd.Keepouts) { if (a > K.X - CurbStep * 0.5 && a < K.Y + CurbStep * 0.5) { bSkip = true; break; } }
-			if (bSkip) { continue; }
-			const FVector P = Sd.Start + Sd.Dir * a;
-			if (bCurbMesh)
+			for (double a = CurbStep * 0.5; a < Sd.Length; a += CurbStep)
 			{
-				const int32 idx = RammsPCG::WritePaletteMesh(Props, Palette, RammsPaletteSlots::Curb, Rng, P + FVector(0, 0, -CH), Sd.Yaw, NextSeed());
-				(void)idx;
+				bool bSkip = false;
+				for (const FVector2D& K : Sd.Keepouts) { if (a > K.X - CurbStep * 0.5 && a < K.Y + CurbStep * 0.5) { bSkip = true; break; } }
+				if (bSkip) { continue; }
+				RammsPCG::WritePaletteMesh(Props, Palette, RammsPaletteSlots::Curb, Rng, Sd.Start + Sd.Dir * a + FVector(0, 0, -CH), Sd.Yaw, NextSeed());
 			}
-			else
+		}
+		else
+		{
+			TArray<FVector2D> Cuts = Sd.Keepouts;
+			Cuts.Sort([](const FVector2D& A, const FVector2D& B) { return A.X < B.X; });
+			double RunStart = 0.0;
+			auto EmitRun = [&](double A0, double A1)
 			{
+				if (A1 - A0 < 20.0) { return; }
 				FRammsPieceDesc P2;
-				P2.Kind = ERammsProcPieceKind::Curb; P2.SizeX = CurbStep; P2.SizeY = 20.0; P2.Rise = CH; P2.MaterialPath = MatConcrete; P2.Seed = NextSeed();
-				P2.Transform = FTransform(FRotator(0.0, Sd.Yaw, 0.0), P - Sd.Dir * (CurbStep * 0.5));
+				P2.Kind = ERammsProcPieceKind::Curb; P2.SizeX = A1 - A0; P2.SizeY = 20.0; P2.Rise = CH; P2.MaterialPath = MatConcrete; P2.Seed = NextSeed();
+				P2.Transform = FTransform(FRotator(0.0, Sd.Yaw, 0.0), Sd.Start + Sd.Dir * A0);
 				RammsPCG::WritePiece(Pieces, P2);
+			};
+			for (const FVector2D& K : Cuts)
+			{
+				EmitRun(RunStart, FMath::Clamp(K.X, RunStart, Sd.Length));
+				RunStart = FMath::Max(RunStart, FMath::Min(K.Y, Sd.Length));
 			}
+			EmitRun(RunStart, Sd.Length);
 		}
 		// Side point for the hazard placer.
 		const int32 s = SidewalksOut.Add(FTransform(FRotator(0.0, Sd.Yaw, 0.0), Sd.Start), FVector(0.0, 0.0, 0.0), FVector(Sd.Length, SW, 0.0), NextSeed());

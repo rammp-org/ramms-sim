@@ -15,10 +15,13 @@ reference); this page is the workflow.
 | `PRE_Suburban` | residential | long blocks, narrow sidewalks, set-back houses with stepped porches, lawns, a third of the blocks as parks with paths and trees |
 | `PRE_Park` | one park block | loop and cross paths, lawn trees and shrubs, benches, a cobbled segment now and then |
 | `PRE_Indoor_Home` | a flat | BSP rooms, furniture against walls and around tables, a few narrow doors and raised thresholds |
-| `PRE_Indoor_Office` | an office floor | central corridor with rooms off it, wider doors, desks and chairs |
+| `PRE_Indoor_Office` | an office floor | central corridor with rooms off it, wider doors, desks, filing, whiteboards |
+| `PRE_MainStreet` | a small-town main street | narrow storefronts from the small-business facade kits, wide sidewalks, cafe seating, kerbside parking |
+| `PRE_Indoor_Store` | a grocery / convenience store | gondola aisles (each recorded as an `Aisle` feature, some below the minimum clear width), wall freezers, checkout, stock room |
 
 Example levels: `/Game/Maps/Gen/Map_Gen_Downtown`, `Map_Gen_Suburban`,
-`Map_Gen_Park`, `Map_Gen_Indoor`, `Map_Gen_Office` — each a lit level with a
+`Map_Gen_Park`, `Map_Gen_Indoor`, `Map_Gen_Office`, `Map_Gen_MainStreet`,
+`Map_Gen_Store` — each a lit level with a
 `WorldGenerator`, the Mebot game mode and a PlayerStart on the first route.
 
 `NonCompliance` is the dial. At 0 every curb has a compliant ramp, every door

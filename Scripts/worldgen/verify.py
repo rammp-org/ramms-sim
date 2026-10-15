@@ -71,7 +71,7 @@ def st_module():
 def st_assets():
     import importlib
     import ramms_worldgen.build_all as b
-    for m in ("ramms_worldgen._helpers", "ramms_worldgen._graph", "ramms_worldgen.palettes", "ramms_worldgen.presets",
+    for m in ("ramms_worldgen._helpers", "ramms_worldgen._graph", "ramms_worldgen.surfaces", "ramms_worldgen.palettes", "ramms_worldgen.presets",
               "ramms_worldgen.graphs", "ramms_worldgen.build_all"):
         importlib.reload(importlib.import_module(m))
     import ramms_worldgen.build_all as b2
@@ -236,6 +236,22 @@ def _collision_check():
             lo = (min(p.x for p in pts), min(p.y for p in pts), min(p.z for p in pts))
             hi = (max(p.x for p in pts), max(p.y for p in pts), max(p.z for p in pts))
             boxes.append((a.get_actor_label(), lo, hi, "wall"))
+    # Stock sits inside its shelving unit's bounds by design: products are checked against walls and
+    # each other, not against the shelves that hold them.
+    def slot_meshes(slot):
+        try:
+            pal = unreal.load_asset("/Game/WorldGen/Palettes/PAL_Default")
+            slots = pal.get_editor_property("slots")
+            for k in slots.keys():
+                if str(k) == slot:
+                    return {m.get_editor_property("mesh").get_name() for m in slots[k].get_editor_property("meshes") if m.get_editor_property("mesh")}
+        except Exception:  # noqa: BLE001
+            pass
+        return set()
+    stock, holders = slot_meshes("Store.Product"), slot_meshes("Store.Shelf")
+    def held(a, b):
+        na, nb = a[0].split("#")[0], b[0].split("#")[0]
+        return (na in stock and nb in holders) or (nb in stock and na in holders)
     tol = 1.0
     overlaps = []
     props = [b for b in boxes if b[3] == "prop"]
@@ -245,7 +261,7 @@ def _collision_check():
         return min(d)
     for i in range(len(props)):
         for j in range(i + 1, len(props)):
-            if pen(props[i], props[j]) > tol:
+            if pen(props[i], props[j]) > tol and not held(props[i], props[j]):
                 overlaps.append((props[i][0], props[j][0], round(pen(props[i], props[j]), 1)))
         for w in walls:
             if pen(props[i], w) > tol:
@@ -364,7 +380,7 @@ def st_levels_start():
     import importlib
     import ramms_worldgen.levels as L
     importlib.reload(L)
-    _levels_state["queue"] = ["downtown", "suburban", "park", "indoor", "office"]
+    _levels_state["queue"] = ["downtown", "suburban", "park", "indoor", "office", "mainstreet", "store"]
     _levels_state["handle"] = unreal.register_slate_post_tick_callback(_levels_tick)
     return "started: " + ", ".join(_levels_state["queue"])
 
@@ -447,6 +463,12 @@ def _after_levels():
     report["finished"] = time.strftime("%Y-%m-%d %H:%M:%S")
     save_report()
     log("ALL DONE: %d errors" % len(report["errors"]))
+    # Leave a command-file watcher running so tools can keep driving this editor session.
+    try:
+        exec(open(os.path.join(os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else
+                               os.path.join(unreal.SystemLibrary.get_project_directory(), "Scripts", "worldgen"), "watch.py")).read(), globals())
+    except Exception as exc:  # noqa: BLE001
+        log("watcher not started: %s" % exc)
 
 
 def main():

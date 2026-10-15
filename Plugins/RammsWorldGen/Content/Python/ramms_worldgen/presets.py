@@ -18,7 +18,7 @@ PRESETS = {
              BlockSizeMin=4000.0, BlockSizeMax=7000.0, RoadWidth=800.0, SidewalkWidth=360.0, FurnitureZoneWidth=110.0,
              StreetJitter=0.2, StreetDropout=0.1, MidblockCrossingChance=0.3, CrosswalkWidth=300.0,
              LotWidthMin=1200.0, LotWidthMax=2400.0, SetbackMin=0.0, SetbackMax=0.0, FloorsMin=3, FloorsMax=9,
-             FloorHeight=380.0, LotCoverage=0.95, EntranceStepChance=0.35, EntranceRampChance=0.6, WindowSpacing=300.0,
+             FloorHeight=380.0, LotCoverage=0.95, EntranceStepChance=0.35, EntranceRampChance=0.6, WindowSpacing=300.0, RearParkingChance=0.4,
              PropDensity=7.0, HazardDensity=4.0, TreeSpacing=900.0, HazardIntrusionChance=0.5, ParkFraction=0.08,
              ParkingDensity=0.6),
     ),
@@ -29,10 +29,10 @@ PRESETS = {
         dict(SiteSizeX=16000.0, SiteSizeY=16000.0, NonCompliance=0.2,
              BlockSizeMin=7000.0, BlockSizeMax=10000.0, RoadWidth=600.0, SidewalkWidth=150.0, FurnitureZoneWidth=0.0,
              StreetJitter=0.3, StreetDropout=0.2, MidblockCrossingChance=0.1, CrosswalkWidth=250.0,
-             LotWidthMin=1800.0, LotWidthMax=3000.0, SetbackMin=400.0, SetbackMax=900.0, FloorsMin=1, FloorsMax=2,
+             LotWidthMin=2300.0, LotWidthMax=3300.0, SetbackMin=400.0, SetbackMax=900.0, FloorsMin=1, FloorsMax=2,
              FloorHeight=320.0, LotCoverage=0.6, EntranceStepChance=0.7, EntranceRampChance=0.3, WindowSpacing=250.0,
              PropDensity=1.5, HazardDensity=1.5, TreeSpacing=0.0, HazardIntrusionChance=0.6,
-             ParkFraction=0.3, LawnLots=1.0, YardTreeChance=0.85, DrivewayChance=0.8, FoliageDensity=0.8, ParkingDensity=0.35,
+             ParkFraction=0.3, LawnLots=1.0, YardTreeChance=0.85, DrivewayChance=0.8, FrontBoundaryChance=0.6, FoliageDensity=0.8, ParkingDensity=0.35,
              PathWidth=180.0),
     ),
     "PRE_Park": (
@@ -60,6 +60,28 @@ PRESETS = {
              RoomSizeMin=400.0, RoomSizeMax=750.0, CorridorWidth=210.0, CorridorChance=0.95, WallThickness=15.0,
              WallHeight=300.0, DoorWidthMean=92.0, DoorWidthStd=6.0, ThresholdChance=0.15, FurnitureDensity=0.45,
              HazardIntrusionChance=0.3, OfficeFraction=0.9),
+    ),
+    "PRE_MainStreet": (
+        unreal.RammsSceneKind.DOWNTOWN, STREETS_GRAPH,
+        "A small-town main street: narrow one- to three-storey storefronts built from the small-business facade "
+        "kits, wide sidewalks with cafe seating, benches and bins, street trees and kerbside parking.",
+        dict(SiteSizeX=14000.0, SiteSizeY=14000.0, NonCompliance=0.2,
+             BlockSizeMin=5000.0, BlockSizeMax=7000.0, RoadWidth=900.0, SidewalkWidth=420.0, FurnitureZoneWidth=130.0,
+             StreetJitter=0.05, StreetDropout=0.05, MidblockCrossingChance=0.35, CrosswalkWidth=300.0,
+             LotWidthMin=800.0, LotWidthMax=1400.0, SetbackMin=0.0, SetbackMax=0.0, FloorsMin=1, FloorsMax=3,
+             FloorHeight=350.0, LotCoverage=1.0, EntranceStepChance=0.3, EntranceRampChance=0.5, WindowSpacing=300.0,
+             FacadeStyles="sb01,sb02,sb03,dt02", RearParkingChance=0.85,
+             PropDensity=9.0, HazardDensity=4.5, TreeSpacing=1000.0, HazardIntrusionChance=0.5, ParkFraction=0.1,
+             ParkingDensity=0.75, FoliageDensity=0.6),
+    ),
+    "PRE_Indoor_Store": (
+        unreal.RammsSceneKind.INDOOR, INDOOR_GRAPH,
+        "A grocery / convenience store: a shop floor with gondola aisles (some narrower than the minimum clear "
+        "width), wall freezers, a checkout by the entrance, a stock room and a restroom.",
+        dict(SiteSizeX=2800.0, SiteSizeY=1900.0, NonCompliance=0.2,
+             RoomSizeMin=700.0, RoomSizeMax=2000.0, CorridorWidth=180.0, CorridorChance=0.0, WallThickness=20.0,
+             WallHeight=380.0, DoorWidthMean=95.0, DoorWidthStd=8.0, ThresholdChance=0.15, FurnitureDensity=0.8,
+             HazardIntrusionChance=0.4, RetailFraction=1.0),
     ),
 }
 

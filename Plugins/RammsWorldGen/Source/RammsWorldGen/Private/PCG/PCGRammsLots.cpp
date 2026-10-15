@@ -369,11 +369,24 @@ bool FPCGRammsBuildingMassingElement::ExecuteInternal(FPCGContext* Context) cons
 			bool bHouseMesh = false;
 			if (bHouse && Palette)
 			{
-				for (int32 Try = 0; Try < 4 && !bHouseMesh; ++Try)
+				// Every house that fits the lot (allowing a slight scale-down) is a candidate; one is picked at random.
+				if (const TArray<FRammsPaletteMesh>* Houses = Palette->GetMeshes(RammsPaletteSlots::House))
 				{
-					FRammsPaletteMesh Hm;
-					if (!Palette->PickMesh(RammsPaletteSlots::House, Rng, Hm)) { break; }
-					if (Hm.Footprint.Y <= Width - 150.0 && Hm.Footprint.X <= Depth * 0.7) { HouseMesh = Hm; bHouseMesh = true; }
+					TArray<FRammsPaletteMesh> Fits;
+					for (const FRammsPaletteMesh& Hm : *Houses)
+					{
+						const double Need = FMath::Max(Hm.Footprint.Y / FMath::Max(Width - 150.0, 1.0), Hm.Footprint.X / FMath::Max(Depth - Setback - 200.0, 1.0));
+						if (Need <= 1.0) { Fits.Add(Hm); }
+						else if (Need <= 1.18)
+						{
+							FRammsPaletteMesh Scaled = Hm;
+							const double K = 1.0 / Need;
+							Scaled.Scale *= K; Scaled.Footprint *= K; Scaled.Height *= K; Scaled.LocationOffset *= K;
+							Scaled.EntranceOffsetY *= K; Scaled.EntranceRise *= K; Scaled.GarageDoor *= K; Scaled.GarageWidth *= K;
+							Fits.Add(Scaled);
+						}
+					}
+					if (Fits.Num() > 0) { HouseMesh = Fits[Rng.RandRange(0, Fits.Num() - 1)]; bHouseMesh = true; }
 				}
 			}
 			if (bHouseMesh)
@@ -397,18 +410,26 @@ bool FPCGRammsBuildingMassingElement::ExecuteInternal(FPCGContext* Context) cons
 
 			// Entrance: decided before the facade so a raised ground floor can sit on its stoop.
 			double EntranceY = RammsPCG::RandRange(Rng, -BW * 0.5 + 200.0, BW * 0.5 - 200.0);
+			// A pack house brings its own door, porch and stairs: the entrance is where its door is.
+			if (bHouseMesh) { const double HalfW = FMath::Max(HouseMesh.Footprint.Y * 0.5 - 60.0, 0.0); EntranceY = FMath::Clamp(HouseMesh.EntranceOffsetY, -HalfW, HalfW); }
 			double DoorW = S->DoorClearWidth + 10.0;
 			bool bDoorNarrow = false;
-			if (Rng.FRand() < S->NonCompliance * 0.5)
+			if (!bHouseMesh && Rng.FRand() < S->NonCompliance * 0.5)
 			{
 				DoorW = RammsPCG::RandRange(Rng, 60.0, S->DoorClearWidth - 2.0);
 				bDoorNarrow = true;
 			}
-			const bool bStepped = Rng.FRand() < FMath::Clamp(S->EntranceStepChance, 0.0, 1.0);
+			const bool bStepped = bHouseMesh ? HouseMesh.EntranceRise > 5.0 : Rng.FRand() < FMath::Clamp(S->EntranceStepChance, 0.0, 1.0);
 			int32 Steps = 0; double StepRise = 0.0;
 			bool bRamp = false, bRampSteep = false;
 			double RampSlope = 0.0;
-			if (bStepped)
+			if (bStepped && bHouseMesh)
+			{
+				// Porch stairs: no ramp, as built.
+				Steps = FMath::Max(1, FMath::RoundToInt(HouseMesh.EntranceRise / 18.0));
+				StepRise = HouseMesh.EntranceRise / Steps;
+			}
+			else if (bStepped)
 			{
 				Steps = Rng.RandRange(1, 3);
 				StepRise = RammsPCG::RandRange(Rng, 12.0, 17.0);
@@ -417,7 +438,7 @@ bool FPCGRammsBuildingMassingElement::ExecuteInternal(FPCGContext* Context) cons
 			}
 			const double EntranceRise = Steps * StepRise;
 			double Threshold = 0.0;
-			if (!bStepped && Rng.FRand() < S->NonCompliance * 0.6)
+			if (!bStepped && !bHouseMesh && Rng.FRand() < S->NonCompliance * 0.6)
 			{
 				Threshold = RammsPCG::RandRange(Rng, 2.0, 5.0);
 			}
@@ -604,7 +625,7 @@ bool FPCGRammsBuildingMassingElement::ExecuteInternal(FPCGContext* Context) cons
 
 			// Door leaf flat on the facade; its frame runs along the facade (lot Y). A facade kit's door
 			// module brings its own leaf, so then only the record is written.
-			if (bDoorModule)
+			if (bDoorModule || bHouseMesh)
 			{
 				const int32 d = Features.AddBox(ToWorld(FrontX, EntranceY, Z0 + EntranceRise + 105.0), Yaw, FVector(20.0, DoorW, 210.0), NextSeed());
 				if (bDoorNarrow) { RammsPCG::WriteManifest(Features, d, FName(TEXT("Door")), FName(TEXT("Narrow")), false, ERammsComplianceIssue::DoorTooNarrow, DoorW, S->DoorClearWidth); }
@@ -628,7 +649,7 @@ bool FPCGRammsBuildingMassingElement::ExecuteInternal(FPCGContext* Context) cons
 			}
 			const double StepsW = DoorW + 80.0;
 			const double Tread = 30.0;
-			if (bStepped)
+			if (bStepped && !bHouseMesh)
 			{
 				FRammsPieceDesc St;
 				St.Kind = ERammsProcPieceKind::Step;
@@ -680,6 +701,145 @@ bool FPCGRammsBuildingMassingElement::ExecuteInternal(FPCGContext* Context) cons
 				else if (bRampSteep) { Issue = ERammsComplianceIssue::SlopeTooSteep; Measure = RampSlope; Limit = S->RampMaxSlope; }
 				RammsPCG::WriteManifest(Features, f, FName(TEXT("Entrance")), Subtype, bAccessible, Issue, Measure, Limit);
 				Features.SetInt(f, RammsPCG::LotId, LotId);
+			}
+
+			// Rear car park: rows of striped stalls across the open ground behind the building, cars in most.
+			if (!bHouse && S->RearParkingChance > 0.0 && Rng.FRand() < FMath::Clamp(S->RearParkingChance, 0.0, 1.0))
+			{
+				const double StallW = 270.0, StallD = 520.0, AisleW = 650.0;
+				const double X0 = -Depth * 0.5 + 120.0, X1 = BackX - 180.0;
+				const double Y0 = -Width * 0.5 + 60.0, Y1 = Width * 0.5 - 60.0;
+				const FString MatLine = RammsPCG::Mat(Palette, RammsPaletteSlots::MatMarking);
+				// Row 1 against the back of the lot; row 2 faces it across the drive aisle when there is room.
+				TArray<TPair<double, double>> Rows; // (row near-x, facing sign)
+				// Deep lots repeat the module (row, aisle, row) back to back until the ground runs out.
+				for (double xm = X0; xm + StallD + AisleW <= X1 && Rows.Num() < 8; xm += 2.0 * StallD + AisleW)
+				{
+					Rows.Add({ xm, 1.0 });
+					if (xm + 2.0 * StallD + AisleW <= X1) { Rows.Add({ xm + StallD + AisleW, -1.0 }); }
+				}
+				const int32 NStalls = static_cast<int32>((Y1 - Y0) / StallW);
+				for (const TPair<double, double>& Row : Rows)
+				{
+					const double xr = Row.Key, xc = xr + StallD * 0.5;
+					for (int32 k = 0; k <= NStalls; ++k)
+					{
+						const double y = Y0 + k * StallW;
+						RammsPCG::WriteCube(Primitives, ToWorld(xc, y, Z0 + 0.6), FVector(StallD - 20.0, 10.0, 1.0), Yaw, MatLine, NextSeed());
+					}
+					for (int32 k = 0; k < NStalls; ++k)
+					{
+						if (Rng.FRand() > 0.7) { continue; }
+						FRammsPaletteMesh Car;
+						if (!Palette || !Palette->PickMesh(RammsPaletteSlots::Car, Rng, Car) || Car.Footprint.Y > StallW - 25.0 || Car.Footprint.X > StallD) { continue; }
+						const double y = Y0 + (k + 0.5) * StallW;
+						// Nose in (toward the row's back edge) most of the time.
+						const double yawc = Yaw + (Row.Value > 0.0 ? 180.0 : 0.0) + (Rng.FRand() < 0.2 ? 180.0 : 0.0);
+						const int32 c = RammsPCG::WritePickedMesh(Props, Car, ToWorld(xc, y, Z0), yawc, NextSeed());
+						RammsPCG::WriteManifest(Props, c, FName(TEXT("Vehicle")), FName(TEXT("CarPark")), true, ERammsComplianceIssue::None, 0.0, 0.0);
+					}
+				}
+				if (Rows.Num() > 0)
+				{
+					const int32 f = Features.AddBox(ToWorld((X0 + X1) * 0.5, 0.0, Z0), Yaw, FVector(X1 - X0, Y1 - Y0, 10.0), NextSeed());
+					RammsPCG::WriteManifest(Features, f, FName(TEXT("CarPark")), Rows.Num() > 2 ? FName(TEXT("MultiRow")) : (Rows.Num() > 1 ? FName(TEXT("DoubleRow")) : FName(TEXT("SingleRow"))), true, ERammsComplianceIssue::None, X1 - X0, 0.0);
+					Features.SetInt(f, RammsPCG::LotId, LotId);
+				}
+			}
+
+			// House lots: a front walk from the sidewalk to the entrance, a driveway beside the house, and a
+			// hedge or fence along the front with gaps for both.
+			if (bHouse)
+			{
+				const double LotFront = Depth * 0.5;
+				const double WalkW = 120.0;
+				const double WalkStart = FrontX + (bStepped && !bHouseMesh ? Steps * Tread : 0.0);
+				const FString MatPath = RammsPCG::Mat(Palette, RammsPaletteSlots::MatPath);
+				if (LotFront - WalkStart > 60.0)
+				{
+					FRammsPieceDesc Wk;
+					Wk.Kind = ERammsProcPieceKind::Slab;
+					Wk.SizeX = LotFront - WalkStart; Wk.SizeY = WalkW; Wk.SizeZ = 6.0;
+					Wk.MaterialPath = MatPath;
+					Wk.Transform = FTransform(FRotator(0.0, Yaw, 0.0), ToWorld(WalkStart, EntranceY, Z0 + 1.5));
+					Wk.ManifestKind = FName(TEXT("Path")); Wk.ManifestSubtype = FName(TEXT("FrontWalk")); Wk.Measure = WalkW; Wk.Threshold = S->MinClearWidth;
+					Wk.Seed = NextSeed();
+					RammsPCG::WritePiece(Pieces, Wk);
+				}
+				// Driveway on the side of the house away from the entrance, when it fits inside the lot.
+				double DrivewayLo = 1e9, DrivewayHi = -1e9;
+				const double HouseHalfW = bHouseMesh ? HouseMesh.Footprint.Y * 0.5 : BW * 0.5;
+				const double HouseDepth = bHouseMesh ? HouseMesh.Footprint.X : BD;
+				double DW = FMath::Clamp(S->DrivewayWidth, 250.0, 500.0);
+				const double DSide = EntranceY > 0.0 ? -1.0 : 1.0;
+				double DCentre = DSide * (HouseHalfW + 60.0 + DW * 0.5);
+				double DStart = FrontX - HouseDepth * 0.6;
+				// A house with a garage door on its front gets the driveway up to that door instead.
+				const bool bGarage = bHouseMesh && HouseMesh.GarageWidth > 150.0;
+				if (bGarage)
+				{
+					DW = FMath::Max(DW, HouseMesh.GarageWidth + 40.0);
+					DCentre = HouseMesh.GarageDoor.Y;
+					DStart = FrontX - HouseDepth * 0.5 + HouseMesh.GarageDoor.X;
+				}
+				if ((bGarage || Rng.FRand() < FMath::Clamp(S->DrivewayChance, 0.0, 1.0)) && FMath::Abs(DCentre) + DW * 0.5 < Width * 0.5 - 30.0 && LotFront - DStart > 200.0)
+				{
+					FRammsPieceDesc Dv;
+					Dv.Kind = ERammsProcPieceKind::Slab;
+					Dv.SizeX = LotFront - DStart; Dv.SizeY = DW; Dv.SizeZ = 8.0;
+					Dv.MaterialPath = MatConcrete;
+					Dv.Transform = FTransform(FRotator(0.0, Yaw, 0.0), ToWorld(DStart, DCentre, Z0 + 2.0));
+					Dv.ManifestKind = FName(TEXT("Driveway")); Dv.ManifestSubtype = FName(TEXT("Concrete")); Dv.Measure = DW;
+					Dv.Seed = NextSeed();
+					RammsPCG::WritePiece(Pieces, Dv);
+					DrivewayLo = DCentre - DW * 0.5; DrivewayHi = DCentre + DW * 0.5;
+					// A car on it, nose to the house.
+					FRammsPaletteMesh Car;
+					if (Rng.FRand() < 0.55 && Palette && Palette->PickMesh(RammsPaletteSlots::Car, Rng, Car) && Car.Footprint.Y < DW - 40.0 && (!bGarage || DStart + Car.Footprint.X + 90.0 < LotFront))
+					{
+						const double cx = bGarage ? DStart + Car.Footprint.X * 0.5 + 90.0 : FMath::Max(DStart + Car.Footprint.X * 0.5 + 60.0, FrontX - Car.Footprint.X * 0.3);
+						const int32 c = RammsPCG::WritePickedMesh(Props, Car, ToWorld(cx, DCentre, Z0 + 2.0 + 8.0 * 0.0), Yaw + (Rng.FRand() < 0.8 ? 180.0 : 0.0), NextSeed());
+						RammsPCG::WriteManifest(Props, c, FName(TEXT("Vehicle")), FName(TEXT("Driveway")), true, ERammsComplianceIssue::None, 0.0, 0.0);
+					}
+				}
+				// Front boundary: hedge (most of the time) or fence, segments end to end with gaps.
+				if (Palette && Rng.FRand() < FMath::Clamp(S->FrontBoundaryChance, 0.0, 1.0))
+				{
+					const FName Slot = Rng.FRand() < 0.65 ? RammsPaletteSlots::Hedge : RammsPaletteSlots::Fence;
+					FRammsPaletteMesh Seg;
+					if (Palette->PickMesh(Slot, Rng, Seg) && Seg.Footprint.Y > 50.0)
+					{
+						const double SegL = Seg.Footprint.Y, Inset = 45.0 + Seg.Footprint.X * 0.5;
+						const double WalkLo = EntranceY - WalkW * 0.5 - 40.0, WalkHi = EntranceY + WalkW * 0.5 + 40.0;
+						for (double y = -Width * 0.5 + 40.0; y + SegL <= Width * 0.5 - 40.0; y += SegL)
+						{
+							const double y0 = y, y1 = y + SegL;
+							if ((y1 > WalkLo && y0 < WalkHi) || (y1 > DrivewayLo - 30.0 && y0 < DrivewayHi + 30.0)) { continue; }
+							RammsPCG::WritePickedMesh(Props, Seg, ToWorld(LotFront - Inset, (y0 + y1) * 0.5, Z0), Yaw, NextSeed());
+						}
+					}
+				}
+				// Back yard: a fence along the rear lot line and one side line (the neighbour's lot supplies the
+				// other side), from behind the house to the back, so deep lots read as private yards.
+				if (Palette && Rng.FRand() < 0.7)
+				{
+					FRammsPaletteMesh Seg;
+					const double YardFront = FrontX - HouseDepth - 120.0;
+					if (Palette->PickMesh(RammsPaletteSlots::Fence, Rng, Seg) && Seg.Footprint.Y > 50.0 && YardFront - (-Depth * 0.5) > 400.0)
+					{
+						const double SegL = Seg.Footprint.Y, Inset = 20.0 + Seg.Footprint.X * 0.5;
+						const double RearX = -Depth * 0.5 + Inset;
+						for (double y = -Width * 0.5 + 20.0; y + SegL <= Width * 0.5 - 20.0; y += SegL)
+						{
+							RammsPCG::WritePickedMesh(Props, Seg, ToWorld(RearX, y + SegL * 0.5, Z0), Yaw, NextSeed());
+						}
+						const double SideY = -Width * 0.5 + Inset;
+						for (double x = RearX + 20.0; x + SegL <= YardFront; x += SegL)
+						{
+							RammsPCG::WritePickedMesh(Props, Seg, ToWorld(x + SegL * 0.5, SideY, Z0), Yaw + 90.0, NextSeed());
+						}
+					}
+				}
 			}
 
 			// Yard trees in the open ground beside or behind the building (procedural stand-ins,

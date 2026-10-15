@@ -8,7 +8,8 @@ import json, os, time
 import unreal
 
 MAPS = ["/Game/Maps/Gen/Map_Gen_Downtown", "/Game/Maps/Gen/Map_Gen_Suburban", "/Game/Maps/Gen/Map_Gen_Park",
-        "/Game/Maps/Gen/Map_Gen_Indoor", "/Game/Maps/Gen/Map_Gen_Office"]
+        "/Game/Maps/Gen/Map_Gen_Indoor", "/Game/Maps/Gen/Map_Gen_Office", "/Game/Maps/Gen/Map_Gen_MainStreet",
+        "/Game/Maps/Gen/Map_Gen_Store"]
 OUT = os.path.join(unreal.SystemLibrary.get_project_saved_directory(), "WorldGen", "shots.json")
 state = {"queue": list(MAPS), "phase": "load", "until": 0.0, "results": {}, "handle": None, "busy": False}
 
@@ -57,7 +58,9 @@ def tick(dt):
             state["phase"] = "shoot"
             state["until"] = time.time() + 5.0
         elif state["phase"] == "shoot":
-            unreal.AutomationLibrary.take_high_res_screenshot(1600, 900, "Shot_%s" % state["current"])
+            import os
+            path = os.path.join(unreal.SystemLibrary.get_project_saved_directory(), "Screenshots", "WindowsEditor", "Shot_%s.png" % state["current"]).replace("\\", "/")
+            unreal.SystemLibrary.execute_console_command(unreal.EditorLevelLibrary.get_editor_world(), "HighResShot 1600x900 filename=%s" % path)
             state["phase"] = "load"
             state["until"] = time.time() + 2.0
     except Exception as exc:

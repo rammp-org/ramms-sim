@@ -35,6 +35,8 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Indoor", meta = (PCG_Overridable)) double FurnitureDensity = 0.5;
 	/** 0 = a home (living rooms, bedrooms, dining), 1 = a workplace (offices, meeting rooms, a break room). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Indoor", meta = (PCG_Overridable)) double OfficeFraction = 0.0;
+	/** Probability a room is retail: large rooms become shop floors (gondola aisles, wall freezers, a checkout), small ones stock rooms. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Indoor", meta = (PCG_Overridable)) double RetailFraction = 0.0;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Indoor", meta = (PCG_Overridable)) double HazardIntrusionChance = 0.5;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Accessibility", meta = (PCG_Overridable)) double DoorClearWidth = 81.3;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Accessibility", meta = (PCG_Overridable)) double DoorThresholdMax = 1.27;

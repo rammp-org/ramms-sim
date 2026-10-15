@@ -19,7 +19,9 @@ ENGINE_MAT = "/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"
 # AmericanCityPacks, TownShops, CityBeachStrip, SuburbNeighborhoodHousePack); a missing pack just
 # leaves fewer variants in a slot.
 MESH_SLOTS = {
-    "Curb": ["semf4_LOD0_TIER2_000", "semf4_LOD0_TIER2_001", "sepxW_LOD0_TIER2_000", "sepxW_LOD0_TIER2_001"],
+    # Curb: left empty on purpose - the Megascans curb pieces vary in length and leave gaps; the procedural
+    # curb (continuous, world-aligned concrete) reads better. Add meshes here to switch back.
+    "Curb": [],
     "SidewalkCorner": ["uiksdjydw_tier_2"],
     "Bench": ["SM_Bench01", "SM_Bench02", "SM_Bench03", "SM_bench_outdoor_01_rm"],
     "Bollard": ["SM_Bollard01B", "SM_Bollard01P", "SM_electric_bollard_metal"],
@@ -40,10 +42,13 @@ MESH_SLOTS = {
     "Stairs": ["stairs_street"],
     "RoofUnit": ["SM_AC_Box", "SM_AC_Exaust", "SM_ac_01", "SM_ac_02"],
     # foliage
-    "Tree": ["SM_Tree1", "SM_Tree2", "SM_Tree3", "SM_BeechTree02", "SM_BeechTree03"],
-    "TreeSmall": ["SM_MyrtleTree01", "SM_MyrtleTree02", "SM_PrivetTree01"],
+    # leafy trees only (the AmericanCityPacks SM_Tree1-3 are bare winter trees)
+    "Tree": ["SM_BeechTree02", "SM_BeechTree03", "SM_MapleTree_Pivot", "SM_TreeLarge_Static", "SM_Alder_Desktop_Forest_modded_01_rep",
+             "SM_Sycamore_American_Sapling_SF_rep"],
+    "TreeSmall": ["SM_MyrtleTree01", "SM_MyrtleTree02", "SM_PrivetTree01", "SM_TreeSmall_Static"],
+    "TreePit": ["SM_tree_grate_01", "SM_Tree_Grate"],
     "Shrub": ["SM_Shrub01", "SM_Shrub01_b", "SM_Plant_Bush_A", "SM_Plant_Bush_B", "SM_Plant_Treebush", "SM_Hedge_Sphere", "SM_Plant_FlowersRedBush", "SM_Plant_FlowersWhiteBush"],
-    "Hedge": ["SM_Hedge02_4m_Half", "SM_Plant_HedgeBush"],
+    "Hedge": ["SM_Hedge_4m_Half", "SM_Hedge02_4m_Half", "SM_Hedge_4m"],
     # buildings
     "House": ["SM_Background_House_A", "SM_Background_House_B"],
     # hazards: things that end up in the access route
@@ -89,6 +94,18 @@ MESH_SLOTS = {
     "Furniture.OfficeStorage": ["SM_FilingCabinet01a", "SM_FilingCabinet01b", "SM_FilingCabinet01e", "SM_MetalShelf_100a", "SM_Shelf_standing_A", "SM_BookShelf_01a"],
     "Furniture.OfficeProp": ["SM_Printer_02a", "SM_WaterCooler_01b", "SM_VendingMachine_01a", "SM_StepLadder_01a", "SM_PaperBoxes_01a"],
     "Furniture.Whiteboard": ["SM_WhiteBoard_01a", "SM_NoticeBoard_01a", "SM_NoticeBoard_01e"],
+    # retail (StorePropsCollection, GroceryProps)
+    "Store.Shelf": ["SM_Shelving4", "SM_Shelving5", "SM_Shelving6", "SM_WoodenShelvings2"],
+    "Store.Fridge": ["SM_Freezer3", "SM_Freezer4", "SM_Refrigerator1"],
+    "Store.ChestFreezer": ["SM_StoreFreezer1", "SM_StoreFreezer2", "SM_CounterFreezer"],
+    "Store.Counter": ["SM_Counter_3", "SM_Counter_4"],
+    "Store.Register": ["SM_CashRegister"],
+    "Store.Cart": ["SM_Cart1", "SM_Cart2", "SM_Cart3"],
+    "Store.Display": ["SM_CardboardDisplay", "SM_NewsRack", "SM_Shelving7"],
+    "Store.Product": ["SM_BoxedProduct00", "SM_BoxedProduct01", "SM_BoxedProduct03", "SM_BoxedProduct04", "SM_BoxedProduct05",
+                      "SM_Can01Pack", "SM_Can02Pack", "SM_Can03Pack", "SM_Can04Pack", "SM_Jug1", "SM_Jug2", "SM_Jar01", "SM_Jar03",
+                      "SM_PastaPack", "SM_RicePack", "SM_FlourPack", "SM_Snack_MorningCrunch", "SM_Snack_RunnersBacon",
+                      "SM_Carton1", "SM_Carton2", "SM_DrinkCanBig_1", "SM_DrinkCanBig_3"],
     "Furniture.Picture": ["SM_Painting_A", "SM_Painting_B", "SM_Painting_C", "SM_Painting_E", "SM_Painting_F", "SM_Painting_large_A", "SM_Painting_wide_A", "SM_Mirror", "SM_Picture", "SM_Classic_Picture"],
     "Furniture.Clutter": ["SM_UtilityCart", "SM_Garage_plastic_box", "SM_Cardboard_Closed_3", "SM_To_laundrybasket", "SM_Old_Chair", "SM_WaterCooler_01b", "SM_Printer_02a", "SM_ShippingBoxes_01b", "SM_FilingCabinet01a", "SM_Laundrybasket"],
 }
@@ -109,9 +126,10 @@ SLOT_HEIGHTS = {
     "Hazard.Cone": 75, "Hazard.Dumpster": 150, "Car": 150,
 }
 # Slots whose meshes keep their native size whatever the height (poles, trees, buildings, hedges).
-NO_NORMALISE = {"Tree", "TreeSmall", "Shrub", "Hedge", "House", "Car", "StreetLight", "UtilityPole", "StreetSign", "BusStop",
+NO_NORMALISE = {"Tree", "TreeSmall", "Shrub", "Hedge", "House", "Car", "Store.Shelf", "Store.Fridge", "Store.ChestFreezer",
+                "Store.Counter", "Store.Register", "Store.Cart", "Store.Display", "Store.Product", "StreetLight", "UtilityPole", "StreetSign", "BusStop",
                 "Stairs", "Curb", "SidewalkCorner", "Railing", "Hazard.Upheaval", "Hazard.Barrier", "RoofUnit",
-                "Flowerbed", "Fence", "Furniture.Picture", "Furniture.Clutter", "Furniture.OfficeProp", "Furniture.Whiteboard", "Furniture.OfficeStorage", "Hazard.Box", "Hazard.AFrame", "InfoBoard", "Bollard"}
+                "Flowerbed", "Fence", "TreePit", "Furniture.Picture", "Furniture.Clutter", "Furniture.OfficeProp", "Furniture.Whiteboard", "Furniture.OfficeStorage", "Hazard.Box", "Hazard.AFrame", "InfoBoard", "Bollard"}
 
 # Meshes whose "front" the facing heuristic cannot tell (symmetric tops): yaw that turns the front to +X.
 MESH_FACING = {
@@ -133,9 +151,9 @@ MATERIALS_DIR = "/Game/WorldGen/Materials"
 
 # slot -> list of material (instance) asset names, first that exists wins
 MATERIAL_SLOTS = {
-    "Mat.Asphalt": ["MI_rh0ribp0", "MI_sjfnbeaa", "MI_vizhdcz"],
-    "Mat.Sidewalk": ["MI_ugxjcdpn", "MI_vmcxajwfw"],
-    "Mat.Concrete": ["MI_ugkjbgplw", "MI_vmcxajwfw"],
+    "Mat.Asphalt": ["M_RammsAsphalt", "MI_rh0ribp0", "MI_sjfnbeaa", "MI_vizhdcz"],
+    "Mat.Sidewalk": ["M_RammsSidewalk", "MI_ugxjcdpn", "MI_vmcxajwfw"],
+    "Mat.Concrete": ["M_RammsConcrete", "MI_ugkjbgplw", "MI_vmcxajwfw"],
     "Mat.Cobble": ["MI_CobbleStone", "MI_tbjjai0s"],
     "Mat.Facade": ["MI_vizcegj"],
     "Mat.FacadeAlt": ["MI_ugtkdffg", "MI_vi4idbm"],
@@ -144,9 +162,9 @@ MATERIAL_SLOTS = {
     "Mat.Marking": ["M_RammsMarkingWhite"],
     "Mat.MarkingYellow": ["M_RammsMarkingYellow"],
     "Mat.Warning": ["M_RammsWarning"],
-    "Mat.Grass": ["MI_SFPark_grass_01_RM", "MI_GrassPatchy", "MI_pjwey0", "MI_tkynejer"],
-    "Mat.Lawn": ["MI_SFPark_grass_01_RM", "MI_GrassPatchy", "MI_tkynejer", "MI_pjwey0"],
-    "Mat.Path": ["MI_vmcxajwfw", "MI_ugkjbgplw"],
+    "Mat.Grass": ["M_RammsGrass", "MI_SFPark_grass_01_RM", "MI_pjwey0"],
+    "Mat.Lawn": ["M_RammsLawn", "M_RammsGrass", "MI_SFPark_grass_01_RM", "MI_tkynejer"],
+    "Mat.Path": ["M_RammsPath", "MI_vmcxajwfw", "MI_ugkjbgplw"],
     "Mat.Foliage": ["M_RammsFoliage"],
     "Mat.Trunk": ["M_RammsTrunk"],
     "Mat.Metal": ["MI_teeaccoc"],
@@ -172,6 +190,50 @@ COMPOSITE_SLOTS = {
     "House": ["/Game/ResidentialHouses/Blueprints/Houses/NoInteriors/House%02d.House%02d_C" % (n, n) for n in range(1, 13)],
 }
 COMPOSITE_FRONT_HINTS = ("Porch", "FrontDoor", "Front_Door", "SM_Door", "Steps")
+
+
+def _pick_front(named, cx, cy, ex, ey):
+    """Yaw that turns a composite house's front door to +X.
+
+    These houses have a front and a back entrance, each with a porch, so averaging porch parts lands near
+    the middle. Score every entrance door instead: the wide front door (Outside_Door_2_4m, FrontDoor...)
+    counts for it, a *_Back frame against it, nearby porch parts and a garage door on the same side add a
+    little. named: [(mesh name, x, y, zmin)] relative to the capture origin.
+    Returns (yaw, (door x, y, zmin) or None)."""
+    def near(x, y, keys, r):
+        return sum(1 for n, px, py, _z in named if any(k in n for k in keys) and abs(px - x) < r and abs(py - y) < r)
+
+    def side(x, y):
+        fx, fy = x - cx, y - cy
+        if abs(fx) / max(ex, 1.0) >= abs(fy) / max(ey, 1.0):
+            return 0.0 if fx > 0 else 180.0
+        return -90.0 if fy > 0 else 90.0
+
+    doors = [(px, py, pz) for n, px, py, pz in named if "EntranceDoor" in n]
+    if not doors:
+        doors = [(px, py, pz) for n, px, py, pz in named if any(h.lower() in n.lower() for h in COMPOSITE_FRONT_HINTS)]
+    if not doors:
+        return 0.0, None
+    garages = [side(px, py) for n, px, py, _z in named if "GarageDoor" in n]
+    best, best_score, best_door = None, -1e9, None
+    for x, y, z in doors:
+        sc = 5.0 * near(x, y, ("Door_2_4m", "FrontDoor", "Front_Door"), 200.0)
+        sc -= 10.0 * near(x, y, ("_Back",), 150.0)
+        sc += 0.3 * near(x, y, ("Porch",), 700.0)
+        sd = side(x, y)
+        # The porch stairs stand in front of the door: their direction from it is the front, which is
+        # more reliable than which bounds side the door is nearest (doors sit near corners).
+        st = [(px, py) for n, px, py, _z in named if "Stairs" in n and abs(px - x) < 600.0 and abs(py - y) < 600.0]
+        if st:
+            sx, sy = min(st, key=lambda q: (q[0] - x) ** 2 + (q[1] - y) ** 2)
+            if abs(sx - x) >= abs(sy - y):
+                sd = 0.0 if sx > x else 180.0
+            else:
+                sd = -90.0 if sy > y else 90.0
+        sc += 2.0 * garages.count(sd)
+        if sc > best_score:
+            best, best_score, best_door = sd, sc, (x, y, z)
+    return best, best_door
 
 # --- facade module kits (AmericanCityPacks) ------------------------------------------------
 # Module meshes are found by name pattern: SM_<style>_GroundFloor_L<n>T<t>[_door|_noDoor]_piece,
@@ -320,7 +382,9 @@ def _vertex_positions(mesh):
         return None
 
 
-LONG_AXIS_SLOTS = {"Car"}
+# slot -> which local axis the mesh's long side should end up on: "x" = along the facing direction
+# (vehicles), "y" = across it (shelving, counters, freezers: their front is a long face).
+LONG_AXIS_SLOTS = {"Car": "x", "Hedge": "y", "Fence": "y", "Store.Shelf": "y", "Store.Fridge": "y", "Store.ChestFreezer": "y", "Store.Counter": "y"}
 
 
 def _facing_yaw(mesh, bounds, slot=""):
@@ -333,8 +397,26 @@ def _facing_yaw(mesh, bounds, slot=""):
     if name in MESH_FACING:
         return MESH_FACING[name]
     if slot in LONG_AXIS_SLOTS:
-        # vehicles: the long axis is the driving axis; which end is the nose does not matter for parking
-        return 90.0 if bounds.box_extent.y > bounds.box_extent.x else 0.0
+        # Only the axis matters here (which end is the nose / the front face is not decidable from bounds).
+        ex, ey = bounds.box_extent.x, bounds.box_extent.y
+        if slot == "Store.Shelf":
+            # Shelving has a full-height back panel at one end of its short axis: more vertices sit in a thin
+            # band there than at the open front (board lips, feet). The front is the other end.
+            verts = _vertex_positions(mesh)
+            if verts:
+                k = 0 if ex <= ey else 1
+                cs = [v[k] for v in verts]
+                lo, hi = min(cs), max(cs)
+                n_lo = sum(1 for c in cs if c - lo < 3.0)
+                n_hi = sum(1 for c in cs if hi - c < 3.0)
+                if n_lo != n_hi:
+                    back_hi = n_hi > n_lo
+                    if k == 0:
+                        return 180.0 if back_hi else 0.0
+                    return 90.0 if back_hi else -90.0
+        if LONG_AXIS_SLOTS[slot] == "x":
+            return 90.0 if ey > ex else 0.0
+        return 90.0 if ex > ey else 0.0
     verts = _vertex_positions(mesh)
     if not verts or len(verts) < 12:
         return 0.0
@@ -357,6 +439,35 @@ def _facing_yaw(mesh, bounds, slot=""):
         front = (0.0, -1.0) if ny > 0 else (0.0, 1.0)
     import math
     return -math.degrees(math.atan2(front[1], front[0]))
+
+
+def _shelf_heights(mesh, scale):
+    """Heights of horizontal boards in a shelving mesh: z levels where many vertices cluster.
+
+    Vertices are binned at 1.5 cm, bins closer than 4.5 cm are merged into one cluster (a board's top,
+    bottom and lip), and a cluster that holds at least 4% of all vertices is a board. The plinth and the
+    top cap (within 10 cm of either end) are not shelves. Low-poly store meshes have few bins, so the
+    threshold is relative to the vertex count, not to the average bin."""
+    verts = _vertex_positions(mesh)
+    if not verts:
+        return []
+    zmin = min(v[2] for v in verts)
+    zmax = max(v[2] for v in verts)
+    bins = {}
+    for v in verts:
+        b = int(round((v[2] - zmin) / 1.5))
+        bins[b] = bins.get(b, 0) + 1
+    clusters = []  # [z_lo, z_hi, count]
+    for b in sorted(bins):
+        z = b * 1.5
+        if clusters and z - clusters[-1][1] <= 4.5:
+            clusters[-1][1] = z
+            clusters[-1][2] += bins[b]
+        else:
+            clusters.append([z, z, bins[b]])
+    need = max(3, 0.04 * len(verts))
+    levels = [c[1] for c in clusters if c[2] >= need and c[0] > 10.0 and c[1] < (zmax - zmin) - 10.0]
+    return [round(z * scale, 1) for z in levels]
 
 
 def _mesh_entry(mesh, slot=""):
@@ -390,6 +501,11 @@ def _mesh_entry(mesh, slot=""):
     oy = origin.x * math.sin(r) + origin.y * math.cos(r)
     base_z = origin.z - ext.z
     e.set_editor_property("location_offset", unreal.Vector(-ox, -oy, -base_z))
+    if slot == "Store.Shelf":
+        try:
+            e.set_editor_property("shelf_heights", _shelf_heights(mesh, scale))
+        except Exception as exc:  # noqa: BLE001
+            H.warn("shelf heights for %s: %s" % (mesh.get_name(), exc))
     return e
 
 
@@ -407,7 +523,8 @@ def _composite_entry(cls_path, slot=""):
     parts = []
     lo = [1e9, 1e9, 1e9]
     hi = [-1e9, -1e9, -1e9]
-    front = [0.0, 0.0, 0]
+    named = []
+    garage_doors = []
     try:
         owners = []
         for c in actor.get_components_by_class(unreal.ChildActorComponent):
@@ -443,8 +560,10 @@ def _composite_entry(cls_path, slot=""):
                 mats = [smc.get_material(i) for i in range(smc.get_num_materials())]
                 part.set_editor_property("materials", mats if mats and all(m is not None for m in mats) else [])
                 parts.append(part)
-                if any(h.lower() in mesh.get_name().lower() for h in COMPOSITE_FRONT_HINTS):
-                    front[0] += bo.x - base.x; front[1] += bo.y - base.y; front[2] += 1
+                co, _ce, _r = unreal.SystemLibrary.get_component_bounds(smc)
+                named.append((mesh.get_name(), co.x - base.x, co.y - base.y, co.z - _ce.z - base.z))
+                if "GarageDoor_Closed" in mesh.get_name():
+                    garage_doors.append((co.x - base.x, co.y - base.y, _ce.x, _ce.y))
     finally:
         eas.destroy_actor(actor)
     if not parts or lo[0] > hi[0]:
@@ -452,14 +571,7 @@ def _composite_entry(cls_path, slot=""):
         return None
     cx, cy = (lo[0] + hi[0]) * 0.5, (lo[1] + hi[1]) * 0.5
     ex, ey, ez = (hi[0] - lo[0]) * 0.5, (hi[1] - lo[1]) * 0.5, (hi[2] - lo[2]) * 0.5
-    yaw = 0.0
-    if front[2] > 0:
-        fx, fy = front[0] / front[2] - cx, front[1] / front[2] - cy
-        # snap to the nearest axis: the front faces the side the porch sits on
-        if abs(fx) / max(ex, 1.0) >= abs(fy) / max(ey, 1.0):
-            yaw = 0.0 if fx > 0 else 180.0
-        else:
-            yaw = -90.0 if fy > 0 else 90.0
+    yaw, door = _pick_front(named, cx, cy, ex, ey)
     e = unreal.RammsPaletteMesh()
     e.set_editor_property("weight", 1.0)
     e.set_editor_property("scale", 1.0)
@@ -473,6 +585,19 @@ def _composite_entry(cls_path, slot=""):
     ox = cx * math.cos(r) - cy * math.sin(r)
     oy = cx * math.sin(r) + cy * math.cos(r)
     e.set_editor_property("location_offset", unreal.Vector(-ox, -oy, -lo[2]))
+    if door is not None:
+        dx, dy = door[0] - cx, door[1] - cy
+        e.set_editor_property("entrance_offset_y", dx * math.sin(r) + dy * math.cos(r))
+        e.set_editor_property("entrance_rise", max(0.0, door[2] - lo[2]))
+    for gx, gy, gex, gey in garage_doors:
+        dx, dy = gx - cx, gy - cy
+        lx = dx * math.cos(r) - dy * math.sin(r)
+        ly = dx * math.sin(r) + dy * math.cos(r)
+        if lx > fx_ * 0.25:  # on the front half: the garage opens toward the street
+            wide = max(gex, gey)  # the door is thin: its long extent is its width
+            e.set_editor_property("garage_door", unreal.Vector2D(lx, ly))
+            e.set_editor_property("garage_width", wide * 2.0)
+            break
     H.log("composite %s: %d parts, footprint %.0fx%.0f h %.0f yaw %.0f" % (cls_path.rsplit("/", 1)[-1], len(parts), fx_ * 2, fy_ * 2, ez * 2, yaw))
     return e
 
@@ -505,6 +630,8 @@ def build_default_palette(path=DEFAULT_PALETTE):
     """Create or refresh the default palette. Returns (palette, report dict)."""
     for name, (rgb, rough, metal) in SOLID_MATERIALS.items():
         _ensure_solid_material(name, rgb, rough, metal)
+    from . import surfaces
+    surfaces.build_surfaces()
     index = _registry_index()
     pal, _ = H.get_or_create(path, unreal.RammsWorldPalette)
     pal.set_editor_property("slots", {})
@@ -530,7 +657,7 @@ def build_default_palette(path=DEFAULT_PALETTE):
     for slot, names in MATERIAL_SLOTS.items():
         chosen = None
         for n in names:
-            if n in SOLID_MATERIALS and H.EAL.does_asset_exist(MATERIALS_DIR + "/" + n):
+            if n.startswith("M_Ramms") and H.EAL.does_asset_exist(MATERIALS_DIR + "/" + n):
                 chosen = H.EAL.load_asset(MATERIALS_DIR + "/" + n)
                 break
             for ad in index.get(n, []):

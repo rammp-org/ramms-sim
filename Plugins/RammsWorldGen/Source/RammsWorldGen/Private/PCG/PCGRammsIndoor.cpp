@@ -58,9 +58,13 @@ namespace
 
 	struct FFurnitureRule { FName Slot; bool bAgainstWall; double Weight; };
 
-	FName KindForRoom(const FRandomStream& Rng, double Area, bool bSmallest, double OfficeFraction)
+	FName KindForRoom(const FRandomStream& Rng, double Area, bool bSmallest, double OfficeFraction, double RetailFraction)
 	{
 		if (bSmallest) { return FName(TEXT("Bathroom")); }
+		if (RetailFraction > 0.0 && Rng.FRand() < RetailFraction)
+		{
+			return Area > 30.0 * 10000.0 ? FName(TEXT("Shop")) : FName(TEXT("Storage"));
+		}
 		const double R = Rng.FRand();
 		if (Rng.FRand() < OfficeFraction)
 		{
@@ -183,7 +187,7 @@ bool FPCGRammsIndoorLayoutElement::ExecuteInternal(FPCGContext* Context) const
 	{
 		int32 Smallest = -1; double SmallestArea = TNumericLimits<double>::Max();
 		for (const FRoom& R : Rooms) { if (!R.bCorridor && R.Rect.GetArea() < SmallestArea) { SmallestArea = R.Rect.GetArea(); Smallest = R.Id; } }
-		for (FRoom& R : Rooms) { R.Kind = R.bCorridor ? FName(TEXT("Corridor")) : KindForRoom(Rng, R.Rect.GetArea(), R.Id == Smallest && Rooms.Num() > 2, FMath::Clamp(S->OfficeFraction, 0.0, 1.0)); }
+		for (FRoom& R : Rooms) { R.Kind = R.bCorridor ? FName(TEXT("Corridor")) : KindForRoom(Rng, R.Rect.GetArea(), R.Id == Smallest && Rooms.Num() > 2, FMath::Clamp(S->OfficeFraction, 0.0, 1.0), FMath::Clamp(S->RetailFraction, 0.0, 1.0)); }
 	}
 
 	// --- walls between rooms, and doors -------------------------------------------------------------
@@ -386,7 +390,7 @@ bool FPCGRammsIndoorLayoutElement::ExecuteInternal(FPCGContext* Context) const
 	{
 		const FVector2D Ctr = R.Rect.GetCenter();
 		const FVector2D Sz = R.Rect.GetSize();
-		const FString Floor = (R.Kind == FName(TEXT("Bedroom"))) ? MatCarpet : (R.Kind == FName(TEXT("Bathroom")) || R.Kind == FName(TEXT("Kitchen")) || R.bCorridor) ? MatTile : MatWood;
+		const FString Floor = (R.Kind == FName(TEXT("Bedroom"))) ? MatCarpet : (R.Kind == FName(TEXT("Bathroom")) || R.Kind == FName(TEXT("Kitchen")) || R.Kind == FName(TEXT("Shop")) || R.Kind == FName(TEXT("Storage")) || R.bCorridor) ? MatTile : MatWood;
 		RammsPCG::WriteCube(Primitives, FVector(Ctr.X, Ctr.Y, Z0 - 10.0), FVector(Sz.X + T, Sz.Y + T, 20.0), 0.0, Floor, NextSeed());
 		{
 			const int32 f = Features.AddBox(FVector(Ctr.X, Ctr.Y, Z0), 0.0, FVector(Sz.X, Sz.Y, H), NextSeed());
@@ -771,6 +775,140 @@ bool FPCGRammsIndoorLayoutElement::ExecuteInternal(FPCGContext* Context) const
 				}
 				else if (TryWall(RammsPaletteSlots::FurnitureCupboard, -1, false, 8.0, B)) { Emit(B); }
 				Picture();
+			}
+			else if (R.Kind == FName(TEXT("Shop")))
+			{
+				// Products on every measured shelf board of a unit, in a row along its front edge. Plain props
+				// (no manifest record): they sit inside the unit's footprint, which is already the obstacle.
+				auto StockShelf = [&](const FItem& U)
+				{
+					if (U.M.ShelfHeights.Num() == 0 || !Palette) { return; }
+					double ux, uy; Dims(U.M, ux, uy);
+					const FVector2D F = Facing(U.Yaw), Sd = Side(U.Yaw);
+					for (int32 h = 0; h < U.M.ShelfHeights.Num(); ++h)
+					{
+						const double Hgt = U.M.ShelfHeights[h];
+						if (Hgt > 175.0) { continue; } // nothing on the very top
+						// Clearance up to the next board (or the unit's top): products must fit under it.
+						const double ShelfClear = (h + 1 < U.M.ShelfHeights.Num() ? U.M.ShelfHeights[h + 1] : U.M.Height) - Hgt - 3.0;
+						FRammsPaletteMesh Pr; bool bFits = false;
+						for (int32 Try = 0; Try < 6 && !bFits; ++Try)
+						{
+							if (!Palette->PickMesh(RammsPaletteSlots::StoreProduct, Rng, Pr)) { return; }
+							bFits = Pr.Height <= ShelfClear;
+						}
+						if (!bFits) { continue; }
+						double px, py; Dims(Pr, px, py);
+						px = FMath::Max(Pr.Footprint.X, 4.0); py = FMath::Max(Pr.Footprint.Y, 4.0);
+						if (px > ux * 0.9) { continue; }
+						const double Front = ux * 0.5 - px * 0.5 - 3.0;
+						const double Step = py + 1.5;
+						const int32 N = FMath::Clamp(static_cast<int32>((uy - 8.0) / Step), 0, 40);
+						const double Fill = RammsPCG::RandRange(Rng, 0.6, 1.0); // some gaps, like a real shelf
+						for (int32 k = 0; k < N; ++k)
+						{
+							if (Rng.FRand() > Fill) { continue; }
+							const double a = -uy * 0.5 + 4.0 + Step * (k + 0.5);
+							const FVector2D Pp = U.P + F * Front + Sd * a;
+							RammsPCG::WritePickedMesh(Props, Pr, FVector(Pp.X, Pp.Y, U.Z + Hgt + 0.3), U.Yaw, NextSeed());
+						}
+					}
+				};
+				// A shop floor: a checkout by the entrance, freezers along the long wall, and gondola rows
+				// (shelving units back to back) parallel to it with aisles between them. Aisle widths are
+				// drawn per aisle - most at or above the preferred clear width, some (NonCompliance) below
+				// the minimum - and each aisle is recorded in the manifest.
+				const bool bAlongX = Sz.X >= Sz.Y;
+				const int32 FreezerWall = bAlongX ? (Rng.FRand() < 0.5 ? 0 : 2) : (Rng.FRand() < 0.5 ? 1 : 3);
+				const FVector2D DoorP = R.DoorCentres.Num() > 0 ? R.DoorCentres[0] : Ctr;
+				// Checkout: on the wall nearest the entrance, beside the door.
+				{
+					const double Dw[4] = { DoorP.Y - Inner.Min.Y, Inner.Max.X - DoorP.X, Inner.Max.Y - DoorP.Y, DoorP.X - Inner.Min.X };
+					int32 DoorWall = 0; for (int32 w = 1; w < 4; ++w) { if (Dw[w] < Dw[DoorWall]) { DoorWall = w; } }
+					const double DoorAlong = (DoorWall == 0 || DoorWall == 2) ? DoorP.X : DoorP.Y;
+					double Lo, Hi; WallRange(DoorWall, Lo, Hi);
+					const double Hint = DoorAlong + ((DoorAlong - Lo) > (Hi - DoorAlong) ? -220.0 : 220.0);
+					FItem Ck;
+					if (TryWall(RammsPaletteSlots::StoreCounter, DoorWall, true, 4.0, Ck, Hint))
+					{
+						Emit(Ck);
+						FItem Rg; if (Stack(RammsPaletteSlots::StoreRegister, Ck, Rg)) { Emit(Rg, FName(TEXT("Decor"))); }
+					}
+				}
+				// Wall freezers / fridges along one long wall.
+				double FreezerDepth = 0.0;
+				{
+					double Lo, Hi; WallRange(FreezerWall, Lo, Hi);
+					double Along = Lo + 30.0;
+					for (int32 n = 0; n < 12 && Along < Hi - 60.0; ++n)
+					{
+						FRammsPaletteMesh M; if (!Pick(RammsPaletteSlots::StoreFridge, M)) { break; }
+						double fx, fy; Dims(M, fx, fy);
+						if (Along + fy > Hi - 30.0) { break; }
+						FItem Fz;
+						if (TryAt(RammsPaletteSlots::StoreFridge, M, WallPos(FreezerWall, Along + fy * 0.5, fx), WallYaw(FreezerWall), 1.0, Fz)) { Emit(Fz); FreezerDepth = FMath::Max(FreezerDepth, fx); }
+						Along += fy + 2.0;
+					}
+				}
+				// Gondola rows across the rest of the floor.
+				{
+					FRammsPaletteMesh Sh; double sx = 0.0, sy = 0.0;
+					if (Pick(RammsPaletteSlots::StoreShelf, Sh))
+					{
+						Dims(Sh, sx, sy);
+						const double RowDepth = sx * 2.0 + 4.0;           // two units back to back
+						const double EndGap = 180.0;                         // cross aisles at both ends
+						// Short-axis coordinate runs away from the freezer wall.
+						const double SMin = bAlongX ? Inner.Min.Y : Inner.Min.X, SMax = bAlongX ? Inner.Max.Y : Inner.Max.X;
+						const bool bFromMin = (FreezerWall == 0 || FreezerWall == 3);
+						const double LMin = (bAlongX ? Inner.Min.X : Inner.Min.Y) + EndGap, LMax = (bAlongX ? Inner.Max.X : Inner.Max.Y) - EndGap;
+						double Cursor = FreezerDepth + 4.0;
+						int32 Aisle = 0;
+						while (Aisle < 8)
+						{
+							const bool bNarrow = Rng.FRand() < S->NonCompliance * 0.6;
+							const double AW = bNarrow ? RammsPCG::RandRange(Rng, 66.0, S->MinClearWidth - 4.0)
+								: RammsPCG::RandRange(Rng, S->PreferredClearWidth * 0.95, S->PreferredClearWidth * 1.35);
+							if (Cursor + AW + RowDepth > (SMax - SMin) - 150.0) { break; } // keep a wide aisle at the far wall
+							// The aisle itself: a manifest record spanning the row length.
+							{
+								const double sc = bFromMin ? SMin + Cursor + AW * 0.5 : SMax - Cursor - AW * 0.5;
+								const double lc = (LMin + LMax) * 0.5;
+								const FVector2D AC = bAlongX ? FVector2D(lc, sc) : FVector2D(sc, lc);
+								const FVector2D AS = bAlongX ? FVector2D(LMax - LMin, AW) : FVector2D(AW, LMax - LMin);
+								const int32 f = Features.AddBox(FVector(AC.X, AC.Y, Z0), 0.0, FVector(AS.X, AS.Y, 10.0), NextSeed());
+								RammsPCG::WriteManifest(Features, f, FName(TEXT("Aisle")), bNarrow ? FName(TEXT("Narrow")) : FName(TEXT("Standard")), !bNarrow,
+									bNarrow ? ERammsComplianceIssue::ClearWidthBelowMinimum : ERammsComplianceIssue::None, AW, S->MinClearWidth);
+								Features.SetInt(f, RammsPCG::RoomId, R.Id);
+							}
+							Cursor += AW;
+							// Row centre line, then the units end to end along it, facing both aisles.
+							const double rc = bFromMin ? SMin + Cursor + RowDepth * 0.5 : SMax - Cursor - RowDepth * 0.5;
+							for (double l = LMin + sy * 0.5; l + sy * 0.5 <= LMax; l += sy + 1.0)
+							{
+								for (int32 sgn = -1; sgn <= 1; sgn += 2)
+								{
+									const double off = sgn * (sx * 0.5 + 2.0);
+									const FVector2D P = bAlongX ? FVector2D(l, rc + off) : FVector2D(rc + off, l);
+									const double Yaw = bAlongX ? (sgn > 0 ? 90.0 : -90.0) : (sgn > 0 ? 0.0 : 180.0);
+									FItem U; if (TryAt(RammsPaletteSlots::StoreShelf, Sh, P, Yaw, 0.5, U)) { Emit(U); StockShelf(U); }
+								}
+							}
+							Cursor += RowDepth;
+							++Aisle;
+						}
+						// A chest freezer island or display in the far aisle, and carts by the door.
+						if (Rng.FRand() < 0.7) { Corner(RammsPaletteSlots::StoreChestFreezer); }
+					}
+				}
+				Corner(RammsPaletteSlots::StoreCart);
+				if (Rng.FRand() < 0.6) { Corner(RammsPaletteSlots::StoreDisplay); }
+			}
+			else if (R.Kind == FName(TEXT("Storage")))
+			{
+				// Stock room: shelving along the walls, boxes.
+				for (int32 i = 0; i < 4; ++i) { FItem A2; if (TryWall(RammsPaletteSlots::FurnitureOfficeStorage, -1, true, 4.0, A2)) { Emit(A2); } }
+				Corner(RammsPaletteSlots::FurnitureClutter);
 			}
 			else if (R.Kind == FName(TEXT("Bathroom")))
 			{

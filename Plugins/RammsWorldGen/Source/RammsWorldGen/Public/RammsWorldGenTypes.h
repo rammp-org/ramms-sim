@@ -221,6 +221,10 @@ struct RAMMSWORLDGEN_API FRammsWorldGenParams
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Buildings", meta = (ClampMin = 0, ClampMax = 1)) double EntranceRampChance = 0.6;
 	/** Window spacing along a facade; 0 disables windows. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Buildings") double WindowSpacing = 300.0;
+	/** Comma-separated modular facade kits (palette Facade.<style>.* slots) buildings draw from, e.g. "dt01,dt02" (downtown) or "sb01,sb02,sb03" (small business). Empty = all. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Buildings") FString FacadeStyles = TEXT("dt01,dt02,dt03");
+	/** Probability that open ground behind a (non-house) building becomes a striped car park with parked cars. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Buildings", meta = (ClampMin = 0, ClampMax = 1)) double RearParkingChance = 0.0;
 
 	// --- street furniture, trees, hazards -------------------------------------
 	/** Props (benches, bins, lights) per 100 m of sidewalk. */
@@ -258,6 +262,8 @@ struct RAMMSWORLDGEN_API FRammsWorldGenParams
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Suburban", meta = (ClampMin = 0, ClampMax = 1)) double YardTreeChance = 0.0;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Suburban", meta = (ClampMin = 0, ClampMax = 1)) double DrivewayChance = 0.0;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Suburban") double DrivewayWidth = 360.0;
+	/** Probability a house lot has a hedge or fence along its front (gaps for the walk and driveway). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Suburban", meta = (ClampMin = 0, ClampMax = 1)) double FrontBoundaryChance = 0.6;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Suburban") double PathWidth = 180.0;
 	/** Trees per 100 m^2 of park. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Suburban") double FoliageDensity = 0.6;
@@ -276,6 +282,8 @@ struct RAMMSWORLDGEN_API FRammsWorldGenParams
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Indoor", meta = (ClampMin = 0, ClampMax = 1)) double FurnitureDensity = 0.5;
 	/** 0 = a home (living rooms, bedrooms, dining), 1 = a workplace (offices, meeting rooms, a break room). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Indoor", meta = (ClampMin = 0, ClampMax = 1)) double OfficeFraction = 0.0;
+	/** Probability a room is retail (shop floor with aisles; small rooms become stock rooms). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Indoor", meta = (ClampMin = 0, ClampMax = 1)) double RetailFraction = 0.0;
 	/** Probability an interior room is a corridor-connected room vs. open plan. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Indoor", meta = (ClampMin = 0, ClampMax = 1)) double CorridorChance = 0.6;
 };

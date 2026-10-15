@@ -18,6 +18,8 @@ EXAMPLES = {
     "park": ("Map_Gen_Park", "PRE_Park", 3),
     "indoor": ("Map_Gen_Indoor", "PRE_Indoor_Home", 5),
     "office": ("Map_Gen_Office", "PRE_Indoor_Office", 2),
+    "mainstreet": ("Map_Gen_MainStreet", "PRE_MainStreet", 4),
+    "store": ("Map_Gen_Store", "PRE_Indoor_Store", 6),
 }
 
 _pending = {}

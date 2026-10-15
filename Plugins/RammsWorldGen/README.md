@@ -119,7 +119,8 @@ Live Coding — same rule as the rest of the project.
    python Scripts/editor_remote_exec.py --file Scripts/worldgen/build_levels.py
    ```
    Creates `/Game/Maps/Gen/Map_Gen_Downtown`, `Map_Gen_Suburban`,
-   `Map_Gen_Park`, `Map_Gen_Indoor` and `Map_Gen_Office`, each with lights, a
+   `Map_Gen_Park`, `Map_Gen_Indoor`, `Map_Gen_Office`, `Map_Gen_MainStreet` and
+   `Map_Gen_Store`, each with lights, a
    ground slab, a `WorldGenerator`, the `BP_MebotGameMode`, and a PlayerStart
    on the widest compliant route. Generation is asynchronous: the level is
    saved when the log says `level ... generated`.
@@ -176,7 +177,7 @@ The in-editor MCP server (see the project README) lists the toolset
 | `worldgen_export_manifest` | Write the manifest JSON |
 | `worldgen_place_player_start` | PlayerStart to the suggested start |
 | `worldgen_build_assets` | Rebuild palette / presets / graphs from code |
-| `worldgen_build_level` | Create an example level (`downtown`, `suburban`, `park`, `indoor`, `office`) |
+| `worldgen_build_level` | Create an example level (`downtown`, `suburban`, `park`, `indoor`, `office`, `mainstreet`, `store`) |
 
 A typical session: `worldgen_list_presets` → `worldgen_generate(preset="PRE_Downtown", seed=7)`
 → poll `worldgen_status` → `worldgen_manifest(only_non_compliant=true)` →
@@ -256,7 +257,9 @@ Kinds and the issues they can carry:
 | `Building` / `House` | house footprint | — |
 | `Prop`, `Furniture`, `Decor`, `Tree`, `Shrub` | palette slot | ClearWidthBelowMinimum when a prop spills out of the furniture zone |
 | `Surface` | Cobbled | SurfaceUneven |
-| `Room` | Living, Bedroom, Office, Meeting, Kitchen, Dining, Bathroom, Corridor | — |
+| `Room` | Living, Bedroom, Office, Meeting, Kitchen, Dining, Bathroom, Corridor, Shop, Storage | — |
+| `Aisle` | Standard, Narrow (shop floors; measure = aisle width) | ClearWidthBelowMinimum |
+| `Path`, `Driveway`, `Vehicle`, `CarPark` | FrontWalk / Concrete / Parked, Driveway, CarPark / SingleRow, DoubleRow, MultiRow | — |
 
 `measure` / `threshold` are the number that decided it (slope as rise/run,
 widths and heights in cm) and what it was compared to.
@@ -273,11 +276,11 @@ runs it at 0.2, the office at 0.1.
 |---|---|
 | Site | `SiteSizeX/Y`, `NonCompliance`, `Palette` |
 | Streets | `BlockSizeMin/Max`, `RoadWidth`, `SidewalkWidth`, `FurnitureZoneWidth`, `CurbHeight`, `StreetJitter`, `StreetDropout`, `MidblockCrossingChance`, `CrosswalkWidth`, `ParkFraction`, `ParkingDensity` |
-| Buildings | `LotWidthMin/Max`, `SetbackMin/Max`, `FloorsMin/Max`, `FloorHeight`, `LotCoverage`, `EntranceStepChance`, `EntranceRampChance`, `WindowSpacing` |
+| Buildings | `LotWidthMin/Max`, `SetbackMin/Max`, `FloorsMin/Max`, `FloorHeight`, `LotCoverage`, `EntranceStepChance`, `EntranceRampChance`, `WindowSpacing`, `FacadeStyles`, `RearParkingChance` |
 | Hazards | `PropDensity`, `HazardDensity` (per 100 m), `TreeSpacing`, `HazardIntrusionChance` |
 | Accessibility | `MinClearWidth`, `PreferredClearWidth`, `RampMaxSlope`, `MaxCrossSlope`, `CurbRampFlareSlope`, `DoorClearWidth`, `DoorThresholdMax`, `VerticalChangeMax`, `LandingSize`, `DetectableWarningDepth` |
-| Suburban / park | `LawnLots`, `YardTreeChance`, `DrivewayChance`, `DrivewayWidth`, `PathWidth`, `FoliageDensity` |
-| Indoor | `RoomSizeMin/Max`, `CorridorWidth`, `CorridorChance`, `WallThickness`, `WallHeight`, `DoorWidthMean/Std`, `ThresholdChance`, `FurnitureDensity`, `OfficeFraction` |
+| Suburban / park | `LawnLots`, `YardTreeChance`, `DrivewayChance`, `DrivewayWidth`, `FrontBoundaryChance`, `PathWidth`, `FoliageDensity` |
+| Indoor | `RoomSizeMin/Max`, `CorridorWidth`, `CorridorChance`, `WallThickness`, `WallHeight`, `DoorWidthMean/Std`, `ThresholdChance`, `FurnitureDensity`, `OfficeFraction`, `RetailFraction` |
 
 ## Extending
 
@@ -289,13 +292,33 @@ runs it at 0.2, the office at 0.1.
   being used as soon as a slot is filled. Furniture and street props are
   normalised to real-world heights per slot (`SLOT_HEIGHTS`); whole houses go
   in the `House` slot and replace the shell on set-back low-rise lots.
+- **Ground surfaces**: `surfaces.py` builds world-aligned materials
+  (`M_RammsAsphalt`, `M_RammsSidewalk`, `M_RammsConcrete`, `M_RammsGrass`,
+  `M_RammsLawn`, `M_RammsPath`, `M_RammsDirt`) from the packs' tileable
+  textures. UVs come from world XY at a real tile size, so stretched road
+  cubes and huge ground slabs tile correctly; repetition is broken by a second
+  sample at another scale (or a variant texture set) blended by a
+  low-frequency mask, plus macro brightness variation. Edit `SURFACES` to swap
+  textures or tile sizes; the Mat.* slots prefer these materials.
+- **Shelving**: `Store.Shelf` entries record their board heights
+  (`ShelfHeights`: vertex clusters holding at least 4% of the mesh's vertices,
+  plinth and top cap excluded) and face the open side away from the back panel
+  (the end of the short axis with the denser vertex band). Shop floors stock
+  every board below 175 cm with `Store.Product` meshes that fit under the next
+  board.
 - **Composite entries**: a palette mesh entry with `Parts` (mesh + relative
   transform + materials) instead of a `Mesh`. `palettes.COMPOSITE_SLOTS`
   captures blueprint houses (Residential Houses - Modular Pack, ~300 child
   actors each) by spawning them once at build time, measuring the union
-  bounds and facing them by their porch / front door parts; the massing node
-  spawns the parts as instanced modules (`WriteComposite`), so a street of
-  them costs nothing.
+  bounds and facing them by their front door. These houses have a front and a
+  back entrance, so each `EntranceDoor` is scored (the wide front door counts
+  for it, a `*_Back` frame against it, nearby porch parts and a front garage
+  add a little) and the front is the direction of its porch stairs. The entry
+  records `EntranceOffsetY` / `EntranceRise` (front walk and manifest records
+  meet the real door; no procedural steps or door are added) and, when a
+  garage door is on the front, `GarageDoor` / `GarageWidth` (the driveway runs
+  up to it). The massing node spawns the parts as instanced modules
+  (`WriteComposite`), so a street of them costs nothing.
 - **Facade kits**: `Facade.<style>.GF` / `GFDoor` / `GFCorner` / `Win` /
   `WinTop` / `WinCorner` mesh slots plus the generic `Facade.Top`,
   `Facade.TallTop` (+ `Corner`) and `Facade.WinCorner`, filled by
