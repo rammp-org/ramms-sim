@@ -24,6 +24,9 @@ public:
 	/** Hazards per 100 m: A-frames, parked scooters, bins left out, cafe seating, barriers, heaved slabs. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hazards", meta = (PCG_Overridable)) double HazardDensity = 3.0;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hazards", meta = (PCG_Overridable)) double TreeSpacing = 900.0;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hazards", meta = (PCG_Overridable, ClampMin = 0, ClampMax = 1)) double CanopyChance = 0.0;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hazards", meta = (PCG_Overridable)) double StreetLightSpacing = 0.0;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hazards", meta = (PCG_Overridable)) double PlantingStrip = 0.0;
 	/** Probability a hazard intrudes below the minimum clear width. NonCompliance = 0 disables intrusion entirely. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hazards", meta = (PCG_Overridable)) double HazardIntrusionChance = 0.5;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Accessibility", meta = (PCG_Overridable)) double VerticalChangeMax = 0.64;
@@ -60,6 +63,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Park", meta = (PCG_Overridable)) double PathWidth = 180.0;
 	/** Trees per 100 m^2 of lawn. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Park", meta = (PCG_Overridable)) double FoliageDensity = 0.6;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Park", meta = (PCG_Overridable)) double GrassDensity = 0.0;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Park", meta = (PCG_Overridable)) double BenchSpacing = 1500.0;
 
 #if WITH_EDITOR

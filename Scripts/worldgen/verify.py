@@ -236,8 +236,8 @@ def _collision_check():
             lo = (min(p.x for p in pts), min(p.y for p in pts), min(p.z for p in pts))
             hi = (max(p.x for p in pts), max(p.y for p in pts), max(p.z for p in pts))
             boxes.append((a.get_actor_label(), lo, hi, "wall"))
-    # Stock sits inside its shelving unit's bounds by design: products are checked against walls and
-    # each other, not against the shelves that hold them.
+    # Stock sits inside its holder's bounds by design (products on shelves, produce in crates on tables,
+    # stacked baskets): stock is checked against walls, not against what holds it or against other stock.
     def slot_meshes(slot):
         try:
             pal = unreal.load_asset("/Game/WorldGen/Palettes/PAL_Default")
@@ -248,10 +248,14 @@ def _collision_check():
         except Exception:  # noqa: BLE001
             pass
         return set()
-    stock, holders = slot_meshes("Store.Product"), slot_meshes("Store.Shelf")
+    stock, holders = set(), set()
+    for sl in ("Store.Product", "Store.Produce", "Store.Crate", "Store.DeliItem", "Store.Basket", "Store.Register"):
+        stock |= slot_meshes(sl)
+    for sl in ("Store.Shelf", "Store.ProduceTable", "Store.DeliCase", "Store.Crate", "Store.Basket", "Store.Counter"):
+        holders |= slot_meshes(sl)
     def held(a, b):
         na, nb = a[0].split("#")[0], b[0].split("#")[0]
-        return (na in stock and nb in holders) or (nb in stock and na in holders)
+        return (na in stock and (nb in holders or nb in stock)) or (nb in stock and (na in holders or na in stock))
     tol = 1.0
     overlaps = []
     props = [b for b in boxes if b[3] == "prop"]

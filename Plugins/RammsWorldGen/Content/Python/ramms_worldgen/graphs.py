@@ -66,6 +66,7 @@ def build_streets_graph(path=STREETS):
             (park, "Features", manifest, "Features"),
             (hazards, "Props", manifest, "Features"),
             (park, "Props", manifest, "Features"),
+            (massing, "Props", manifest, "Features"),  # driveway cars, street trees, mailboxes, foundation shrubs
         ])
         g.to_output(manifest, "Out")
         return g.graph

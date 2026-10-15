@@ -42,6 +42,7 @@ namespace
 		TArray<FVector2D> DoorCentres; // doors on this room's walls
 		TArray<double> DoorWidths;     // parallel to DoorCentres
 		TArray<FBox2D> Keepouts;       // door swings and approaches: nothing is placed here
+		FString WallMat, WallMatLow, FloorMat; // finishes picked per room (WallMatLow: wainscot below 120 cm)
 	};
 
 	// A wall between two rooms (or a room and the outside), as a segment on a dividing line.
@@ -54,6 +55,7 @@ namespace
 		bool bHasDoor = false;
 		double DoorAt = 0.0;           // along-position of the door centre when bHasDoor
 		double DoorWidth = 0.0;
+		TArray<FVector4> Windows;      // exterior walls: (centre along, width, sill, head)
 	};
 
 	struct FFurnitureRule { FName Slot; bool bAgainstWall; double Weight; };
@@ -331,15 +333,69 @@ bool FPCGRammsIndoorLayoutElement::ExecuteInternal(FPCGContext* Context) const
 	auto NextSeed = [&]() { return RammsPCG::SubSeed(Seed, 8000 + (++Counter)); };
 	const double PThreshold = FMath::Clamp(S->ThresholdChance * FMath::Min(1.0, S->NonCompliance * 4.0), 0.0, 1.0);
 
+	// --- finishes and windows ---------------------------------------------------------------------
+	const FString MatTrim = RammsPCG::Mat(Palette, RammsPaletteSlots::MatTrim);
+	const FString MatTrimIn = Palette && Palette->HasSlot(FName(TEXT("Mat.Trim.Interior"))) ? RammsPCG::Mat(Palette, FName(TEXT("Mat.Trim.Interior"))) : MatTrim;
+	const FString MatGlass = RammsPCG::Mat(Palette, RammsPaletteSlots::MatGlass);
+	const FString MatConcreteFloor = RammsPCG::Mat(Palette, RammsPaletteSlots::MatConcrete);
+	auto PickMat = [&](FName Slot, const FString& Fallback) -> FString
+	{
+		const FString M = Palette ? Palette->PickMaterialPath(Slot, Rng) : FString();
+		return M.IsEmpty() ? Fallback : M;
+	};
+	for (FRoom& R : Rooms)
+	{
+		const FName K = R.Kind;
+		const bool bHome = K == FName(TEXT("Living")) || K == FName(TEXT("Bedroom")) || K == FName(TEXT("Dining"));
+		R.WallMat = (bHome && Rng.FRand() < 0.3) ? PickMat(RammsPaletteSlots::MatWallPaper, MatWall) : PickMat(RammsPaletteSlots::MatWallPaint, MatWall);
+		if (K == FName(TEXT("Bathroom")) || (K == FName(TEXT("Kitchen")) && Rng.FRand() < 0.5)) { R.WallMatLow = PickMat(RammsPaletteSlots::MatWallTile, R.WallMat); }
+		if (K == FName(TEXT("Bathroom")) || K == FName(TEXT("Kitchen"))) { R.FloorMat = PickMat(RammsPaletteSlots::MatFloorTile, MatTile); }
+		else if (K == FName(TEXT("Shop"))) { R.FloorMat = PickMat(Rng.FRand() < 0.6 ? RammsPaletteSlots::MatFloorVinyl : RammsPaletteSlots::MatFloorTile, MatTile); }
+		else if (K == FName(TEXT("Storage"))) { R.FloorMat = MatConcreteFloor; }
+		else if (K == FName(TEXT("Bedroom"))) { R.FloorMat = Rng.FRand() < 0.55 ? PickMat(RammsPaletteSlots::MatFloorCarpet, MatCarpet) : PickMat(RammsPaletteSlots::MatFloorWood, MatWood); }
+		else if (K == FName(TEXT("Office")) || K == FName(TEXT("Meeting"))) { R.FloorMat = Rng.FRand() < 0.6 ? PickMat(RammsPaletteSlots::MatFloorCarpet, MatCarpet) : PickMat(RammsPaletteSlots::MatFloorVinyl, MatTile); }
+		else if (R.bCorridor) { R.FloorMat = Rng.FRand() < 0.5 ? PickMat(RammsPaletteSlots::MatFloorVinyl, MatTile) : PickMat(RammsPaletteSlots::MatFloorWood, MatWood); }
+		else { R.FloorMat = PickMat(RammsPaletteSlots::MatFloorWood, MatWood); }
+	}
+	// Windows along the exterior walls, a few per room that touches them (none in storage or corridors),
+	// kept clear of the entrance and of the interior walls that meet the facade.
+	for (FWallSeg& W : Walls)
+	{
+		if (W.RoomB >= 0) { continue; }
+		for (const FRoom& R : Rooms)
+		{
+			if (R.bCorridor || R.Kind == FName(TEXT("Storage"))) { continue; }
+			const bool bTouch = W.bAlongX
+				? (FMath::IsNearlyEqual(R.Rect.Min.Y, W.Line + T * 0.5, 2.0) || FMath::IsNearlyEqual(R.Rect.Max.Y, W.Line - T * 0.5, 2.0))
+				: (FMath::IsNearlyEqual(R.Rect.Min.X, W.Line + T * 0.5, 2.0) || FMath::IsNearlyEqual(R.Rect.Max.X, W.Line - T * 0.5, 2.0));
+			if (!bTouch) { continue; }
+			const double Ra = FMath::Max(W.bAlongX ? R.Rect.Min.X : R.Rect.Min.Y, W.A), Rb = FMath::Min(W.bAlongX ? R.Rect.Max.X : R.Rect.Max.Y, W.B);
+			const double Len = Rb - Ra;
+			const bool bBath = R.Kind == FName(TEXT("Bathroom"));
+			const bool bShop = R.Kind == FName(TEXT("Shop"));
+			const double Ww = bBath ? 60.0 : (bShop ? 180.0 : RammsPCG::RandRange(Rng, 100.0, 140.0));
+			const double Sill = bBath ? 140.0 : (bShop ? 60.0 : 90.0), Head = FMath::Min(210.0, H - 25.0);
+			const int32 N = bBath ? 1 : FMath::Clamp(static_cast<int32>((Len - 60.0) / (bShop ? 360.0 : 300.0)), Len >= Ww + 100.0 ? 1 : 0, 4);
+			for (int32 k = 0; k < N; ++k)
+			{
+				const double Cc = Ra + Len * (k + 0.5) / N;
+				if (Cc - Ww * 0.5 < Ra + 40.0 || Cc + Ww * 0.5 > Rb - 40.0) { continue; }
+				if (W.bHasDoor && FMath::Abs(Cc - W.DoorAt) < W.DoorWidth * 0.5 + Ww * 0.5 + 40.0) { continue; }
+				W.Windows.Add(FVector4(Cc, Ww, Sill, Head));
+			}
+		}
+	}
+
 	for (const FWallSeg& W : Walls)
 	{
 		FRammsPieceDesc P;
 		P.Kind = ERammsProcPieceKind::Wall;
 		P.SizeX = W.B - W.A; P.SizeY = T; P.SizeZ = H;
-		P.MaterialPath = MatWall; P.MaterialPath2 = MatMetal;
+		P.MaterialPath = MatWall; P.MaterialPath2 = MatTrimIn; P.MaterialPath3 = MatGlass;
 		P.OpeningWidth = W.bHasDoor ? W.DoorWidth + 2.0 : 0.0;
 		P.OpeningOffset = W.bHasDoor ? W.DoorAt - W.A : 0.0;
 		P.OpeningHeight = 210.0;
+		for (const FVector4& Wn : W.Windows) { P.Openings += FString::Printf(TEXT("%.1f,%.1f,%.1f,%.1f;"), Wn.X - W.A, Wn.Y, Wn.Z, Wn.W); }
 		P.Transform = W.bAlongX ? FTransform(FRotator(0.0, 0.0, 0.0), FVector(W.A, W.Line, Z0)) : FTransform(FRotator(0.0, 90.0, 0.0), FVector(W.Line, W.A, Z0));
 		P.Seed = NextSeed();
 		RammsPCG::WritePiece(Pieces, P);
@@ -351,23 +407,58 @@ bool FPCGRammsIndoorLayoutElement::ExecuteInternal(FPCGContext* Context) const
 			const bool bHigh = Thresh > S->DoorThresholdMax;
 			// Leaf swung open 90 degrees into room A, hinged at the opening's start.
 			const FVector Hinge = W.bAlongX ? FVector(W.DoorAt - W.DoorWidth * 0.5, W.Line, Z0) : FVector(W.Line, W.DoorAt - W.DoorWidth * 0.5, Z0);
-			const FVector2D ACentre = Rooms[W.RoomA].Rect.GetCenter();
+			const FVector2D ACentre = W.RoomA >= 0 ? Rooms[W.RoomA].Rect.GetCenter() : FVector2D(Site.GetCenter());
 			const double IntoA = W.bAlongX ? (ACentre.Y > W.Line ? 1.0 : -1.0) : (ACentre.X > W.Line ? 1.0 : -1.0);
 			const double WallYaw = W.bAlongX ? 0.0 : 90.0;
-			FRammsPieceDesc D;
-			D.Kind = ERammsProcPieceKind::Door;
-			D.SizeX = W.DoorWidth; D.SizeY = 4.0; D.SizeZ = 205.0; D.Rise = 0.0;
-			D.MaterialPath = MatDoor; D.MaterialPath2 = MatMetal;
-			D.ManifestKind = W.RoomB < 0 ? FName(TEXT("Entrance")) : FName(TEXT("Door"));
-			if (bNarrow) { D.Measure = W.DoorWidth; D.Threshold = S->DoorClearWidth; }
-			else if (bHigh) { D.Measure = Thresh; D.Threshold = S->DoorThresholdMax; }
-			else { D.Measure = W.DoorWidth; D.Threshold = S->DoorClearWidth; }
-			D.bCompliant = !bNarrow && !bHigh;
-			D.Issue = bNarrow ? ERammsComplianceIssue::DoorTooNarrow : (bHigh ? ERammsComplianceIssue::ThresholdTooHigh : ERammsComplianceIssue::None);
-			D.ManifestSubtype = bNarrow ? FName(TEXT("Narrow")) : (bHigh ? FName(TEXT("RaisedThreshold")) : FName(TEXT("Standard")));
-			D.Transform = FTransform(FRotator(0.0, WallYaw + 90.0 * IntoA, 0.0), Hinge);
-			D.Seed = NextSeed();
-			RammsPCG::WritePiece(Pieces, D);
+			const FName DoorKind = W.RoomB < 0 ? FName(TEXT("Entrance")) : FName(TEXT("Door"));
+			const ERammsComplianceIssue DoorIssue = bNarrow ? ERammsComplianceIssue::DoorTooNarrow : (bHigh ? ERammsComplianceIssue::ThresholdTooHigh : ERammsComplianceIssue::None);
+			const FName DoorSub = bNarrow ? FName(TEXT("Narrow")) : (bHigh ? FName(TEXT("RaisedThreshold")) : FName(TEXT("Standard")));
+			const double DoorMeasure = bHigh && !bNarrow ? Thresh : W.DoorWidth;
+			const double DoorLimit = bHigh && !bNarrow ? S->DoorThresholdMax : S->DoorClearWidth;
+			// A real door leaf from the palette (handle included), scaled to the opening and standing open
+			// against the casing; the procedural leaf is the fallback.
+			FRammsPaletteMesh Leaf;
+			const FName LeafSlot = W.RoomB < 0 ? RammsPaletteSlots::DoorExterior : RammsPaletteSlots::DoorInterior;
+			const bool bLeaf = Palette && (Palette->PickMesh(LeafSlot, Rng, Leaf) || Palette->PickMesh(RammsPaletteSlots::DoorInterior, Rng, Leaf)) && Leaf.Footprint.Y > 30.0 && Leaf.Height > 100.0;
+			if (bLeaf)
+			{
+				const FVector U = W.bAlongX ? FVector(1, 0, 0) : FVector(0, 1, 0);
+				const FVector V = W.bAlongX ? FVector(0, IntoA, 0) : FVector(IntoA, 0, 0); // +Y of the leaf's facing frame = into room A
+				const double LeafW = W.DoorWidth - 1.0;
+				const double Thick = FMath::Clamp(Leaf.Footprint.X, 3.0, 25.0);
+				const double Sy = LeafW / FMath::Max(Leaf.Footprint.Y, 1.0), Sz = 203.0 / FMath::Max(Leaf.Height, 1.0);
+				// Facing-frame +Y = (-sin yaw, cos yaw) must point along V.
+				double LeafYaw = FMath::RadiansToDegrees(FMath::Atan2(-V.X, V.Y));
+				if (Leaf.HandleSide < 0.0) { LeafYaw += 180.0; } // handle on the free edge, away from the hinge
+				const FVector Centre = Hinge + U * (Thick * 0.5 + 1.0) + V * (T * 0.5 + 2.5 + LeafW * 0.5) + FVector(0, 0, Thresh);
+				const FRotator YawRot(0.0, LeafYaw, 0.0);
+				const FRotator Rot = (YawRot.Quaternion() * Leaf.RotationOffset.Quaternion()).Rotator();
+				const bool bSwap = FMath::Abs(FMath::Abs(FMath::Fmod(Leaf.RotationOffset.Yaw, 180.0)) - 90.0) < 1.0;
+				const FVector S3 = (bSwap ? FVector(Sy, 1.0, Sz) : FVector(1.0, Sy, Sz)) * Leaf.Scale;
+				const FVector Loc = Centre + YawRot.RotateVector(FVector(Leaf.LocationOffset.X, Leaf.LocationOffset.Y * Sy, Leaf.LocationOffset.Z * Sz));
+				const int32 d = Props.Add(FTransform(Rot, Loc, S3), FVector(-Thick * 0.5, -LeafW * 0.5, 0.0), FVector(Thick * 0.5, LeafW * 0.5, 203.0), NextSeed());
+				Props.SetPath(d, RammsPCG::Mesh, Leaf.Mesh.ToSoftObjectPath());
+				RammsPCG::WriteManifest(Props, d, DoorKind, DoorSub, !bNarrow && !bHigh, DoorIssue, DoorMeasure, DoorLimit);
+			}
+			else
+			{
+				FRammsPieceDesc D;
+				D.Kind = ERammsProcPieceKind::Door;
+				D.SizeX = W.DoorWidth; D.SizeY = 4.0; D.SizeZ = 205.0; D.Rise = 0.0;
+				D.MaterialPath = MatDoor; D.MaterialPath2 = MatMetal;
+				D.ManifestKind = DoorKind;
+				D.Measure = DoorMeasure; D.Threshold = DoorLimit;
+				D.bCompliant = !bNarrow && !bHigh;
+				D.Issue = DoorIssue;
+				D.ManifestSubtype = DoorSub;
+				// Swung open against the casing on room A's side, clear of the jamb.
+				const FVector U = W.bAlongX ? FVector(1, 0, 0) : FVector(0, 1, 0);
+				const FVector V = W.bAlongX ? FVector(0, IntoA, 0) : FVector(IntoA, 0, 0);
+				// The procedural leaf extends along its +X: point that into room A.
+				D.Transform = FTransform(FRotator(0.0, FMath::RadiansToDegrees(FMath::Atan2(V.Y, V.X)), 0.0), Hinge + U * 3.0 + V * (T * 0.5 + 2.5));
+				D.Seed = NextSeed();
+				RammsPCG::WritePiece(Pieces, D);
+			}
 			if (Thresh > 0.1)
 			{
 				FRammsPieceDesc Th;
@@ -384,14 +475,80 @@ bool FPCGRammsIndoorLayoutElement::ExecuteInternal(FPCGContext* Context) const
 		}
 	}
 
+	// Wall finishes: a 1 cm liner in the room's paint / wallpaper (tile below 120 cm in bathrooms and some
+	// kitchens) on each inner face, cut around door and window openings, with a skirting board. Shared walls
+	// get a different finish on each side this way.
+	auto EmitLiners = [&](const FRoom& R)
+	{
+		struct FCut { double A, B, Lo, Hi; };
+		for (int32 Side = 0; Side < 4; ++Side)
+		{
+			const bool bAlongX = Side < 2;                     // 0: min Y, 1: max Y, 2: min X, 3: max X
+			const double Edge = Side == 0 ? R.Rect.Min.Y : Side == 1 ? R.Rect.Max.Y : Side == 2 ? R.Rect.Min.X : R.Rect.Max.X;
+			const double SiteEdge = Side == 0 ? Site.Min.Y : Side == 1 ? Site.Max.Y : Side == 2 ? Site.Min.X : Site.Max.X;
+			const bool bExt = FMath::IsNearlyEqual(Edge, SiteEdge, Tol);
+			const double Inward = (Side == 0 || Side == 2) ? 1.0 : -1.0;
+			const double Face = Edge + Inward * (bExt ? 0.0 : T * 0.5);
+			auto EndInset = [&](double V, double SiteV) { return FMath::IsNearlyEqual(V, SiteV, Tol) ? 0.0 : T * 0.5; };
+			const double A0 = (bAlongX ? R.Rect.Min.X : R.Rect.Min.Y) + EndInset(bAlongX ? R.Rect.Min.X : R.Rect.Min.Y, bAlongX ? Site.Min.X : Site.Min.Y);
+			const double B0 = (bAlongX ? R.Rect.Max.X : R.Rect.Max.Y) - EndInset(bAlongX ? R.Rect.Max.X : R.Rect.Max.Y, bAlongX ? Site.Max.X : Site.Max.Y);
+			if (B0 - A0 < 5.0) { continue; }
+			TArray<FCut> Cuts;
+			for (int32 d = 0; d < R.DoorCentres.Num(); ++d)
+			{
+				const FVector2D& Dc = R.DoorCentres[d];
+				const double Across = bAlongX ? Dc.Y : Dc.X, Along = bAlongX ? Dc.X : Dc.Y;
+				if (FMath::Abs(Across - Edge) > T) { continue; }
+				const double Hw = (R.DoorWidths.IsValidIndex(d) ? R.DoorWidths[d] : 90.0) * 0.5 + 1.0;
+				Cuts.Add({ Along - Hw, Along + Hw, 0.0, 210.0 });
+			}
+			if (bExt)
+			{
+				for (const FWallSeg& W : Walls)
+				{
+					if (W.RoomB >= 0 || W.bAlongX != bAlongX || FMath::Abs(W.Line - (Edge - Inward * T * 0.5)) > 2.0) { continue; }
+					for (const FVector4& Wn : W.Windows) { Cuts.Add({ Wn.X - Wn.Y * 0.5, Wn.X + Wn.Y * 0.5, Wn.Z, Wn.W }); }
+				}
+			}
+			Cuts.Sort([](const FCut& X1, const FCut& X2) { return X1.A < X2.A; });
+			auto Strip = [&](double A, double B, double Lo, double Hi, double Thick, const FString& Mat)
+			{
+				if (B - A < 0.5 || Hi - Lo < 0.5) { return; }
+				const double Mid = (A + B) * 0.5, Off = Face + Inward * Thick * 0.5;
+				const FVector Cen = bAlongX ? FVector(Mid, Off, Z0 + (Lo + Hi) * 0.5) : FVector(Off, Mid, Z0 + (Lo + Hi) * 0.5);
+				RammsPCG::WriteCube(Primitives, Cen, bAlongX ? FVector(B - A, Thick, Hi - Lo) : FVector(Thick, B - A, Hi - Lo), 0.0, Mat, NextSeed());
+			};
+			const double Split = R.WallMatLow.IsEmpty() ? 0.0 : 120.0;
+			auto Finish = [&](double A, double B, double Lo, double Hi)
+			{
+				if (Split > Lo && Split < Hi) { Strip(A, B, Lo, Split, 1.0, R.WallMatLow); Strip(A, B, Split, Hi, 1.0, R.WallMat); }
+				else { Strip(A, B, Lo, Hi, 1.0, Hi <= Split ? R.WallMatLow : R.WallMat); }
+			};
+			double Xc = A0;
+			for (const FCut& Ct : Cuts)
+			{
+				const double Ca = FMath::Clamp(Ct.A, A0, B0), Cb = FMath::Clamp(Ct.B, A0, B0);
+				if (Cb <= Ca) { continue; }
+				Finish(Xc, Ca, 0.0, H);
+				Finish(Ca, Cb, 0.0, Ct.Lo);
+				Finish(Ca, Cb, Ct.Hi, H);
+				if (Ct.Lo < 1.0) { Strip(Xc, Ca, 0.0, 10.0, 1.6, MatTrimIn); } else { Strip(Xc, Cb, 0.0, 10.0, 1.6, MatTrimIn); }
+				Xc = Cb;
+			}
+			Finish(Xc, B0, 0.0, H);
+			Strip(Xc, B0, 0.0, 10.0, 1.6, MatTrimIn);
+		}
+	};
+
 	// Floors, routes, furniture per room.
 	const double Intrude = S->NonCompliance <= 0.0 ? 0.0 : FMath::Clamp(S->HazardIntrusionChance * (0.5 + 2.0 * S->NonCompliance), 0.0, 1.0);
 	for (const FRoom& R : Rooms)
 	{
 		const FVector2D Ctr = R.Rect.GetCenter();
 		const FVector2D Sz = R.Rect.GetSize();
-		const FString Floor = (R.Kind == FName(TEXT("Bedroom"))) ? MatCarpet : (R.Kind == FName(TEXT("Bathroom")) || R.Kind == FName(TEXT("Kitchen")) || R.Kind == FName(TEXT("Shop")) || R.Kind == FName(TEXT("Storage")) || R.bCorridor) ? MatTile : MatWood;
-		RammsPCG::WriteCube(Primitives, FVector(Ctr.X, Ctr.Y, Z0 - 10.0), FVector(Sz.X + T, Sz.Y + T, 20.0), 0.0, Floor, NextSeed());
+		// Floors meet under the wall centre lines (no overlap, so no z-fighting in door openings).
+		RammsPCG::WriteCube(Primitives, FVector(Ctr.X, Ctr.Y, Z0 - 10.0), FVector(Sz.X, Sz.Y, 20.0), 0.0, R.FloorMat.IsEmpty() ? MatWood : R.FloorMat, NextSeed());
+		EmitLiners(R);
 		{
 			const int32 f = Features.AddBox(FVector(Ctr.X, Ctr.Y, Z0), 0.0, FVector(Sz.X, Sz.Y, H), NextSeed());
 			RammsPCG::WriteManifest(Features, f, FName(TEXT("Room")), R.Kind, true, ERammsComplianceIssue::None, FMath::Min(Sz.X, Sz.Y), S->PreferredClearWidth);
@@ -814,26 +971,80 @@ bool FPCGRammsIndoorLayoutElement::ExecuteInternal(FPCGContext* Context) const
 						}
 					}
 				};
-				// A shop floor: a checkout by the entrance, freezers along the long wall, and gondola rows
-				// (shelving units back to back) parallel to it with aisles between them. Aisle widths are
-				// drawn per aisle - most at or above the preferred clear width, some (NonCompliance) below
-				// the minimum - and each aisle is recorded in the manifest.
+				// A shop floor laid out like a small supermarket: checkout lanes by the entrance, wall freezers
+				// along one long wall, produce tables along the other, a deli counter across the far end, and
+				// gondola rows (shelving back to back) between them with aisles. Aisle and checkout-lane widths
+				// are drawn per aisle - most at or above the preferred clear width, some (NonCompliance) below
+				// the minimum - and each is recorded in the manifest.
 				const bool bAlongX = Sz.X >= Sz.Y;
 				const int32 FreezerWall = bAlongX ? (Rng.FRand() < 0.5 ? 0 : 2) : (Rng.FRand() < 0.5 ? 1 : 3);
+				const int32 FarWall = (FreezerWall + 2) % 4;
 				const FVector2D DoorP = R.DoorCentres.Num() > 0 ? R.DoorCentres[0] : Ctr;
-				// Checkout: on the wall nearest the entrance, beside the door.
+				const double DoorWd = R.DoorWidths.Num() > 0 ? R.DoorWidths[0] : 100.0;
+				const double Dw[4] = { DoorP.Y - Inner.Min.Y, Inner.Max.X - DoorP.X, Inner.Max.Y - DoorP.Y, DoorP.X - Inner.Min.X };
+				int32 DoorWall = 0; for (int32 w = 1; w < 4; ++w) { if (Dw[w] < Dw[DoorWall]) { DoorWall = w; } }
+				const double DoorAlong = (DoorWall == 0 || DoorWall == 2) ? DoorP.X : DoorP.Y;
+				const bool bWallZ = H >= 290.0; // room for hanging signs
+				auto Hang = [&](FName Slot, const FVector2D& P, double Yaw, double Z)
 				{
-					const double Dw[4] = { DoorP.Y - Inner.Min.Y, Inner.Max.X - DoorP.X, Inner.Max.Y - DoorP.Y, DoorP.X - Inner.Min.X };
-					int32 DoorWall = 0; for (int32 w = 1; w < 4; ++w) { if (Dw[w] < Dw[DoorWall]) { DoorWall = w; } }
-					const double DoorAlong = (DoorWall == 0 || DoorWall == 2) ? DoorP.X : DoorP.Y;
+					FRammsPaletteMesh M; if (!Pick(Slot, M)) { return; }
+					FItem It; It.Slot = Slot; It.M = M; It.P = P; It.Yaw = Yaw; It.Box = BoxFor(P, Yaw, M.Footprint.X, M.Footprint.Y); It.Z = Z;
+					Emit(It, FName(TEXT("Decor")));
+				};
+				// Checkout lanes: counters standing out from the entrance wall, long side into the room, a lane
+				// between each pair, starting beside the door on its roomier side.
+				{
 					double Lo, Hi; WallRange(DoorWall, Lo, Hi);
-					const double Hint = DoorAlong + ((DoorAlong - Lo) > (Hi - DoorAlong) ? -220.0 : 220.0);
-					FItem Ck;
-					if (TryWall(RammsPaletteSlots::StoreCounter, DoorWall, true, 4.0, Ck, Hint))
+					const double Dir = (DoorAlong - Lo) > (Hi - DoorAlong) ? -1.0 : 1.0;
+					FRammsPaletteMesh Cm;
+					if (Pick(RammsPaletteSlots::StoreCounter, Cm))
 					{
-						Emit(Ck);
-						FItem Rg; if (Stack(RammsPaletteSlots::StoreRegister, Ck, Rg)) { Emit(Rg, FName(TEXT("Decor"))); }
+						double cx, cy; Dims(Cm, cx, cy);
+						const int32 Lanes = FMath::Clamp(static_cast<int32>(((Dir > 0 ? Hi - DoorAlong : DoorAlong - Lo) - DoorWd * 0.5 - 120.0) / (cx + 120.0)), 1, 3);
+						double Along = DoorAlong + Dir * (DoorWd * 0.5 + 130.0 + cx * 0.5);
+						for (int32 k = 0; k < Lanes; ++k)
+						{
+							FItem Ck;
+							if (!TryAt(RammsPaletteSlots::StoreCounter, Cm, WallPos(DoorWall, Along, cy + 140.0), WallYaw(DoorWall) + 90.0, 2.0, Ck)) { break; }
+							Emit(Ck);
+							FItem Rg; if (Stack(RammsPaletteSlots::StoreRegister, Ck, Rg)) { Emit(Rg, FName(TEXT("Decor"))); }
+							// The lane beside the counter (toward the door side): a manifest record with its width.
+							const bool bNarrowLane = Rng.FRand() < S->NonCompliance * 0.5;
+							const double LaneW = bNarrowLane ? RammsPCG::RandRange(Rng, 70.0, S->MinClearWidth - 4.0) : RammsPCG::RandRange(Rng, 95.0, 125.0);
+							const FVector2D LaneC = WallPos(DoorWall, Along - Dir * (cx * 0.5 + LaneW * 0.5), cy + 140.0);
+							const int32 f = Features.AddBox(FVector(LaneC.X, LaneC.Y, Z0), WallYaw(DoorWall) + 90.0, FVector(LaneW, cy, 10.0), NextSeed());
+							RammsPCG::WriteManifest(Features, f, FName(TEXT("CheckoutLane")), bNarrowLane ? FName(TEXT("Narrow")) : FName(TEXT("Standard")), !bNarrowLane,
+								bNarrowLane ? ERammsComplianceIssue::ClearWidthBelowMinimum : ERammsComplianceIssue::None, LaneW, S->MinClearWidth);
+							Features.SetInt(f, RammsPCG::RoomId, R.Id);
+							Placed.Add(BoxFor(LaneC, WallYaw(DoorWall) + 90.0, LaneW, cy)); // keep the lane itself clear
+							// Impulse rack at the lane's mouth.
+							if (Rng.FRand() < 0.6)
+							{
+								FRammsPaletteMesh Im; if (Pick(RammsPaletteSlots::StoreDisplay, Im))
+								{
+									double ix, iy; Dims(Im, ix, iy);
+									FItem It; if (TryAt(RammsPaletteSlots::StoreDisplay, Im, WallPos(DoorWall, Along, cy * 2.0 + 140.0 + ix * 2.0 + 30.0), WallYaw(DoorWall), 2.0, It)) { Emit(It); }
+								}
+							}
+							Along += Dir * (cx + LaneW);
+						}
 					}
+					// Baskets stacked by the door on the other side.
+					FRammsPaletteMesh Bk;
+					if (Pick(RammsPaletteSlots::StoreBasket, Bk))
+					{
+						double bx, by; Dims(Bk, bx, by);
+						FItem It;
+						if (TryAt(RammsPaletteSlots::StoreBasket, Bk, WallPos(DoorWall, DoorAlong - Dir * (DoorWd * 0.5 + 60.0 + by * 0.5), bx + 30.0), WallYaw(DoorWall), 2.0, It))
+						{
+							Emit(It);
+							for (int32 k = 1; k < 4; ++k) { FItem Up = It; Up.Z = Z0 + k * FMath::Max(Bk.Height * 0.35, 6.0); Emit(Up, FName(TEXT("Decor"))); }
+						}
+					}
+					// Exit sign over the entrance.
+					// Exit sign over the street door (not over a door into the next room).
+					const bool bStreetDoor = FMath::Abs(DoorP.X - Site.Min.X) < T || FMath::Abs(DoorP.X - Site.Max.X) < T || FMath::Abs(DoorP.Y - Site.Min.Y) < T || FMath::Abs(DoorP.Y - Site.Max.Y) < T;
+					if (bWallZ && bStreetDoor) { Hang(RammsPaletteSlots::StoreExitSign, WallPos(DoorWall, DoorAlong, 14.0), WallYaw(DoorWall), Z0 + 228.0); }
 				}
 				// Wall freezers / fridges along one long wall.
 				double FreezerDepth = 0.0;
@@ -850,6 +1061,88 @@ bool FPCGRammsIndoorLayoutElement::ExecuteInternal(FPCGContext* Context) const
 						Along += fy + 2.0;
 					}
 				}
+				// Produce along the opposite long wall: tables, crates on them, fruit and vegetables in the crates.
+				double ProduceDepth = 0.0;
+				{
+					FRammsPaletteMesh Tm;
+					if (Pick(RammsPaletteSlots::StoreProduceTable, Tm))
+					{
+						double tx, ty; Dims(Tm, tx, ty);
+						double Lo, Hi; WallRange(FarWall, Lo, Hi);
+						for (double Along = Lo + 200.0 + ty * 0.5; Along + ty * 0.5 < Hi - 200.0; Along += ty + 30.0)
+						{
+							FItem Tb;
+							if (!TryAt(RammsPaletteSlots::StoreProduceTable, Tm, WallPos(FarWall, Along, tx + 10.0), WallYaw(FarWall), 1.0, Tb)) { continue; }
+							Emit(Tb);
+							ProduceDepth = FMath::Max(ProduceDepth, tx + 10.0);
+							const FVector2D F = Facing(Tb.Yaw), Sd = Side(Tb.Yaw);
+							const double TopZ = Z0 + Tm.Height;
+							FRammsPaletteMesh Cr; const bool bCrates = Pick(RammsPaletteSlots::StoreCrate, Cr);
+							double crx = 40.0, cry = 30.0, crz = 0.0;
+							if (bCrates) { Dims(Cr, crx, cry); crz = Cr.Height; }
+							const int32 Nx = FMath::Max(1, static_cast<int32>((tx - 8.0) / (crx + 3.0))), Ny = FMath::Max(1, static_cast<int32>((ty - 8.0) / (cry + 3.0)));
+							for (int32 ix = 0; ix < Nx; ++ix)
+							{
+								for (int32 iy = 0; iy < Ny; ++iy)
+								{
+									const FVector2D CrateC = Tb.P + F * ((ix - (Nx - 1) * 0.5) * (crx + 3.0)) + Sd * ((iy - (Ny - 1) * 0.5) * (cry + 3.0));
+									if (bCrates) { RammsPCG::WritePickedMesh(Props, Cr, FVector(CrateC.X, CrateC.Y, TopZ + 0.5), Tb.Yaw, NextSeed()); }
+									FRammsPaletteMesh Fr; if (!Pick(RammsPaletteSlots::StoreProduce, Fr)) { continue; }
+									const double fx = FMath::Max(Fr.Footprint.X, 3.0), fy = FMath::Max(Fr.Footprint.Y, 3.0);
+									const int32 Px = FMath::Clamp(static_cast<int32>((crx - 6.0) / (fx + 0.5)), 1, 8), Py = FMath::Clamp(static_cast<int32>((cry - 6.0) / (fy + 0.5)), 1, 8);
+									// Two layers, the upper one offset by half an item, mounded a little above the crate rim.
+									for (int32 Layer = 0; Layer < 2; ++Layer)
+									{
+										const double Base = TopZ + 0.5 + (bCrates ? crz * 0.55 : 0.0) + Layer * Fr.Height * 0.7;
+										const int32 Lx = Px - Layer, Ly = Py - Layer;
+										for (int32 a = 0; a < Lx; ++a)
+										{
+											for (int32 c = 0; c < Ly; ++c)
+											{
+												const FVector2D Pp = CrateC + F * ((a - (Lx - 1) * 0.5) * (fx + 0.5)) + Sd * ((c - (Ly - 1) * 0.5) * (fy + 0.5));
+												RammsPCG::WritePickedMesh(Props, Fr, FVector(Pp.X, Pp.Y, Base), Tb.Yaw + RammsPCG::RandRange(Rng, -30.0, 30.0), NextSeed());
+											}
+										}
+									}
+								}
+							}
+						}
+						if (ProduceDepth > 0.0 && bWallZ)
+						{
+							double Lo2, Hi2; WallRange(FarWall, Lo2, Hi2);
+							Hang(RammsPaletteSlots::StoreSign, WallPos(FarWall, (Lo2 + Hi2) * 0.5, ProduceDepth + 60.0), WallYaw(FarWall), Z0 + 235.0);
+						}
+					}
+				}
+				// Deli: glass counter cases across the end wall away from the entrance.
+				const int32 EndA = bAlongX ? 3 : 0, EndB = bAlongX ? 1 : 2; // walls at the low / high end of the rows
+				const double DistA = FVector2D::Distance(DoorP, WallPos(EndA, (bAlongX ? Inner.Min.Y + Inner.Max.Y : Inner.Min.X + Inner.Max.X) * 0.5, 0.0));
+				const double DistB = FVector2D::Distance(DoorP, WallPos(EndB, (bAlongX ? Inner.Min.Y + Inner.Max.Y : Inner.Min.X + Inner.Max.X) * 0.5, 0.0));
+				const int32 DeliWall = DistA > DistB ? EndA : EndB;
+				double DeliDepth = 0.0;
+				{
+					double Lo, Hi; WallRange(DeliWall, Lo, Hi);
+					// Between the freezers and the produce tables.
+					const double Lo2 = Lo + ((FreezerWall == 0 || FreezerWall == 3) ? FreezerDepth : ProduceDepth) + 160.0;
+					const double Hi2 = Hi - ((FreezerWall == 0 || FreezerWall == 3) ? ProduceDepth : FreezerDepth) - 160.0;
+					double Along = Lo2;
+					for (int32 n = 0; n < 5; ++n)
+					{
+						FRammsPaletteMesh M; if (!Pick(RammsPaletteSlots::StoreDeliCase, M)) { break; }
+						double fx, fy; Dims(M, fx, fy);
+						if (Along + fy > Hi2) { break; }
+						FItem Dc;
+						if (TryAt(RammsPaletteSlots::StoreDeliCase, M, WallPos(DeliWall, Along + fy * 0.5, fx + 70.0), WallYaw(DeliWall), 1.0, Dc))
+						{
+							Emit(Dc);
+							DeliDepth = FMath::Max(DeliDepth, fx + 70.0);
+							// Goods on the case top.
+							FItem Gd; if (Rng.FRand() < 0.7 && Stack(RammsPaletteSlots::StoreDeliItem, Dc, Gd)) { Emit(Gd, FName(TEXT("Decor"))); }
+						}
+						Along += fy + 1.0;
+					}
+					if (DeliDepth > 0.0 && bWallZ) { Hang(RammsPaletteSlots::StoreSign, WallPos(DeliWall, (Lo2 + Along) * 0.5, DeliDepth + 50.0), WallYaw(DeliWall), Z0 + 235.0); }
+				}
 				// Gondola rows across the rest of the floor.
 				{
 					FRammsPaletteMesh Sh; double sx = 0.0, sy = 0.0;
@@ -861,7 +1154,8 @@ bool FPCGRammsIndoorLayoutElement::ExecuteInternal(FPCGContext* Context) const
 						// Short-axis coordinate runs away from the freezer wall.
 						const double SMin = bAlongX ? Inner.Min.Y : Inner.Min.X, SMax = bAlongX ? Inner.Max.Y : Inner.Max.X;
 						const bool bFromMin = (FreezerWall == 0 || FreezerWall == 3);
-						const double LMin = (bAlongX ? Inner.Min.X : Inner.Min.Y) + EndGap, LMax = (bAlongX ? Inner.Max.X : Inner.Max.Y) - EndGap;
+						const double LMin = (bAlongX ? Inner.Min.X : Inner.Min.Y) + EndGap + (DeliWall == EndA ? DeliDepth : 0.0);
+						const double LMax = (bAlongX ? Inner.Max.X : Inner.Max.Y) - EndGap - (DeliWall == EndB ? DeliDepth : 0.0);
 						double Cursor = FreezerDepth + 4.0;
 						int32 Aisle = 0;
 						while (Aisle < 8)
@@ -869,10 +1163,10 @@ bool FPCGRammsIndoorLayoutElement::ExecuteInternal(FPCGContext* Context) const
 							const bool bNarrow = Rng.FRand() < S->NonCompliance * 0.6;
 							const double AW = bNarrow ? RammsPCG::RandRange(Rng, 66.0, S->MinClearWidth - 4.0)
 								: RammsPCG::RandRange(Rng, S->PreferredClearWidth * 0.95, S->PreferredClearWidth * 1.35);
-							if (Cursor + AW + RowDepth > (SMax - SMin) - 150.0) { break; } // keep a wide aisle at the far wall
+							if (Cursor + AW + RowDepth > (SMax - SMin) - 150.0 - ProduceDepth) { break; } // keep a wide aisle in front of the produce
 							// The aisle itself: a manifest record spanning the row length.
+							const double sc = bFromMin ? SMin + Cursor + AW * 0.5 : SMax - Cursor - AW * 0.5;
 							{
-								const double sc = bFromMin ? SMin + Cursor + AW * 0.5 : SMax - Cursor - AW * 0.5;
 								const double lc = (LMin + LMax) * 0.5;
 								const FVector2D AC = bAlongX ? FVector2D(lc, sc) : FVector2D(sc, lc);
 								const FVector2D AS = bAlongX ? FVector2D(LMax - LMin, AW) : FVector2D(AW, LMax - LMin);
@@ -880,6 +1174,8 @@ bool FPCGRammsIndoorLayoutElement::ExecuteInternal(FPCGContext* Context) const
 								RammsPCG::WriteManifest(Features, f, FName(TEXT("Aisle")), bNarrow ? FName(TEXT("Narrow")) : FName(TEXT("Standard")), !bNarrow,
 									bNarrow ? ERammsComplianceIssue::ClearWidthBelowMinimum : ERammsComplianceIssue::None, AW, S->MinClearWidth);
 								Features.SetInt(f, RammsPCG::RoomId, R.Id);
+								// Aisle number sign hanging over the middle of the aisle.
+								if (bWallZ) { Hang(RammsPaletteSlots::StoreSign, AC, bAlongX ? 0.0 : 90.0, Z0 + 240.0); }
 							}
 							Cursor += AW;
 							// Row centre line, then the units end to end along it, facing both aisles.
@@ -894,15 +1190,28 @@ bool FPCGRammsIndoorLayoutElement::ExecuteInternal(FPCGContext* Context) const
 									FItem U; if (TryAt(RammsPaletteSlots::StoreShelf, Sh, P, Yaw, 0.5, U)) { Emit(U); StockShelf(U); }
 								}
 							}
+							// End caps: a display at one or both ends of the row, in the cross aisle.
+							for (int32 End = 0; End < 2; ++End)
+							{
+								if (Rng.FRand() > 0.5) { continue; }
+								FRammsPaletteMesh Ec; if (!Pick(RammsPaletteSlots::StoreDisplay, Ec)) { break; }
+								double ex, ey; Dims(Ec, ex, ey);
+								if (ex > 60.0) { continue; } // keep the cross aisle passable
+								const double l = End == 0 ? LMin - ex * 0.5 - 3.0 : LMax + ex * 0.5 + 3.0;
+								const FVector2D P = bAlongX ? FVector2D(l, rc) : FVector2D(rc, l);
+								const double Yaw = bAlongX ? (End == 0 ? 180.0 : 0.0) : (End == 0 ? -90.0 : 90.0);
+								FItem It; if (TryAt(RammsPaletteSlots::StoreDisplay, Ec, P, Yaw, 1.0, It)) { Emit(It); }
+							}
 							Cursor += RowDepth;
 							++Aisle;
 						}
-						// A chest freezer island or display in the far aisle, and carts by the door.
+						// A chest freezer island in the far aisle.
 						if (Rng.FRand() < 0.7) { Corner(RammsPaletteSlots::StoreChestFreezer); }
 					}
 				}
 				Corner(RammsPaletteSlots::StoreCart);
-				if (Rng.FRand() < 0.6) { Corner(RammsPaletteSlots::StoreDisplay); }
+				// Back-of-house clutter: boxes, a pallet, a mop bucket in the corners.
+				for (int32 k = 0; k < 2; ++k) { Corner(RammsPaletteSlots::StoreClutter); }
 			}
 			else if (R.Kind == FName(TEXT("Storage")))
 			{

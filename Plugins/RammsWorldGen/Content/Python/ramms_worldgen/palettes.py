@@ -44,7 +44,21 @@ MESH_SLOTS = {
     # foliage
     # leafy trees only (the AmericanCityPacks SM_Tree1-3 are bare winter trees)
     "Tree": ["SM_BeechTree02", "SM_BeechTree03", "SM_MapleTree_Pivot", "SM_TreeLarge_Static", "SM_Alder_Desktop_Forest_modded_01_rep",
-             "SM_Sycamore_American_Sapling_SF_rep"],
+             "SM_Sycamore_American_Sapling_SF_rep", "SM_SF_Broadleaf_Desktop_Field_rep"],
+    # big old street trees for canopy streets (the 300k-triangle oaks only when they are Nanite meshes)
+    "TreeLarge": ["SM_SF_Broadleaf_Desktop_Field_rep", "SM_JacarandaTree", "SM_TreeLarge_Static", "SM_BeechTree03", "SM_MapleTree_Pivot",
+                  "SM_Tree_Q_Rubra_Adult_vertcol_02", "SM_tree_Rubra_old_tall_01"],
+    # lawn cover: low clumps (spawned at 60-130% scale), a few weeds
+    "GrassClump": ["SM_Grass_Clump_01_1m", "SM_GrassClump02", "SM_grass_bermuda_01_main", "SM_grass_bermuda_02_main", "SM_Plant_Grass_Small",
+                   "SM_grass_bermuda_01_weeds"],
+    "Flowers": ["SM_Flowers01", "SM_Flowers02", "SM_Flowers03", "SM_Flower_Red_01", "SM_Flower_Red_02", "SM_Flower_Yellow_01", "SM_grass_bermuda_03_flower",
+                "SM_Plant_FlowersRedBush"],
+    "FoundationShrub": ["SM_shrub_03_a", "SM_shrub_03_b", "SM_shrub_03_c", "SM_shrub_03_d", "SM_Plant_Bush_A", "SM_Plant_Bush_B", "SM_Shrub01",
+                        "SM_Hedge_Sphere", "SM_Plant_FlowersWhiteBush"],
+    # door leaves with their handles; scaled to the opening
+    "Door.Interior": ["SM_Door_interior", "SM_WoodenDoor1", "SM_OfficeDoor_01a", "SM_DoorSingleLeft_1", "SM_toiletwooddoor", "SM_Door_exterior_white",
+                      "SM_Door_exterior_paneled"],
+    "Door.Exterior": ["SM_Door_exterior_windowed", "SM_Door_exterior_windowed_brown", "SM_ExteriorDoor_01a", "SM_DoorMain"],
     "TreeSmall": ["SM_MyrtleTree01", "SM_MyrtleTree02", "SM_PrivetTree01", "SM_TreeSmall_Static"],
     "TreePit": ["SM_tree_grate_01", "SM_Tree_Grate"],
     "Shrub": ["SM_Shrub01", "SM_Shrub01_b", "SM_Plant_Bush_A", "SM_Plant_Bush_B", "SM_Plant_Treebush", "SM_Hedge_Sphere", "SM_Plant_FlowersRedBush", "SM_Plant_FlowersWhiteBush"],
@@ -106,6 +120,18 @@ MESH_SLOTS = {
                       "SM_Can01Pack", "SM_Can02Pack", "SM_Can03Pack", "SM_Can04Pack", "SM_Jug1", "SM_Jug2", "SM_Jar01", "SM_Jar03",
                       "SM_PastaPack", "SM_RicePack", "SM_FlourPack", "SM_Snack_MorningCrunch", "SM_Snack_RunnersBacon",
                       "SM_Carton1", "SM_Carton2", "SM_DrinkCanBig_1", "SM_DrinkCanBig_3"],
+    "Store.ProduceTable": ["SM_MetalTable"],
+    "Store.Crate": ["SM_PlasticCrate"],
+    "Store.Produce": ["SM_Apple1", "SM_Apple2", "SM_Apple3", "SM_Avocado", "SM_Banana1", "SM_Banana2", "SM_Carrot1", "SM_Carrot2", "SM_Corn1",
+                      "SM_Cucumber1", "SM_Cucumber2", "SM_Garlic", "SM_Lemon", "SM_Lime", "SM_Onion", "SM_Orange", "SM_Pear", "SM_Pepper1", "SM_Pepper2",
+                      "SM_Tomato1", "SM_Tomato2", "SM_Pumkin1"],
+    "Store.DeliCase": ["SM_CounterFreezer", "SM_Icecreamfridge"],
+    "Store.DeliItem": ["SM_odenmachine", "SM_sausagemachine_01", "SM_Cheese1", "SM_Bread1", "SM_Meat1"],
+    "Store.Sign": ["SM_storebillboard"],
+    "Store.ExitSign": ["SM_ExitSign1", "SM_ExitSign2"],
+    "Store.Basket": ["SM_ShoppingBasket"],
+    "Store.Clutter": ["SM_WoodenPallet", "SM_plasticcrate", "SM_WetFloorSign", "SM_CardboardBox_A", "SM_CardboardBox_B", "SM_Cardboard1", "SM_Box1",
+                      "SM_box_01", "SM_cardbox", "SM_Bucket"],
     "Furniture.Picture": ["SM_Painting_A", "SM_Painting_B", "SM_Painting_C", "SM_Painting_E", "SM_Painting_F", "SM_Painting_large_A", "SM_Painting_wide_A", "SM_Mirror", "SM_Picture", "SM_Classic_Picture"],
     "Furniture.Clutter": ["SM_UtilityCart", "SM_Garage_plastic_box", "SM_Cardboard_Closed_3", "SM_To_laundrybasket", "SM_Old_Chair", "SM_WaterCooler_01b", "SM_Printer_02a", "SM_ShippingBoxes_01b", "SM_FilingCabinet01a", "SM_Laundrybasket"],
 }
@@ -126,7 +152,9 @@ SLOT_HEIGHTS = {
     "Hazard.Cone": 75, "Hazard.Dumpster": 150, "Car": 150,
 }
 # Slots whose meshes keep their native size whatever the height (poles, trees, buildings, hedges).
-NO_NORMALISE = {"Tree", "TreeSmall", "Shrub", "Hedge", "House", "Car", "Store.Shelf", "Store.Fridge", "Store.ChestFreezer",
+NO_NORMALISE = {"TreeLarge", "GrassClump", "Flowers", "FoundationShrub", "Door.Interior", "Door.Exterior", "Store.ProduceTable", "Store.Crate",
+                "Store.Produce", "Store.DeliCase", "Store.DeliItem", "Store.Sign", "Store.ExitSign", "Store.Basket", "Store.Clutter",
+                "Tree", "TreeSmall", "Shrub", "Hedge", "House", "Car", "Store.Shelf", "Store.Fridge", "Store.ChestFreezer",
                 "Store.Counter", "Store.Register", "Store.Cart", "Store.Display", "Store.Product", "StreetLight", "UtilityPole", "StreetSign", "BusStop",
                 "Stairs", "Curb", "SidewalkCorner", "Railing", "Hazard.Upheaval", "Hazard.Barrier", "RoofUnit",
                 "Flowerbed", "Fence", "TreePit", "Furniture.Picture", "Furniture.Clutter", "Furniture.OfficeProp", "Furniture.Whiteboard", "Furniture.OfficeStorage", "Hazard.Box", "Hazard.AFrame", "InfoBoard", "Bollard"}
@@ -146,6 +174,7 @@ SOLID_MATERIALS = {
     "M_RammsRoof": ((0.22, 0.22, 0.24), 0.95, 0.0),
     "M_RammsStorefront": ((0.10, 0.10, 0.12), 0.45, 0.6),
     "M_RammsTrim": ((0.62, 0.60, 0.56), 0.8, 0.0),
+    "M_RammsTrimWhite": ((0.82, 0.81, 0.78), 0.45, 0.0),
 }
 MATERIALS_DIR = "/Game/WorldGen/Materials"
 
@@ -155,8 +184,10 @@ MATERIAL_SLOTS = {
     "Mat.Sidewalk": ["M_RammsSidewalk", "MI_ugxjcdpn", "MI_vmcxajwfw"],
     "Mat.Concrete": ["M_RammsConcrete", "MI_ugkjbgplw", "MI_vmcxajwfw"],
     "Mat.Cobble": ["MI_CobbleStone", "MI_tbjjai0s"],
-    "Mat.Facade": ["MI_vizcegj"],
-    "Mat.FacadeAlt": ["MI_ugtkdffg", "MI_vi4idbm"],
+    "Mat.Facade": ["M_RammsBrick", "MI_vizcegj"],
+    "Mat.FacadeAlt": ["M_RammsSiding", "MI_ugtkdffg", "MI_vi4idbm"],
+    "Mat.Curb": ["M_RammsCurb", "M_RammsConcrete"],
+    "Mat.Trim.Interior": ["M_RammsTrimWhite"],
     "Mat.Glass": ["MI_Glass", "M_Glass", "MI_AdvancedGlass", "M_AdvancedGlass"],
     "Mat.Paint": ["M_RammsMarkingWhite"],
     "Mat.Marking": ["M_RammsMarkingWhite"],
@@ -177,6 +208,26 @@ MATERIAL_SLOTS = {
     "Mat.Wall.Interior": ["MI_qj2luvs0", "MI_umridamn"],
     "Mat.Ceiling": ["MI_ufgnagwew", "MI_ugtmehro"],
     "Mat.Door": ["MI_vlznbajfw", "MI_ugcwcevaw"],
+}
+
+# slot -> material set (FRammsPaletteSlot::Materials): a node picks one per room / per decal. Names are
+# looked up like MATERIAL_SLOTS; "MI_RammsPaint_*" expands to every paint instance surfaces.py made.
+MATERIAL_SETS = {
+    "Mat.Wall.Paint": ["MI_RammsPaint_*"],
+    "Mat.Wall.Paper": ["M_RammsWallpaper", "M_RammsWallpaperDiamond", "M_RammsWallpaperFlowers", "M_RammsWallpaperRed"],
+    "Mat.Wall.Tile": ["M_RammsWallTile", "M_RammsWallTile2"],
+    "Mat.Floor.Wood": ["M_RammsFloorWood1", "M_RammsFloorWood2", "M_RammsFloorParquet", "M_RammsFloorHardwood"],
+    "Mat.Floor.Carpet": ["M_RammsFloorCarpet1", "M_RammsFloorCarpet2", "M_RammsFloorCarpetOffice", "M_RammsFloorCarpetTiles"],
+    "Mat.Floor.Tile": ["M_RammsFloorBath", "M_RammsFloorCeramic", "M_RammsFloorTiles", "M_RammsFloorMarble"],
+    "Mat.Floor.Vinyl": ["M_RammsFloorPVC", "M_RammsFloorPVC2", "M_RammsFloorShop", "M_RammsFloorConcrete"],
+    # projected decals (deferred-decal materials only; anything else is skipped)
+    "Decal.Road.Crack": ["MI_AsphaltCrack", "MI_Crack01", "MI_Crack02", "MI_08_Asphalt_Crack_rmopsgp2_4K_RM", "MI_09_Asphalt_Crack_rmopfdp2_4K_RM"],
+    "Decal.Road.Pothole": ["MI_Pothole01", "MI_Pothole02", "MI_Pothole03"],
+    "Decal.Road.Patch": ["MI_ManholePatch", "MI_manhole_patch_dec_01_RM", "MI_manhole_patch_dec_03_RM", "MI_manhole_patch_tint_dec_02_RM",
+                         "MI_16_Round_Manhole_Cover_scolskp_4K_RM", "MI_17_Round_Manhole_Cover_scomxop_4K_RM"],
+    "Decal.Sidewalk.Crack": ["MI_Cracks_01", "MI_Cracks_02", "MI_Cracks_03", "MI_Cracks_04", "MI_Crack01", "MI_Crack02"],
+    "Decal.Stain": ["MI_decal_overlay_grime_01_RM", "Mi_Stain_01a", "MI_Stains"],
+    "Decal.Puddle": ["MI_AsphaltPuddle01", "MI_AsphaltPuddle02", "MI_Puddle01", "MI_RoadPuddle01", "MI_RoadPuddle02"],
 }
 
 ACTOR_SLOTS = {
@@ -384,7 +435,8 @@ def _vertex_positions(mesh):
 
 # slot -> which local axis the mesh's long side should end up on: "x" = along the facing direction
 # (vehicles), "y" = across it (shelving, counters, freezers: their front is a long face).
-LONG_AXIS_SLOTS = {"Car": "x", "Hedge": "y", "Fence": "y", "Store.Shelf": "y", "Store.Fridge": "y", "Store.ChestFreezer": "y", "Store.Counter": "y"}
+LONG_AXIS_SLOTS = {"Car": "x", "Hedge": "y", "Fence": "y", "Store.Shelf": "y", "Store.Fridge": "y", "Store.ChestFreezer": "y", "Store.Counter": "y",
+                   "Door.Interior": "y", "Door.Exterior": "y", "Store.DeliCase": "y", "Store.ProduceTable": "y", "Store.Sign": "y", "Store.ExitSign": "y"}
 
 
 def _facing_yaw(mesh, bounds, slot=""):
@@ -470,6 +522,63 @@ def _shelf_heights(mesh, scale):
     return [round(z * scale, 1) for z in levels]
 
 
+HEAVY_OK_IF_NANITE = {"TreeLarge"}
+TREE_SLOTS = {"Tree", "TreeSmall", "TreeLarge"}
+DOOR_SLOTS = {"Door.Interior", "Door.Exterior"}
+
+
+def _nanite(mesh):
+    try:
+        return bool(mesh.get_editor_property("nanite_settings").get_editor_property("enabled"))
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _is_decal(mat):
+    try:
+        base = mat.get_base_material()
+        return base.get_editor_property("material_domain") == unreal.MaterialDomain.MD_DEFERRED_DECAL
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _trunk_xy(mesh):
+    """Mesh-space XY of a tree's trunk: the centroid of the vertices in the lowest 60 cm (the canopy's
+    bounds centre is often a metre or more off the trunk)."""
+    verts = _vertex_positions(mesh)
+    if not verts:
+        return None
+    zmin = min(v[2] for v in verts)
+    low = [v for v in verts if v[2] < zmin + 60.0]
+    if len(low) < 3:
+        return None
+    return (sum(v[0] for v in low) / len(low), sum(v[1] for v in low) / len(low))
+
+
+def _handle_side(mesh, yaw):
+    """+1 / -1: which end of the facing-frame Y axis of a door leaf carries the handle (vertex-dense hardware
+    at 85-120 cm near one edge); 0 when it cannot tell."""
+    import math
+    verts = _vertex_positions(mesh)
+    if not verts:
+        return 0.0
+    zmin = min(v[2] for v in verts)
+    r = math.radians(yaw)
+    ys = [v[0] * math.sin(r) + v[1] * math.cos(r) for v in verts]
+    ylo, yhi = min(ys), max(ys)
+    w = max(yhi - ylo, 1.0)
+    pos = neg = 0
+    for v, y in zip(verts, ys):
+        if 85.0 <= v[2] - zmin <= 120.0:
+            if y > yhi - 0.25 * w:
+                pos += 1
+            elif y < ylo + 0.25 * w:
+                neg += 1
+    if pos == neg:
+        return 0.0
+    return 1.0 if pos > neg else -1.0
+
+
 def _mesh_entry(mesh, slot=""):
     import math
     bounds = mesh.get_bounds()
@@ -500,7 +609,19 @@ def _mesh_entry(mesh, slot=""):
     ox = origin.x * math.cos(r) - origin.y * math.sin(r)
     oy = origin.x * math.sin(r) + origin.y * math.cos(r)
     base_z = origin.z - ext.z
+    if slot in TREE_SLOTS:
+        # Put the trunk, not the canopy's centre, on the requested point (tree pits, planting strips).
+        t = _trunk_xy(mesh)
+        if t is not None:
+            tx, ty = t[0] * scale, t[1] * scale
+            ox = tx * math.cos(r) - ty * math.sin(r)
+            oy = tx * math.sin(r) + ty * math.cos(r)
     e.set_editor_property("location_offset", unreal.Vector(-ox, -oy, -base_z))
+    if slot in DOOR_SLOTS:
+        try:
+            e.set_editor_property("handle_side", _handle_side(mesh, yaw))
+        except Exception as exc:  # noqa: BLE001
+            H.warn("handle side for %s: %s" % (mesh.get_name(), exc))
     if slot == "Store.Shelf":
         try:
             e.set_editor_property("shelf_heights", _shelf_heights(mesh, scale))
@@ -647,6 +768,12 @@ def build_default_palette(path=DEFAULT_PALETTE):
                 mesh = ad.get_asset()
                 if mesh is None:
                     continue
+                if slot in HEAVY_OK_IF_NANITE and not _nanite(mesh):
+                    try:
+                        if mesh.get_num_triangles(0) > 100000:
+                            continue
+                    except Exception:  # noqa: BLE001
+                        pass
                 pal.add_mesh(slot, _mesh_entry(mesh, slot))
                 found.append(mesh.get_path_name())
                 break
@@ -671,6 +798,33 @@ def build_default_palette(path=DEFAULT_PALETTE):
             report["missing"].append(slot)
         pal.set_material(slot, chosen)
         report["materials"][slot] = chosen.get_path_name()
+
+    report["material_sets"] = {}
+    reg = unreal.AssetRegistryHelpers.get_asset_registry()
+    for slot, names in MATERIAL_SETS.items():
+        mats = []
+        for n in names:
+            if n.endswith("*"):
+                for ad in reg.get_assets_by_path(MATERIALS_DIR, False):
+                    if str(ad.asset_name).startswith(n[:-1]):
+                        mats.append(ad.get_asset())
+                continue
+            if n.startswith("M_Ramms"):
+                if H.EAL.does_asset_exist(MATERIALS_DIR + "/" + n):
+                    mats.append(H.EAL.load_asset(MATERIALS_DIR + "/" + n))
+                continue
+            for ad in index.get(n, []):
+                if str(ad.asset_class_path.asset_name) in ("MaterialInstanceConstant", "Material"):
+                    mats.append(ad.get_asset())
+                    break
+        mats = [m for m in mats if m is not None]
+        if slot.startswith("Decal."):
+            mats = [m for m in mats if _is_decal(m)]
+        for m in mats:
+            pal.add_material(slot, m)
+        report["material_sets"][slot] = [m.get_name() for m in mats]
+        if not mats:
+            report["missing"].append(slot)
 
     build_facade_slots(pal, report)
 

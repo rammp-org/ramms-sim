@@ -34,6 +34,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Streets", meta = (PCG_Overridable)) double RoadWidth = 700.0;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Streets", meta = (PCG_Overridable)) double SidewalkWidth = 300.0;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Streets", meta = (PCG_Overridable)) double FurnitureZoneWidth = 100.0;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Streets", meta = (PCG_Overridable)) double DecalDensity = 0.0;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Streets", meta = (PCG_Overridable)) double PlantingStrip = 0.0;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Streets", meta = (PCG_Overridable)) double GrassDensity = 0.0;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Streets", meta = (PCG_Overridable)) double CurbHeight = 15.0;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Streets", meta = (PCG_Overridable)) double StreetJitter = 0.15;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Streets", meta = (PCG_Overridable)) double StreetDropout = 0.1;

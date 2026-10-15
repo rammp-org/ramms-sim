@@ -2,6 +2,8 @@
 #include "RammsProcPiece.h"
 
 #include "Components/DynamicMeshComponent.h"
+#include "Components/DecalComponent.h"
+#include "Components/BillboardComponent.h"
 #include "UDynamicMesh.h"
 #include "GeometryScript/MeshPrimitiveFunctions.h"
 #include "GeometryScript/MeshMaterialFunctions.h"
@@ -68,7 +70,7 @@ ARammsProcPiece::ARammsProcPiece()
 
 ERammsProcPieceKind ARammsProcPiece::GetEffectiveKind() const
 {
-	if (KindId >= 0 && KindId <= static_cast<int32>(ERammsProcPieceKind::Roof))
+	if (KindId >= 0 && KindId <= static_cast<int32>(ERammsProcPieceKind::Decal))
 	{
 		return static_cast<ERammsProcPieceKind>(KindId);
 	}
@@ -94,6 +96,26 @@ void ARammsProcPiece::Rebuild()
 	}
 	Mesh->Reset();
 	UGeometryScriptLibrary_MeshMaterialFunctions::EnableMaterialIDs(Mesh);
+
+#if WITH_EDITOR
+	// Editor sprites (a decal's icon) would litter screenshots of generated streets: drop them.
+	TArray<UBillboardComponent*> Sprites;
+	GetComponents<UBillboardComponent>(Sprites);
+	for (UBillboardComponent* B : Sprites) { if (B) { B->DestroyComponent(); } }
+#endif
+	if (GetEffectiveKind() == ERammsProcPieceKind::Decal)
+	{
+		// No geometry: a decal component projecting the material down onto whatever is below.
+		MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		MeshComponent->NotifyMeshUpdated();
+		BuildDecal();
+		return;
+	}
+	if (DecalComponent)
+	{
+		DecalComponent->DestroyComponent();
+		DecalComponent = nullptr;
+	}
 
 	switch (GetEffectiveKind())
 	{
@@ -240,32 +262,61 @@ void ARammsProcPiece::BuildWall(UDynamicMesh* M)
 	const double L = FMath::Max(SizeX, 10.0);
 	const double T = FMath::Max(SizeY, 5.0);
 	const double H = FMath::Max(SizeZ, 50.0);
-	if (OpeningWidth <= 0.0 || OpeningWidth >= L)
+	// Openings: the door (OpeningWidth) plus any windows listed in Openings, as [centre, width, sill, head].
+	struct FOpening { double C, W, Sill, Head; };
+	TArray<FOpening> Ops;
+	if (OpeningWidth > 0.0 && OpeningWidth < L)
 	{
-		Box(M, FVector(L * 0.5, 0.0, H * 0.5), FVector(L, T, H));
-		return;
+		const double OW = OpeningWidth;
+		Ops.Add({ FMath::Clamp(OpeningOffset > 0.0 ? OpeningOffset : L * 0.5, OW * 0.5, L - OW * 0.5), OW, 0.0, FMath::Clamp(OpeningHeight, 100.0, H) });
 	}
-	const double OW = OpeningWidth;
-	const double OC = FMath::Clamp(OpeningOffset > 0.0 ? OpeningOffset : L * 0.5, OW * 0.5, L - OW * 0.5);
-	const double OH = FMath::Clamp(OpeningHeight, 100.0, H);
-	const double LeftLen = OC - OW * 0.5;
-	const double RightLen = L - (OC + OW * 0.5);
-	if (LeftLen > 0.5)
+	TArray<FString> Items;
+	Openings.ParseIntoArray(Items, TEXT(";"), true);
+	for (const FString& It : Items)
 	{
-		Box(M, FVector(LeftLen * 0.5, 0.0, H * 0.5), FVector(LeftLen, T, H));
+		TArray<FString> V;
+		It.ParseIntoArray(V, TEXT(","), true);
+		if (V.Num() < 4) { continue; }
+		const double C = FCString::Atod(*V[0]), W = FCString::Atod(*V[1]), Sill = FCString::Atod(*V[2]), Head = FCString::Atod(*V[3]);
+		if (W < 20.0 || C - W * 0.5 < 5.0 || C + W * 0.5 > L - 5.0 || Head <= Sill + 20.0 || Head > H) { continue; }
+		Ops.Add({ C, W, FMath::Max(Sill, 0.0), Head });
 	}
-	if (RightLen > 0.5)
+	Ops.Sort([](const FOpening& A, const FOpening& B) { return A.C < B.C; });
+	// Drop openings that would overlap the one before them.
+	for (int32 i = Ops.Num() - 1; i > 0; --i)
 	{
-		Box(M, FVector(L - RightLen * 0.5, 0.0, H * 0.5), FVector(RightLen, T, H));
+		if (Ops[i].C - Ops[i].W * 0.5 < Ops[i - 1].C + Ops[i - 1].W * 0.5 + 20.0) { Ops.RemoveAt(i); }
 	}
-	if (H - OH > 0.5)
+	// Solid wall between openings, and the parts below / above each opening.
+	double X = 0.0;
+	for (const FOpening& O : Ops)
 	{
-		Box(M, FVector(OC, 0.0, OH + (H - OH) * 0.5), FVector(OW, T, H - OH));
+		const double A = O.C - O.W * 0.5, B = O.C + O.W * 0.5;
+		if (A - X > 0.5) { Box(M, FVector((X + A) * 0.5, 0.0, H * 0.5), FVector(A - X, T, H)); }
+		if (O.Sill > 0.5) { Box(M, FVector(O.C, 0.0, O.Sill * 0.5), FVector(O.W, T, O.Sill)); }
+		if (H - O.Head > 0.5) { Box(M, FVector(O.C, 0.0, O.Head + (H - O.Head) * 0.5), FVector(O.W, T, H - O.Head)); }
+		X = B;
 	}
-	// Door frame jambs, slightly proud of the wall, in the secondary material.
-	const double Jamb = 5.0;
-	Box(M, FVector(OC - OW * 0.5 - Jamb * 0.5, 0.0, OH * 0.5), FVector(Jamb, T + 2.0, OH), FRotator::ZeroRotator, 1);
-	Box(M, FVector(OC + OW * 0.5 + Jamb * 0.5, 0.0, OH * 0.5), FVector(Jamb, T + 2.0, OH), FRotator::ZeroRotator, 1);
+	if (L - X > 0.5) { Box(M, FVector((X + L) * 0.5, 0.0, H * 0.5), FVector(L - X, T, H)); }
+	// Frames in the secondary material, proud of both faces by 2 cm so they never share a plane with the
+	// wall or with the 1 cm finish liners rooms put on it (no z-fighting): casing jambs and a head for doors,
+	// a full frame, a sill ledge and a glass pane (third material) for windows.
+	const double Casing = 7.0, Proud = T + 4.0;
+	for (const FOpening& O : Ops)
+	{
+		const double A = O.C - O.W * 0.5, B = O.C + O.W * 0.5;
+		const double Hgt = O.Head - O.Sill;
+		Box(M, FVector(A - Casing * 0.5, 0.0, O.Sill + Hgt * 0.5), FVector(Casing, Proud, Hgt), FRotator::ZeroRotator, 1);
+		Box(M, FVector(B + Casing * 0.5, 0.0, O.Sill + Hgt * 0.5), FVector(Casing, Proud, Hgt), FRotator::ZeroRotator, 1);
+		Box(M, FVector(O.C, 0.0, O.Head + Casing * 0.5), FVector(O.W + 2.0 * Casing, Proud, Casing), FRotator::ZeroRotator, 1);
+		if (O.Sill > 0.5)
+		{
+			Box(M, FVector(O.C, 0.0, O.Sill - 2.0), FVector(O.W + 2.0 * Casing + 6.0, T + 10.0, 4.0), FRotator::ZeroRotator, 1);
+			// Mullion and glass.
+			Box(M, FVector(O.C, 0.0, O.Sill + Hgt * 0.5), FVector(4.0, 6.0, Hgt), FRotator::ZeroRotator, 1);
+			Box(M, FVector(O.C, 0.0, O.Sill + Hgt * 0.5), FVector(O.W, 1.0, Hgt), FRotator::ZeroRotator, 2);
+		}
+	}
 }
 
 void ARammsProcPiece::BuildDoor(UDynamicMesh* M)
@@ -275,6 +326,12 @@ void ARammsProcPiece::BuildDoor(UDynamicMesh* M)
 	const double T = FMath::Clamp(SizeY, 2.0, 10.0);
 	const double H = FMath::Max(SizeZ, 150.0);
 	Box(M, FVector(W * 0.5, 0.0, Rise + H * 0.5), FVector(W, T, H));
+	// Lever handles on both faces near the latch edge, in the secondary material.
+	for (int32 Side = -1; Side <= 1; Side += 2)
+	{
+		Box(M, FVector(W - 7.0, Side * (T * 0.5 + 1.0), Rise + 100.0), FVector(6.0, 2.0, 6.0), FRotator::ZeroRotator, 1);
+		Box(M, FVector(W - 13.0, Side * (T * 0.5 + 4.0), Rise + 100.0), FVector(14.0, 2.0, 2.0), FRotator::ZeroRotator, 1);
+	}
 	if (Rise > 0.05)
 	{
 		// Raised threshold across the opening; this is the part that matters.
@@ -371,6 +428,28 @@ void ARammsProcPiece::BuildColumn(UDynamicMesh* M)
 
 // --- materials and collision ------------------------------------------------------
 
+void ARammsProcPiece::BuildDecal()
+{
+	if (!DecalComponent)
+	{
+		DecalComponent = NewObject<UDecalComponent>(this, TEXT("Decal"));
+#if WITH_EDITORONLY_DATA
+		DecalComponent->bVisualizeComponent = false; // no editor sprite on every crack
+#endif
+		DecalComponent->SetupAttachment(MeshComponent);
+		DecalComponent->RegisterComponent();
+		AddInstanceComponent(DecalComponent);
+	}
+	// Decal X is the projection axis: pitch it straight down. Size is half extents (depth, width, length).
+	DecalComponent->SetRelativeRotation(FRotator(-90.0, 0.0, 0.0));
+	DecalComponent->SetRelativeLocation(FVector::ZeroVector);
+	DecalComponent->DecalSize = FVector(FMath::Max(SizeZ, 2.0) * 0.5, FMath::Max(SizeY, 5.0) * 0.5, FMath::Max(SizeX, 5.0) * 0.5);
+	DecalComponent->SetFadeScreenSize(0.0005f);
+	UMaterialInterface* Mat = MaterialPath.IsEmpty() ? nullptr : Cast<UMaterialInterface>(FSoftObjectPath(MaterialPath).TryLoad());
+	DecalComponent->SetDecalMaterial(Mat);
+	DecalComponent->MarkRenderStateDirty();
+}
+
 void ARammsProcPiece::ApplyMaterials()
 {
 	auto Load = [](const FString& Path) -> UMaterialInterface*
@@ -388,13 +467,19 @@ void ARammsProcPiece::ApplyMaterials()
 	};
 	UMaterialInterface* M0 = Load(MaterialPath);
 	UMaterialInterface* M1 = Load(MaterialPath2);
+	UMaterialInterface* M2 = Load(MaterialPath3);
 	if (!M1)
 	{
 		M1 = M0;
 	}
-	MeshComponent->SetNumMaterials(2);
+	if (!M2)
+	{
+		M2 = M1;
+	}
+	MeshComponent->SetNumMaterials(3);
 	MeshComponent->SetMaterial(0, M0);
 	MeshComponent->SetMaterial(1, M1);
+	MeshComponent->SetMaterial(2, M2);
 	MeshComponent->NotifyMeshUpdated();
 }
 

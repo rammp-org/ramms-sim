@@ -83,6 +83,10 @@ struct RAMMSWORLDGEN_API FRammsPaletteMesh
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Palette")
 	double GarageWidth = 0.0;
 
+	/** Door leaves: which end of the facing-frame Y axis carries the handle (+1 / -1; 0 = unknown). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Palette")
+	double HandleSide = 0.0;
+
 	/** Composite entries (Mesh unset): every part is spawned with the entry's placement applied. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Palette")
 	TArray<FRammsPalettePart> Parts;
@@ -235,6 +239,15 @@ namespace RammsPaletteSlots
 	inline const FName StoreCart(TEXT("Store.Cart"));
 	inline const FName StoreDisplay(TEXT("Store.Display"));
 	inline const FName StoreProduct(TEXT("Store.Product"));
+	inline const FName StoreProduceTable(TEXT("Store.ProduceTable"));
+	inline const FName StoreCrate(TEXT("Store.Crate"));
+	inline const FName StoreProduce(TEXT("Store.Produce"));
+	inline const FName StoreDeliCase(TEXT("Store.DeliCase"));
+	inline const FName StoreDeliItem(TEXT("Store.DeliItem"));
+	inline const FName StoreSign(TEXT("Store.Sign"));
+	inline const FName StoreExitSign(TEXT("Store.ExitSign"));
+	inline const FName StoreBasket(TEXT("Store.Basket"));
+	inline const FName StoreClutter(TEXT("Store.Clutter"));
 	// building dressing
 	inline const FName RoofUnit(TEXT("RoofUnit"));
 	inline const FName MatMarking(TEXT("Mat.Marking"));
@@ -243,6 +256,27 @@ namespace RammsPaletteSlots
 	inline const FName MatTrim(TEXT("Mat.Trim"));
 	inline const FName MatRoof(TEXT("Mat.Roof"));
 	inline const FName DoorActor(TEXT("DoorActor"));
+	// interior finishes: material sets (FRammsPaletteSlot::Materials), one pick per room
+	inline const FName MatWallPaint(TEXT("Mat.Wall.Paint"));
+	inline const FName MatWallPaper(TEXT("Mat.Wall.Paper"));
+	inline const FName MatWallTile(TEXT("Mat.Wall.Tile"));
+	inline const FName MatFloorVinyl(TEXT("Mat.Floor.Vinyl"));
+	inline const FName MatCurb(TEXT("Mat.Curb"));
+	// door leaves (meshes, handles included; HandleSide says which edge carries the handle)
+	inline const FName DoorInterior(TEXT("Door.Interior"));
+	inline const FName DoorExterior(TEXT("Door.Exterior"));
+	// ground cover and front-yard planting
+	inline const FName GrassClump(TEXT("GrassClump"));
+	inline const FName Flowers(TEXT("Flowers"));
+	inline const FName FoundationShrub(TEXT("FoundationShrub"));
+	inline const FName TreeLarge(TEXT("TreeLarge"));
+	// projected decals (pieces of kind Decal)
+	inline const FName DecalRoadCrack(TEXT("Decal.Road.Crack"));
+	inline const FName DecalPothole(TEXT("Decal.Road.Pothole"));
+	inline const FName DecalPatch(TEXT("Decal.Road.Patch"));
+	inline const FName DecalWalkCrack(TEXT("Decal.Sidewalk.Crack"));
+	inline const FName DecalStain(TEXT("Decal.Stain"));
+	inline const FName DecalPuddle(TEXT("Decal.Puddle"));
 }
 
 /**

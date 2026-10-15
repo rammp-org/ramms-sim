@@ -61,6 +61,16 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Buildings", meta = (PCG_Overridable)) double WindowSpacing = 300.0;
 	/** Probability that a lot with open ground beside or behind the building gets a yard tree; 0 for dense downtown lots. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Buildings", meta = (PCG_Overridable)) double YardTreeChance = 0.0;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Buildings", meta = (PCG_Overridable)) double GrassDensity = 0.0;
+	/** The street's sidewalk and furniture zone widths (from the generator params), so driveways can run out to the curb. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Buildings", meta = (PCG_Overridable)) double SidewalkWidth = 0.0;
+	/** Planting-strip streets: the lots dress the strip in front of them (street trees, grass, a street light
+	 *  between driveways) because only they know where their driveways and walks cross it. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Buildings", meta = (PCG_Overridable)) double FurnitureZoneWidth = 0.0;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Buildings", meta = (PCG_Overridable)) double PlantingStrip = 0.0;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Buildings", meta = (PCG_Overridable)) double TreeSpacing = 0.0;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Buildings", meta = (PCG_Overridable)) double CanopyChance = 0.0;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Buildings", meta = (PCG_Overridable)) double StreetLightSpacing = 0.0;
 	/** House lots: probability of a driveway beside the house (sometimes with a car on it). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Buildings", meta = (PCG_Overridable)) double DrivewayChance = 0.0;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Buildings", meta = (PCG_Overridable)) double DrivewayWidth = 360.0;

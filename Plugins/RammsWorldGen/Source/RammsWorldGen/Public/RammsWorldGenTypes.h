@@ -44,6 +44,7 @@ enum class ERammsProcPieceKind : uint8
 	Column    UMETA(ToolTip = "Square column: SizeX side, SizeZ height."),
 	Stairs    UMETA(ToolTip = "Alias of Step with StepCount >= 3; kept for manifest readability."),
 	Roof      UMETA(ToolTip = "Gable roof: SizeX span across the ridge, SizeY ridge length, SizeZ rise; sits with its eaves at the origin."),
+	Decal     UMETA(ToolTip = "Projected decal (crack, pothole, stain): SizeX length, SizeY width, SizeZ projection depth; MaterialPath is a deferred-decal material; centred on the origin, projecting down."),
 };
 
 /** Why a generated feature is tagged non-compliant. Carried into the manifest. */
@@ -233,6 +234,16 @@ struct RAMMSWORLDGEN_API FRammsWorldGenParams
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hazards") double HazardDensity = 3.0;
 	/** Spacing of street trees in the furniture zone; 0 = none. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hazards") double TreeSpacing = 900.0;
+	/** Probability that a sidewalk side is a canopy street: large old trees closer together, in pits or the planting strip. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hazards", meta = (ClampMin = 0, ClampMax = 1)) double CanopyChance = 0.0;
+	/** Street lights every this many cm along each sidewalk (staggered between the two sides); 0 = only random ones. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hazards") double StreetLightSpacing = 0.0;
+	/** Projected decals per 100 m of street: asphalt cracks, potholes, patches, manholes, sidewalk cracks and stains. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Streets") double DecalDensity = 0.0;
+	/** 1 = the furniture zone is a grass planting strip (residential streets) instead of paving. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Streets") double PlantingStrip = 0.0;
+	/** Grass clumps per m^2 on lawns, yards, planting strips and park grass; 0 = bare lawn material. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Suburban") double GrassDensity = 0.0;
 	/** Probability that a placed hazard intrudes into the access route below the minimum clear width. Scaled by NonCompliance. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hazards", meta = (ClampMin = 0, ClampMax = 1)) double HazardIntrusionChance = 0.5;
 

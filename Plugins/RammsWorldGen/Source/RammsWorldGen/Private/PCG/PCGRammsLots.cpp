@@ -341,6 +341,7 @@ bool FPCGRammsBuildingMassingElement::ExecuteInternal(FPCGContext* Context) cons
 		for (int32 i = 0; i < R.Num; ++i)
 		{
 			const int32 LotId = static_cast<int32>(R.GetD(i, RammsPCG::LotId, i));
+			const int32 BlockIdV = static_cast<int32>(R.GetD(i, RammsPCG::BlockId, 0));
 			FRandomStream Rng(RammsPCG::SubSeed(Seed, 3000 + LotId));
 			const FTransform& Xf = R.T(i);
 			const FVector Size = R.Size(i);           // X = depth (toward street), Y = width
@@ -377,7 +378,7 @@ bool FPCGRammsBuildingMassingElement::ExecuteInternal(FPCGContext* Context) cons
 					{
 						const double Need = FMath::Max(Hm.Footprint.Y / FMath::Max(Width - 150.0, 1.0), Hm.Footprint.X / FMath::Max(Depth - Setback - 200.0, 1.0));
 						if (Need <= 1.0) { Fits.Add(Hm); }
-						else if (Need <= 1.18)
+						else if (Need <= 1.35)
 						{
 							FRammsPaletteMesh Scaled = Hm;
 							const double K = 1.0 / Need;
@@ -651,14 +652,33 @@ bool FPCGRammsBuildingMassingElement::ExecuteInternal(FPCGContext* Context) cons
 			const double Tread = 30.0;
 			if (bStepped && !bHouseMesh)
 			{
+				// A ramp runs along the facade beside the steps (rising toward the door, its top landing against
+				// the top step), which is how entrances are retrofitted; it needs that much facade on one side
+				// and a front yard at least as deep as the ramp is wide. Without the room there is no ramp.
+				const double RampW = 120.0;
+				const double RampSlopeV = bRampSteep ? S->RampMaxSlope * RammsPCG::RandRange(Rng, 1.4, 2.2) : S->RampMaxSlope;
+				const double RampRun = EntranceRise / FMath::Max(RampSlopeV, 0.01);
+				const double RampLen = RampRun + S->LandingSize;
+				const double RoomPos = BW * 0.5 - (EntranceY + StepsW * 0.5) - 20.0;
+				const double RoomNeg = (EntranceY - StepsW * 0.5) - (-BW * 0.5) - 20.0;
+				const double FrontYard = Depth * 0.5 - FrontX;
+				double RampSide = 0.0;
+				if (bRamp && FrontYard >= RampW + 15.0)
+				{
+					if (RoomPos >= RampLen && (RoomNeg < RampLen || Rng.FRand() < 0.5)) { RampSide = 1.0; }
+					else if (RoomNeg >= RampLen) { RampSide = -1.0; }
+				}
+				if (RampSide == 0.0) { bRamp = false; bRampSteep = false; }
+
 				FRammsPieceDesc St;
 				St.Kind = ERammsProcPieceKind::Step;
 				St.StepCount = Steps; St.Rise = StepRise; St.SizeX = Tread; St.SizeY = StepsW;
 				St.MaterialPath = MatConcrete;
 				St.ManifestKind = FName(TEXT("Step"));
 				St.Measure = EntranceRise; St.Threshold = 0.64;
-				// Steps rise toward their local -X; put the bottom on the street side and the top at the facade.
-				St.Transform = FTransform(FRotator(0.0, Yaw + 180.0, 0.0), ToWorld(FrontX + Steps * Tread, EntranceY, Z0));
+				// Steps rise toward their local -X: the origin (bottom step) on the street side, the top step
+				// against the facade.
+				St.Transform = FTransform(FRotator(0.0, Yaw, 0.0), ToWorld(FrontX + Steps * Tread, EntranceY, Z0));
 				St.bCompliant = bRamp && !bRampSteep; // steps are fine when a usable ramp exists beside them
 				St.Issue = St.bCompliant ? ERammsComplianceIssue::None : ERammsComplianceIssue::StepAtEntrance;
 				St.ManifestSubtype = bRamp ? FName(TEXT("WithRamp")) : FName(TEXT("NoRamp"));
@@ -669,9 +689,9 @@ bool FPCGRammsBuildingMassingElement::ExecuteInternal(FPCGContext* Context) cons
 					FRammsPieceDesc Rp;
 					Rp.Kind = ERammsProcPieceKind::Ramp;
 					Rp.Rise = EntranceRise;
-					Rp.Slope = bRampSteep ? S->RampMaxSlope * RammsPCG::RandRange(Rng, 1.4, 2.2) : S->RampMaxSlope;
+					Rp.Slope = RampSlopeV;
 					RampSlope = Rp.Slope;
-					Rp.SizeY = 120.0;
+					Rp.SizeY = RampW;
 					Rp.LandingSize = S->LandingSize;
 					Rp.MaterialPath = MatConcrete; Rp.MaterialPath2 = MatMetal;
 					Rp.ManifestKind = FName(TEXT("Ramp"));
@@ -679,10 +699,9 @@ bool FPCGRammsBuildingMassingElement::ExecuteInternal(FPCGContext* Context) cons
 					Rp.bCompliant = !bRampSteep;
 					Rp.Issue = bRampSteep ? ERammsComplianceIssue::SlopeTooSteep : ERammsComplianceIssue::None;
 					Rp.ManifestSubtype = bRampSteep ? FName(TEXT("TooSteep")) : FName(TEXT("Standard"));
-					const double Run = EntranceRise / Rp.Slope;
-					// Beside the steps, same orientation: low end on the street side, landing at the facade.
-					const double RampY = EntranceY + (StepsW * 0.5 + Rp.SizeY * 0.5 + 20.0) * (Rng.FRand() < 0.5 ? 1.0 : -1.0);
-					Rp.Transform = FTransform(FRotator(0.0, Yaw + 180.0, 0.0), ToWorld(FrontX + Run + Rp.LandingSize, RampY, Z0));
+					// The ramp rises toward its local -X; local +X points away from the steps along the facade.
+					const double LowY = EntranceY + RampSide * (StepsW * 0.5 + RampLen);
+					Rp.Transform = FTransform(FRotator(0.0, Yaw + RampSide * 90.0, 0.0), ToWorld(FrontX + RampW * 0.5 + 6.0, LowY, Z0));
 					Rp.Seed = NextSeed();
 					RammsPCG::WritePiece(Pieces, Rp);
 				}
@@ -840,6 +859,132 @@ bool FPCGRammsBuildingMassingElement::ExecuteInternal(FPCGContext* Context) cons
 						}
 					}
 				}
+				// The entrance's footprint in front of the facade: steps and (when there is one) the ramp along it.
+				const double EntranceClear = StepsW * 0.5 + 40.0 + (bRamp ? EntranceRise / FMath::Max(S->RampMaxSlope, 0.01) + S->LandingSize : 0.0);
+				// Foundation planting: a row of shrubs along the front of the house on both sides of the entrance,
+				// clear of the steps, ramp, walk and driveway.
+				if (Palette && Rng.FRand() < 0.85)
+				{
+					FRammsPaletteMesh Sh;
+					if (Palette->PickMesh(RammsPaletteSlots::FoundationShrub, Rng, Sh) || Palette->PickMesh(RammsPaletteSlots::Shrub, Rng, Sh))
+					{
+						const double Sp = FMath::Max(FMath::Max(Sh.Footprint.X, Sh.Footprint.Y), 50.0) + 25.0;
+						const double Xs = FrontX + FMath::Max(Sh.Footprint.X, 50.0) * 0.5 + 20.0;
+						if (Xs < LotFront - 150.0)
+						{
+							for (double y = -HouseHalfW + Sp * 0.5; y <= HouseHalfW - Sp * 0.5; y += Sp)
+							{
+								if (FMath::Abs(y - EntranceY) < EntranceClear || (y > DrivewayLo - 40.0 && y < DrivewayHi + 40.0) || Rng.FRand() < 0.12) { continue; }
+								FRammsPaletteMesh Pick = Sh;
+								if (Rng.FRand() < 0.3) { Palette->PickMesh(RammsPaletteSlots::FoundationShrub, Rng, Pick); }
+								const int32 p = RammsPCG::WritePickedMesh(Props, Pick, ToWorld(Xs, y, Z0), RammsPCG::RandRange(Rng, 0.0, 360.0), NextSeed(), RammsPCG::RandRange(Rng, 0.8, 1.15));
+								RammsPCG::WriteManifest(Props, p, FName(TEXT("Shrub")), FName(TEXT("Foundation")), true, ERammsComplianceIssue::None, 0.0, 0.0);
+							}
+						}
+					}
+				}
+				// Flowers beside the walk.
+				if (Palette && Rng.FRand() < 0.5 && LotFront - FrontX > 400.0)
+				{
+					const double Fy = EntranceY + (Rng.FRand() < 0.5 ? -1.0 : 1.0) * (WalkW * 0.5 + 60.0);
+					if (!(Fy > DrivewayLo - 60.0 && Fy < DrivewayHi + 60.0))
+					{
+						RammsPCG::WritePaletteMesh(Props, Palette, RammsPaletteSlots::Flowers, Rng, ToWorld(FrontX + (LotFront - FrontX) * RammsPCG::RandRange(Rng, 0.35, 0.7), Fy, Z0), RammsPCG::RandRange(Rng, 0.0, 360.0), NextSeed());
+					}
+				}
+				// Mailbox on its post at the street end of the walk (or the driveway).
+				if (Palette && Rng.FRand() < 0.8)
+				{
+					const double My = DrivewayHi > DrivewayLo ? (DCentre > EntranceY ? DrivewayLo - 45.0 : DrivewayHi + 45.0) : EntranceY + (WalkW * 0.5 + 45.0);
+					const int32 m = RammsPCG::WritePaletteMesh(Props, Palette, RammsPaletteSlots::Mailbox, Rng, ToWorld(LotFront - 35.0, My, Z0), Yaw, NextSeed());
+					RammsPCG::WriteManifest(Props, m, FName(TEXT("Prop")), FName(TEXT("Mailbox")), true, ERammsComplianceIssue::None, 0.0, 0.0);
+				}
+				// The driveway carries on across the sidewalk (and planting strip) to the curb as an apron.
+				if (DrivewayHi > DrivewayLo && S->SidewalkWidth > 1.0)
+				{
+					FRammsPieceDesc Ap;
+					Ap.Kind = ERammsProcPieceKind::Slab;
+					Ap.SizeX = S->SidewalkWidth; Ap.SizeY = DrivewayHi - DrivewayLo; Ap.SizeZ = 3.0;
+					Ap.MaterialPath = MatConcrete;
+					Ap.Transform = FTransform(FRotator(0.0, Yaw, 0.0), ToWorld(LotFront, (DrivewayLo + DrivewayHi) * 0.5, Z0 + 0.5));
+					Ap.Seed = NextSeed();
+					RammsPCG::WritePiece(Pieces, Ap);
+				}
+				// Grass clumps over the yard (sparser behind the house), off the house, walk, entrance and driveway.
+				if (S->GrassDensity > 0.0 && Palette && Palette->HasSlot(RammsPaletteSlots::GrassClump))
+				{
+					const double Step = 100.0 / FMath::Sqrt(FMath::Max(S->GrassDensity, 0.05));
+					const FBox2D NoGrass[4] = {
+						FBox2D(FVector2D(FrontX - HouseDepth - 30.0, -HouseHalfW - 30.0), FVector2D(FrontX + 30.0, HouseHalfW + 30.0)),
+						FBox2D(FVector2D(WalkStart - 10.0, EntranceY - WalkW * 0.5 - 15.0), FVector2D(LotFront + 10.0, EntranceY + WalkW * 0.5 + 15.0)),
+						FBox2D(FVector2D(DStart - 10.0, DrivewayLo - 15.0), FVector2D(LotFront + 10.0, DrivewayHi + 15.0)),
+						FBox2D(FVector2D(FrontX - 10.0, EntranceY - EntranceClear), FVector2D(FrontX + 260.0, EntranceY + EntranceClear)) };
+					for (double gx = -Depth * 0.5 + 30.0; gx < LotFront - 30.0; gx += Step)
+					{
+						const bool bBack = gx < FrontX - HouseDepth;
+						for (double gy = -Width * 0.5 + 30.0; gy < Width * 0.5 - 30.0; gy += Step)
+						{
+							if (bBack && Rng.FRand() < 0.45) { continue; }
+							const FVector2D P(gx + RammsPCG::RandRange(Rng, -Step * 0.45, Step * 0.45), gy + RammsPCG::RandRange(Rng, -Step * 0.45, Step * 0.45));
+							bool bOut = false;
+							for (const FBox2D& B : NoGrass) { if (B.bIsValid && B.IsInside(P)) { bOut = true; break; } }
+							if (bOut) { continue; }
+							FRammsPaletteMesh G; if (!Palette->PickMesh(RammsPaletteSlots::GrassClump, Rng, G)) { break; }
+							RammsPCG::WritePickedMesh(Props, G, ToWorld(P.X, P.Y, Z0), RammsPCG::RandRange(Rng, 0.0, 360.0), NextSeed(), RammsPCG::RandRange(Rng, 0.7, 1.3));
+						}
+					}
+				}
+				// The planting strip in front of the lot (between the walk and the curb): street trees spaced along it
+				// and a street light, both clear of the driveway apron, plus grass. Canopy streets get big old trees.
+				const double FZs = FMath::Min(S->FurnitureZoneWidth, S->SidewalkWidth);
+				if (S->PlantingStrip > 0.5 && FZs > 60.0 && Palette)
+				{
+					const double StripX = LotFront + S->SidewalkWidth - FZs * 0.5;
+					FRandomStream BlockRng(RammsPCG::SubSeed(Seed, 9100 + BlockIdV));
+					const bool bCanopy = BlockRng.FRand() < FMath::Clamp(S->CanopyChance, 0.0, 1.0);
+					auto ClearOfDrive = [&](double Yc, double Half) { return !(Yc + Half > DrivewayLo - 60.0 && Yc - Half < DrivewayHi + 60.0); };
+					if (S->TreeSpacing > 200.0)
+					{
+						const double Sp = bCanopy ? FMath::Max(S->TreeSpacing * 0.65, 500.0) : S->TreeSpacing;
+						const int32 NT = FMath::Max(1, FMath::RoundToInt(Width / Sp));
+						for (int32 k = 0; k < NT; ++k)
+						{
+							const double Ty = -Width * 0.5 + Width * (k + 0.5) / NT + RammsPCG::RandRange(Rng, -60.0, 60.0);
+							if (!ClearOfDrive(Ty, 90.0) || FMath::Abs(Ty) > Width * 0.5 - 80.0) { continue; }
+							FRammsPaletteMesh Tm;
+							if (bCanopy ? (Palette->PickMesh(RammsPaletteSlots::TreeLarge, Rng, Tm) || Palette->PickMesh(RammsPaletteSlots::Tree, Rng, Tm)) : Palette->PickMesh(RammsPaletteSlots::Tree, Rng, Tm))
+							{
+								const int32 t = RammsPCG::WritePickedMesh(Props, Tm, ToWorld(StripX, Ty, Z0), RammsPCG::RandRange(Rng, 0.0, 360.0), NextSeed(),
+									bCanopy ? RammsPCG::RandRange(Rng, 1.1, 1.4) : RammsPCG::RandRange(Rng, 0.85, 1.1));
+								RammsPCG::WriteManifest(Props, t, FName(TEXT("Tree")), bCanopy ? FName(TEXT("Canopy")) : FName(TEXT("StreetTree")), true, ERammsComplianceIssue::None, 0.0, 0.0);
+							}
+						}
+					}
+					if (S->StreetLightSpacing > 300.0 && (LotId % FMath::Max(1, FMath::RoundToInt(S->StreetLightSpacing / FMath::Max(Width, 100.0)))) == 0)
+					{
+						const double Ly = (LotId % 2 == 0 ? -1.0 : 1.0) * (Width * 0.5 - 70.0);
+						if (ClearOfDrive(Ly, 40.0))
+						{
+							const int32 l = RammsPCG::WritePaletteMesh(Props, Palette, RammsPaletteSlots::StreetLight, Rng, ToWorld(StripX, Ly, Z0), Yaw + 90.0, NextSeed());
+							RammsPCG::WriteManifest(Props, l, FName(TEXT("Prop")), RammsPaletteSlots::StreetLight, true, ERammsComplianceIssue::None, 0.0, 0.0);
+						}
+					}
+					if (S->GrassDensity > 0.0 && Palette->HasSlot(RammsPaletteSlots::GrassClump))
+					{
+						const double Step = 100.0 / FMath::Sqrt(FMath::Max(S->GrassDensity, 0.05));
+						for (double gy = -Width * 0.5 + 20.0; gy < Width * 0.5 - 20.0; gy += Step)
+						{
+							for (double gx = StripX - FZs * 0.5 + 25.0; gx < StripX + FZs * 0.5 - 20.0; gx += Step)
+							{
+								const double Py = gy + RammsPCG::RandRange(Rng, -Step * 0.4, Step * 0.4);
+								if (!ClearOfDrive(Py, 30.0)) { continue; }
+								FRammsPaletteMesh G; if (!Palette->PickMesh(RammsPaletteSlots::GrassClump, Rng, G)) { break; }
+								RammsPCG::WritePickedMesh(Props, G, ToWorld(FMath::Clamp(gx + RammsPCG::RandRange(Rng, -Step * 0.3, Step * 0.3), StripX - FZs * 0.5 + 20.0, StripX + FZs * 0.5 - 20.0), Py, Z0),
+									RammsPCG::RandRange(Rng, 0.0, 360.0), NextSeed(), RammsPCG::RandRange(Rng, 0.6, 1.0));
+							}
+						}
+					}
+				}
 			}
 
 			// Yard trees in the open ground beside or behind the building (procedural stand-ins,
@@ -868,13 +1013,6 @@ bool FPCGRammsBuildingMassingElement::ExecuteInternal(FPCGContext* Context) cons
 					RammsPCG::WriteFoliage(Props, Pieces, Palette, Rng.FRand() < 0.5 ? RammsPaletteSlots::TreeSmall : RammsPaletteSlots::Tree, Rng,
 						ToWorld(tx, ty, Z0), RammsPCG::RandRange(Rng, 0.0, 360.0), NextSeed(), RammsPCG::RandRange(Rng, 350.0, 650.0), RammsPCG::RandRange(Rng, 550.0, 950.0),
 						RammsPCG::Mat(Palette, RammsPaletteSlots::MatFoliage), RammsPCG::Mat(Palette, RammsPaletteSlots::MatTrunk), FName(TEXT("Tree")));
-					// A shrub or two by the house.
-					if (Rng.FRand() < 0.7)
-					{
-						RammsPCG::WriteFoliage(Props, Pieces, Palette, RammsPaletteSlots::Shrub, Rng,
-							ToWorld(FrontX + 90.0, RammsPCG::RandRange(Rng, -BW * 0.45, BW * 0.45), Z0), RammsPCG::RandRange(Rng, 0.0, 360.0), NextSeed(), 80.0, 70.0,
-							RammsPCG::Mat(Palette, RammsPaletteSlots::MatFoliage), RammsPCG::Mat(Palette, RammsPaletteSlots::MatTrunk), FName(TEXT("Shrub")));
-					}
 				}
 			}
 

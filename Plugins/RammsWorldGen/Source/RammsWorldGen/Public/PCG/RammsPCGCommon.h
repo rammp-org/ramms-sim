@@ -48,6 +48,8 @@ namespace RammsPCG
 	inline const FName WarningDepth(TEXT("WarningDepth"));
 	inline const FName MaterialPath(TEXT("MaterialPath"));
 	inline const FName MaterialPath2(TEXT("MaterialPath2"));
+	inline const FName MaterialPath3(TEXT("MaterialPath3"));
+	inline const FName Openings(TEXT("Openings"));
 	inline const FName UVScale(TEXT("UVScale"));
 	// manifest (on pieces and on mesh features alike)
 	inline const FName ManifestKind(TEXT("ManifestKind"));
@@ -163,7 +165,9 @@ struct RAMMSWORLDGEN_API FRammsPieceDesc
 	double OpeningWidth = 0.0, OpeningOffset = 0.0, OpeningHeight = 210.0;
 	double LandingSize = 152.4, WarningDepth = 0.0;
 	double UVScale = 200.0;
-	FString MaterialPath, MaterialPath2;
+	FString MaterialPath, MaterialPath2, MaterialPath3;
+	/** Walls: extra openings, "offset,width,sill,head;..." (see ARammsProcPiece::Openings). */
+	FString Openings;
 	FName ManifestKind, ManifestSubtype;
 	bool bCompliant = true;
 	ERammsComplianceIssue Issue = ERammsComplianceIssue::None;

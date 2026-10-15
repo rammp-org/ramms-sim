@@ -242,6 +242,7 @@ bool FPCGRammsStreetNetworkElement::ExecuteInternal(FPCGContext* Context) const
 	const FString MatWarn = RammsPCG::Mat(Palette, RammsPaletteSlots::MatWarning);
 	const FString MatLawn = RammsPCG::Mat(Palette, RammsPaletteSlots::MatLawn);
 	const FString MatConcrete = RammsPCG::Mat(Palette, RammsPaletteSlots::MatConcrete);
+	const FString MatCurb = Palette && Palette->HasSlot(RammsPaletteSlots::MatCurb) ? RammsPCG::Mat(Palette, RammsPaletteSlots::MatCurb) : MatConcrete;
 	int32 FeatureSeed = 0;
 	auto NextSeed = [&]() { return RammsPCG::SubSeed(Seed, ++FeatureSeed); };
 
@@ -331,6 +332,30 @@ bool FPCGRammsStreetNetworkElement::ExecuteInternal(FPCGContext* Context) const
 		// Road slab between the intersection squares.
 		const FVector C = Sg.bAlongX ? FVector((A + B) * 0.5, Across, Zr - 10.0) : FVector(Across, (A + B) * 0.5, Zr - 10.0);
 		RammsPCG::WriteCube(Primitives, C, Sg.bAlongX ? FVector(Len, RW, 20.0) : FVector(RW, Len, 20.0), 0.0, MatRoad, NextSeed());
+		// Road wear: cracks, patches, manholes and the odd pothole, projected onto the asphalt.
+		if (S->DecalDensity > 0.0 && Palette && Len > 300.0)
+		{
+			const int32 N = FMath::RoundToInt(S->DecalDensity * Len / 10000.0 + RammsPCG::RandRange(Rng, -0.4, 0.4));
+			for (int32 n = 0; n < N; ++n)
+			{
+				const double Roll = Rng.FRand();
+				const FName Slot = Roll < 0.45 ? RammsPaletteSlots::DecalRoadCrack : Roll < 0.7 ? RammsPaletteSlots::DecalPatch : Roll < 0.85 ? RammsPaletteSlots::DecalPothole : RammsPaletteSlots::DecalPuddle;
+				const FString M = Palette->PickMaterialPath(Slot, Rng);
+				if (M.IsEmpty()) { continue; }
+				const double Sz = Slot == RammsPaletteSlots::DecalPothole ? RammsPCG::RandRange(Rng, 70.0, 140.0)
+					: Slot == RammsPaletteSlots::DecalPatch ? RammsPCG::RandRange(Rng, 80.0, 170.0) : RammsPCG::RandRange(Rng, 150.0, 400.0);
+				const double Along = RammsPCG::RandRange(Rng, A + RW * 0.5 + 100.0, B - RW * 0.5 - 100.0);
+				const double AcrossD = RammsPCG::RandRange(Rng, -RW * 0.5 + Sz * 0.4, RW * 0.5 - Sz * 0.4);
+				FRammsPieceDesc Dc;
+				Dc.Kind = ERammsProcPieceKind::Decal;
+				Dc.SizeX = Sz; Dc.SizeY = Sz * RammsPCG::RandRange(Rng, 0.5, 1.0); Dc.SizeZ = 40.0;
+				Dc.MaterialPath = M;
+				const FVector P = Sg.bAlongX ? FVector(Along, Y[Sg.J] + AcrossD, Zr) : FVector(X[Sg.I] + AcrossD, Along, Zr);
+				Dc.Transform = FTransform(FRotator(0.0, RammsPCG::RandRange(Rng, 0.0, 360.0), 0.0), P);
+				Dc.Seed = NextSeed();
+				RammsPCG::WritePiece(Pieces, Dc);
+			}
+		}
 		// Markings: a dashed yellow centre line between the crossings, white edge lines along the
 		// gutters, and a stop line before each end of the segment.
 		{
@@ -403,10 +428,45 @@ bool FPCGRammsStreetNetworkElement::ExecuteInternal(FPCGContext* Context) const
 		const bool bShort = (Sd.Index == 1 || Sd.Index == 3);
 		const double L0 = bShort ? SW : 0.0;
 		const double L = Sd.Length - (bShort ? 2.0 * SW : 0.0);
+		const bool bStrip = S->PlantingStrip > 0.5 && FZ > 30.0 && !B.bPark;
 		if (L > 1.0)
 		{
-			const FVector SlabCentre = Sd.Start + Sd.Dir * (L0 + L * 0.5) + Sd.Inward * (SW * 0.5) + FVector(0, 0, -10.0);
-			RammsPCG::WriteCube(Primitives, SlabCentre, FVector(L, SW, 20.0), Sd.Yaw, MatWalk, NextSeed());
+			// A planting strip street: grass between the curb and the walk (paved where the curb ramps land).
+			const double Pave0 = bStrip ? FZ : 0.0;
+			const FVector SlabCentre = Sd.Start + Sd.Dir * (L0 + L * 0.5) + Sd.Inward * ((SW + Pave0) * 0.5) + FVector(0, 0, -10.0);
+			RammsPCG::WriteCube(Primitives, SlabCentre, FVector(L, SW - Pave0, 20.0), Sd.Yaw, MatWalk, NextSeed());
+			if (bStrip)
+			{
+				FRammsPieceDesc G;
+				G.Kind = ERammsProcPieceKind::Slab;
+				G.SizeX = L; G.SizeY = FZ; G.SizeZ = 20.0; G.UVScale = 350.0;
+				G.MaterialPath = MatLawn;
+				G.Transform = FTransform(FRotator(0.0, Sd.Yaw, 0.0), Sd.Start + Sd.Dir * L0 + Sd.Inward * (FZ * 0.5) + FVector(0, 0, -0.5));
+				G.Seed = NextSeed();
+				RammsPCG::WritePiece(Pieces, G);
+				// (The lots dress the strip in front of them - trees, grass, lights - around their driveways.)
+			}
+		}
+		// Sidewalk wear: cracks and stains projected onto the walk.
+		if (S->DecalDensity > 0.0 && Palette && L > 200.0)
+		{
+			const int32 N = FMath::RoundToInt(S->DecalDensity * 0.8 * L / 10000.0 + RammsPCG::RandRange(Rng, -0.4, 0.4));
+			for (int32 n = 0; n < N; ++n)
+			{
+				const bool bStain = Rng.FRand() < 0.35;
+				const FString M = Palette->PickMaterialPath(bStain ? RammsPaletteSlots::DecalStain : RammsPaletteSlots::DecalWalkCrack, Rng);
+				if (M.IsEmpty()) { continue; }
+				const double Sz = RammsPCG::RandRange(Rng, 80.0, 200.0);
+				const double Lo = bStrip ? FZ + Sz * 0.3 : Sz * 0.3, Hi = SW - Sz * 0.3;
+				if (Hi <= Lo) { continue; }
+				FRammsPieceDesc Dc;
+				Dc.Kind = ERammsProcPieceKind::Decal;
+				Dc.SizeX = Sz; Dc.SizeY = Sz * RammsPCG::RandRange(Rng, 0.5, 1.0); Dc.SizeZ = 40.0;
+				Dc.MaterialPath = M;
+				Dc.Transform = FTransform(FRotator(0.0, RammsPCG::RandRange(Rng, 0.0, 360.0), 0.0), Sd.Start + Sd.Dir * RammsPCG::RandRange(Rng, L0 + 60.0, L0 + L - 60.0) + Sd.Inward * RammsPCG::RandRange(Rng, Lo, Hi));
+				Dc.Seed = NextSeed();
+				RammsPCG::WritePiece(Pieces, Dc);
+			}
 		}
 		// Parked cars at the curb (in the road, outside the curb line), clear of crossings and ramps.
 		if (S->ParkingDensity > 0.0 && RW >= 550.0 && Sd.Length > 1500.0)
@@ -450,7 +510,7 @@ bool FPCGRammsStreetNetworkElement::ExecuteInternal(FPCGContext* Context) const
 			{
 				if (A1 - A0 < 20.0) { return; }
 				FRammsPieceDesc P2;
-				P2.Kind = ERammsProcPieceKind::Curb; P2.SizeX = A1 - A0; P2.SizeY = 20.0; P2.Rise = CH; P2.MaterialPath = MatConcrete; P2.Seed = NextSeed();
+				P2.Kind = ERammsProcPieceKind::Curb; P2.SizeX = A1 - A0; P2.SizeY = 20.0; P2.Rise = CH; P2.MaterialPath = MatCurb; P2.Seed = NextSeed();
 				P2.Transform = FTransform(FRotator(0.0, Sd.Yaw, 0.0), Sd.Start + Sd.Dir * A0);
 				RammsPCG::WritePiece(Pieces, P2);
 			};

@@ -260,6 +260,8 @@ Kinds and the issues they can carry:
 | `Room` | Living, Bedroom, Office, Meeting, Kitchen, Dining, Bathroom, Corridor, Shop, Storage | — |
 | `Aisle` | Standard, Narrow (shop floors; measure = aisle width) | ClearWidthBelowMinimum |
 | `Path`, `Driveway`, `Vehicle`, `CarPark` | FrontWalk / Concrete / Parked, Driveway, CarPark / SingleRow, DoubleRow, MultiRow | — |
+| `CheckoutLane` | Standard, Narrow (store checkouts; measure = lane width) | ClearWidthBelowMinimum |
+| `Tree`, `Shrub`, `Prop` (lots) | StreetTree, Canopy / Foundation / Mailbox, StreetLight | — |
 
 `measure` / `threshold` are the number that decided it (slope as rise/run,
 widths and heights in cm) and what it was compared to.
@@ -275,11 +277,11 @@ runs it at 0.2, the office at 0.1.
 | Group | Parameters |
 |---|---|
 | Site | `SiteSizeX/Y`, `NonCompliance`, `Palette` |
-| Streets | `BlockSizeMin/Max`, `RoadWidth`, `SidewalkWidth`, `FurnitureZoneWidth`, `CurbHeight`, `StreetJitter`, `StreetDropout`, `MidblockCrossingChance`, `CrosswalkWidth`, `ParkFraction`, `ParkingDensity` |
+| Streets | `BlockSizeMin/Max`, `RoadWidth`, `SidewalkWidth`, `FurnitureZoneWidth`, `PlantingStrip` (1 = the furniture zone is a grass strip), `CurbHeight`, `StreetJitter`, `StreetDropout`, `MidblockCrossingChance`, `CrosswalkWidth`, `ParkFraction`, `ParkingDensity`, `DecalDensity` (cracks, potholes, patches, stains per 100 m) |
 | Buildings | `LotWidthMin/Max`, `SetbackMin/Max`, `FloorsMin/Max`, `FloorHeight`, `LotCoverage`, `EntranceStepChance`, `EntranceRampChance`, `WindowSpacing`, `FacadeStyles`, `RearParkingChance` |
-| Hazards | `PropDensity`, `HazardDensity` (per 100 m), `TreeSpacing`, `HazardIntrusionChance` |
+| Hazards | `PropDensity`, `HazardDensity` (per 100 m), `TreeSpacing`, `CanopyChance` (big old trees, closer together), `StreetLightSpacing`, `HazardIntrusionChance` |
 | Accessibility | `MinClearWidth`, `PreferredClearWidth`, `RampMaxSlope`, `MaxCrossSlope`, `CurbRampFlareSlope`, `DoorClearWidth`, `DoorThresholdMax`, `VerticalChangeMax`, `LandingSize`, `DetectableWarningDepth` |
-| Suburban / park | `LawnLots`, `YardTreeChance`, `DrivewayChance`, `DrivewayWidth`, `FrontBoundaryChance`, `PathWidth`, `FoliageDensity` |
+| Suburban / park | `LawnLots`, `YardTreeChance`, `DrivewayChance`, `DrivewayWidth`, `FrontBoundaryChance`, `PathWidth`, `FoliageDensity`, `GrassDensity` (grass clumps per m^2 on lawns, strips and parks) |
 | Indoor | `RoomSizeMin/Max`, `CorridorWidth`, `CorridorChance`, `WallThickness`, `WallHeight`, `DoorWidthMean/Std`, `ThresholdChance`, `FurnitureDensity`, `OfficeFraction`, `RetailFraction` |
 
 ## Extending
@@ -343,7 +345,51 @@ runs it at 0.2, the office at 0.1.
 - **New piece kind**: add to `ERammsProcPieceKind`, a `Build*` in
   `RammsProcPiece.cpp`, and emit it from a node.
 
+## Streets and yards
+
+- **Curbs and ground**: every surface material projects its texture by the
+  dominant normal axis (XY on tops, YZ / XZ on faces), so curb faces, slab
+  edges and stand-in building shells tile at real size instead of smearing.
+  Curbs use their own finer concrete (`Mat.Curb`); stand-in houses use
+  world-aligned brick / siding (`Mat.Facade`, `Mat.FacadeAlt`).
+- **Entrances**: steps rise from the street side to the door; a ramp, when
+  there is room for one, runs along the facade beside the steps with its
+  landing against the top step (it never crosses the sidewalk).
+- **Planting strips** (`PlantingStrip`): the furniture zone becomes grass.
+  Each house lot dresses the strip in front of it - street trees spaced along
+  it, a street light every few lots, grass clumps - around its driveway, whose
+  apron continues across the strip and sidewalk to the curb. `CanopyChance`
+  turns a block's street into big old trees (`TreeLarge`) closer together.
+  Paved streets keep trees in pits, the grate scaled to fit the furniture
+  zone; trees are placed by their trunk (measured from the mesh), not the
+  canopy's centre.
+- **Yards**: foundation shrubs along the house front, flowers by the walk, a
+  mailbox at the street end of the walk or driveway, a garage driveway, back
+  yard fences, grass clumps (`GrassDensity`) over lawns, parks and strips.
+- **Wear**: `Decal` pieces project cracks, potholes, patches, manholes and
+  puddles onto roads and cracks / stains onto sidewalks (`DecalDensity`;
+  palette `Decal.*` material sets, deferred-decal materials only).
+
 ## Indoor furnishing and routes
+
+Walls are finished per room: a 1 cm liner in the room's paint (`Mat.Wall.Paint`,
+tinted instances of `M_RammsPaint`), wallpaper (`Mat.Wall.Paper`) or tile below
+120 cm (`Mat.Wall.Tile`, bathrooms and some kitchens), cut around doors and
+windows, with a skirting board, so the two sides of a shared wall differ.
+Floors are picked per room from `Mat.Floor.Wood / Carpet / Tile / Vinyl` and
+meet under the wall centre lines (no overlap, no z-fighting). Exterior walls
+get windows (frame, sill, mullion and glass in the wall's openings). Doors
+are real leaves from `Door.Interior` / `Door.Exterior` (handles included,
+turned so the handle is on the free edge), scaled to the opening and standing
+open against the casing; casings and frames stand 2 cm proud of the wall so
+nothing shares a plane.
+
+A shop floor is laid out like a small supermarket: checkout lanes standing
+out from the entrance wall (each lane a `CheckoutLane` record with its
+width), baskets and an exit sign by the door, wall freezers along one long
+wall, produce tables with crates of fruit and vegetables along the other, a
+deli counter across the far end, gondola rows with end-cap displays and a
+hanging sign over each aisle, and clutter in the corners.
 
 Rooms are furnished the way a person would arrange them, in groups: a sofa
 with its coffee table, armchair and a TV on a stand opposite; a bed with

@@ -182,20 +182,62 @@ bool FPCGRammsHazardPlacerElement::ExecuteInternal(FPCGContext* Context) const
 			};
 
 			// --- trees in the furniture zone -----------------------------------------------
-			if (S->TreeSpacing > 200.0 && FZ >= 80.0 && !bPark)
+			// In tree pits on paved streets (the grate scaled to fit the zone, the trunk on its centre), straight
+			// into the grass on planting-strip streets. A canopy street has large old trees closer together.
+			const bool bStrip = S->PlantingStrip > 0.5;
+			const bool bCanopy = !bPark && Rng.FRand() < FMath::Clamp(S->CanopyChance, 0.0, 1.0);
+			// (On planting-strip streets the lots plant the strip in front of them, around their driveways.)
+			if (S->TreeSpacing > 200.0 && FZ >= 80.0 && !bPark && !bStrip)
 			{
-				for (double a = 450.0; a < Length - 450.0; a += S->TreeSpacing)
+				const double Spacing = bCanopy ? FMath::Max(S->TreeSpacing * 0.65, 500.0) : S->TreeSpacing;
+				for (double a = 450.0; a < Length - 450.0; a += Spacing)
 				{
-					const double Jit = RammsPCG::RandRange(Rng, -100.0, 100.0);
+					const double Jit = RammsPCG::RandRange(Rng, -80.0, 80.0);
 					const double A = a + Jit;
 					if (!Occ.Free(A - 70.0, A + 70.0)) { continue; }
 					Occ.Take(A - 90.0, A + 90.0);
 					const FVector Base = ToWorld(A, FZ * 0.5, 0.0);
-					FRammsPaletteMesh Pit;
-					const int32 p = RammsPCG::WritePaletteMesh(Props, Palette, RammsPaletteSlots::TreePit, Rng, Base, Yaw, NextSeed(), &Pit);
-					if (p >= 0) { RammsPCG::WriteManifest(Props, p, FName(TEXT("Prop")), FName(TEXT("TreePit")), true, ERammsComplianceIssue::None, RouteW, S->MinClearWidth); }
-					RammsPCG::WriteFoliage(Props, Pieces, Palette, RammsPaletteSlots::Tree, Rng, Base, RammsPCG::RandRange(Rng, 0.0, 360.0), NextSeed(),
-						RammsPCG::RandRange(Rng, 300.0, 520.0), RammsPCG::RandRange(Rng, 550.0, 850.0), MatFoliage, MatTrunk, FName(TEXT("Tree")));
+					if (!bStrip)
+					{
+						FRammsPaletteMesh Pit;
+						if (Palette && Palette->PickMesh(RammsPaletteSlots::TreePit, Rng, Pit))
+						{
+							const double PitMax = FMath::Max(Pit.Footprint.X, Pit.Footprint.Y);
+							const double Fit = FMath::Min(1.0, (FZ - 12.0) / FMath::Max(PitMax, 1.0));
+							const int32 p = RammsPCG::WritePickedMesh(Props, Pit, Base, Yaw, NextSeed(), Fit);
+							RammsPCG::WriteManifest(Props, p, FName(TEXT("Prop")), FName(TEXT("TreePit")), true, ERammsComplianceIssue::None, RouteW, S->MinClearWidth);
+						}
+					}
+					FRammsPaletteMesh Big;
+					if (bCanopy && Palette && (Palette->PickMesh(RammsPaletteSlots::TreeLarge, Rng, Big) || Palette->PickMesh(RammsPaletteSlots::Tree, Rng, Big)))
+					{
+						const int32 p = RammsPCG::WritePickedMesh(Props, Big, Base, RammsPCG::RandRange(Rng, 0.0, 360.0), NextSeed(), RammsPCG::RandRange(Rng, 1.1, 1.4));
+						RammsPCG::WriteManifest(Props, p, FName(TEXT("Tree")), FName(TEXT("Canopy")), true, ERammsComplianceIssue::None, 0.0, 0.0);
+					}
+					else
+					{
+						RammsPCG::WriteFoliage(Props, Pieces, Palette, RammsPaletteSlots::Tree, Rng, Base, RammsPCG::RandRange(Rng, 0.0, 360.0), NextSeed(),
+							RammsPCG::RandRange(Rng, 300.0, 520.0), RammsPCG::RandRange(Rng, 550.0, 850.0), MatFoliage, MatTrunk, FName(TEXT("Tree")));
+					}
+				}
+			}
+
+			// --- street lights at a regular spacing, staggered between the two sides of a street ---
+			if (S->StreetLightSpacing > 300.0 && !bPark && !bStrip)
+			{
+				FRammsPaletteMesh Lm;
+				if (Palette && Palette->PickMesh(RammsPaletteSlots::StreetLight, Rng, Lm))
+				{
+					const double Sp = S->StreetLightSpacing;
+					for (double a = 200.0 + ((SideIndex % 2) ? Sp * 0.5 : 0.0); a < Length - 200.0; a += Sp)
+					{
+						double A = a;
+						if (!Occ.Free(A - 30.0, A + 30.0)) { A += 120.0; if (!Occ.Free(A - 30.0, A + 30.0)) { continue; } }
+						Occ.Take(A - 40.0, A + 40.0);
+						const double Y = FZ >= 40.0 ? FMath::Min(FZ * 0.5, 45.0) : 30.0;
+						const int32 p = RammsPCG::WritePickedMesh(Props, Lm, ToWorld(A, Y, 0.0), Yaw, NextSeed());
+						RammsPCG::WriteManifest(Props, p, FName(TEXT("Prop")), RammsPaletteSlots::StreetLight, true, ERammsComplianceIssue::None, RouteW, S->MinClearWidth);
+					}
 				}
 			}
 
@@ -205,7 +247,7 @@ bool FPCGRammsHazardPlacerElement::ExecuteInternal(FPCGContext* Context) const
 			{
 				const double Roll = Rng.FRand();
 				FName Slot = RammsPaletteSlots::Bench;
-				const bool bResidential = FZ < 50.0; // no furniture zone: a residential street
+				const bool bResidential = FZ < 50.0 || S->PlantingStrip > 0.5; // no furniture zone or a grass strip: a residential street
 				if (Roll < 0.18) { Slot = RammsPaletteSlots::Bench; }
 				else if (Roll < 0.34) { Slot = RammsPaletteSlots::TrashBin; }
 				else if (Roll < 0.50) { Slot = RammsPaletteSlots::StreetLight; }
@@ -440,6 +482,23 @@ bool FPCGRammsParkLayoutElement::ExecuteInternal(FPCGContext* Context) const
 				++SegIndex;
 			}
 
+			// Grass clumps over the lawn, off the paths.
+			if (S->GrassDensity > 0.0 && Palette && Palette->HasSlot(RammsPaletteSlots::GrassClump))
+			{
+				const double Step = 100.0 / FMath::Sqrt(FMath::Max(S->GrassDensity, 0.05));
+				for (double gx = C.X - Size.X * 0.5 + 60.0; gx < C.X + Size.X * 0.5 - 60.0; gx += Step)
+				{
+					for (double gy = C.Y - Size.Y * 0.5 + 60.0; gy < C.Y + Size.Y * 0.5 - 60.0; gy += Step)
+					{
+						const FVector2D P(gx + RammsPCG::RandRange(Rng, -Step * 0.45, Step * 0.45), gy + RammsPCG::RandRange(Rng, -Step * 0.45, Step * 0.45));
+						bool bOnPath = false;
+						for (const FBox2D& B : PathBoxes) { if (B.ExpandBy(-PW * 0.35).IsInside(P)) { bOnPath = true; break; } }
+						if (bOnPath) { continue; }
+						FRammsPaletteMesh G; if (!Palette->PickMesh(RammsPaletteSlots::GrassClump, Rng, G)) { break; }
+						RammsPCG::WritePickedMesh(Props, G, FVector(P.X, P.Y, Z0), RammsPCG::RandRange(Rng, 0.0, 360.0), NextSeed(), RammsPCG::RandRange(Rng, 0.7, 1.3));
+					}
+				}
+			}
 			// Trees and shrubs on the lawn, off the paths.
 			const double AreaM2 = Size.X * Size.Y / 10000.0;
 			const int32 NumTrees = FMath::RoundToInt(S->FoliageDensity * AreaM2 / 100.0);

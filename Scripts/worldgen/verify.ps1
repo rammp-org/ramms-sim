@@ -37,7 +37,10 @@ Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $Out "verify_report.
 Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $Root "Content\Maps\Gen\Map_Gen_*.umap")
 $script = Join-Path $Root "Scripts\worldgen\verify.py"
 "launching editor with $script"
-Start-Process -FilePath "$UE\Engine\Binaries\Win64\UnrealEditor.exe" -ArgumentList @("`"$Root\Ramms.uproject`"", "-ExecCmds=`"py $script`"")
+# Keep rendering at full rate when the editor is not the foreground window, so screenshots taken by the
+# verification scripts are not starved (command-line ini override; applies to this session only).
+$noThrottle = "-ini:EditorPerProjectUserSettings:[/Script/UnrealEd.EditorPerformanceSettings]:bThrottleCPUWhenNotForeground=False"
+Start-Process -FilePath "$UE\Engine\Binaries\Win64\UnrealEditor.exe" -ArgumentList @("`"$Root\Ramms.uproject`"", "-ExecCmds=`"py $script`"", $noThrottle)
 "launched"
 # The editor restores its last window placement, which can be off-screen (a monitor that is no longer
 # attached). An off-screen window never renders, so screenshots and scene captures come back black.

@@ -162,6 +162,8 @@ int32 RammsPCG::WritePiece(FRammsPointWriter& W, const FRammsPieceDesc& P)
 	W.Set(i, UVScale, P.UVScale);
 	W.Set(i, MaterialPath, P.MaterialPath);
 	W.Set(i, MaterialPath2, P.MaterialPath2);
+	W.Set(i, MaterialPath3, P.MaterialPath3);
+	W.Set(i, Openings, P.Openings);
 	W.Set(i, ManifestKind, P.ManifestKind);
 	W.Set(i, ManifestSubtype, P.ManifestSubtype);
 	W.SetBool(i, bCompliant, P.bCompliant);
