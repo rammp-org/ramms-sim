@@ -33,10 +33,16 @@ FOLDER = "WorldGen/Crowd"
 PROFILE_ASSET = "/Game/NPCs/DA_CrowdAgentProfile"
 SPAWNER_CLASS = "/Script/RammsCrowd.RammsCrowdSpawner"
 # Lane profiles from Config/DefaultPlugins.ini ([/Script/ZoneGraph.ZoneGraphSettings]).
+# (name, guid, total width): two opposite lanes each. Generated levels use the narrower ones so a lane
+# fits the clear part of a sidewalk or a doorway: agents walk a lane's centre line and Mass avoidance only
+# steers around other agents, not around static geometry, so the lanes themselves must be clear.
 LANE_PROFILES = {
     "wide": ("PedestrianLanes", "8A3C5B1E4F2D47A9B6E1C0D2F3A4B5C6", 300.0),
-    "narrow": ("PedestrianLanesNarrow", "5D2E8B7A1C4F4E3B9A6D0C1E2F3B4A57", 150.0),
+    "sidewalk": ("PedestrianLanesSidewalk", "7B1D4C9E2A3F4B5C8D6E0F1A2B3C4D5E", 120.0),
+    "narrow": ("PedestrianLanesNarrow", "5D2E8B7A1C4F4E3B9A6D0C1E2F3B4A57", 50.0),
 }
+AGENT_RADIUS = 30.0     # a little under the profile's 35 cm: agents brush past a door jamb rather than refuse it
+CELL = 25.0             # clearance grid for rerouting a lane around furniture and props
 
 
 # --- geometry -------------------------------------------------------------------------------------
@@ -77,6 +83,7 @@ class _Graph:
         self.z = []          # node heights
         self.edges = {}      # id -> [a, b, [interior (x, y, z)...]]
         self._eid = 0
+        self.links = set()   # edge ids that cross a doorway between two rooms
 
     def node(self, p, z=0.0):
         for i, n in enumerate(self.nodes):
@@ -219,7 +226,9 @@ def _indoor_graph(routes, features=()):
             nearest[a] = best[1]
     for a, b in nearest.items():
         if nearest.get(b) == a and a < b:
-            g.add(a, b)
+            k = g.add(a, b)
+            if k:
+                g.links.add(k)
     # Shop aisles: a ladder.
     aisles = []
     for f in features:
@@ -246,6 +255,247 @@ def _indoor_graph(routes, features=()):
                 if _len(_sub(g.nodes[m], g.nodes[corner])) < 1500.0:
                     g.add(corner, m)
     return g
+
+
+# --- keeping lanes clear of walls, furniture and props ----------------------------------------------
+
+class _Clearance:
+    """Is a pedestrian of a given radius free to stand at (x, y) on the floor at height z? A capsule from
+    30 cm above the floor (thresholds, curbs and floor slabs do not count) to head height, tested against
+    everything that blocks (walls, furniture, props, vehicles). Results are cached on a 25 cm grid."""
+
+    def __init__(self, world):
+        self.world = world
+        self.cache = {}
+        self.types = [unreal.ObjectTypeQuery.OBJECT_TYPE_QUERY1, unreal.ObjectTypeQuery.OBJECT_TYPE_QUERY2]
+        self.calls = 0
+
+    def free(self, x, y, z, r):
+        # Cached at 5 cm, not the 25 cm search grid: a doorway is only ~8 cm wider than a person, and
+        # snapping a test point to the grid would close it.
+        key = (int(round(x / 5.0)), int(round(y / 5.0)), int(round(z / 20.0)), int(r))
+        hit = self.cache.get(key)
+        if hit is None:
+            self.calls += 1
+            cx, cy = key[0] * 5.0, key[1] * 5.0
+            half = 70.0
+            # Returns the overlapping components, or None when there are none (the bool return is folded in).
+            res = unreal.SystemLibrary.capsule_overlap_components(
+                self.world, unreal.Vector(cx, cy, z + 30.0 + half), r, max(half, r), self.types,
+                unreal.PrimitiveComponent.static_class(), [])
+            if isinstance(res, tuple):
+                res = res[-1] if res and res[0] else None
+            hit = bool(res)
+            self.cache[key] = hit
+        return not hit
+
+    def segment_free(self, a, b, za, zb, r):
+        d = _len(_sub(b, a))
+        n = max(1, int(d / 15.0))
+        for i in range(n + 1):
+            t = i / n
+            if not self.free(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, za + (zb - za) * t, r):
+                return False
+        return True
+
+    def nearest_free(self, p, z, r, reach=120.0):
+        if self.free(p[0], p[1], z, r):
+            return p
+        best = None
+        steps = int(reach / CELL)
+        for i in range(-steps, steps + 1):
+            for j in range(-steps, steps + 1):
+                q = (p[0] + i * CELL, p[1] + j * CELL)
+                d = _len(_sub(q, p))
+                if d <= reach and (best is None or d < best[0]) and self.free(q[0], q[1], z, r):
+                    best = (d, q)
+        return best[1] if best else None
+
+
+def _astar(clr, a, b, za, zb, r, margin):
+    """Shortest 8-connected path on the 25 cm grid from a to b keeping radius r free, inside the pair's
+    bounding box grown by margin. Returns a list of points (a ... b) or None."""
+    import heapq
+    # The grid is laid so the start sits exactly on a cell centre: from a doorway, a path straight out
+    # along the door's axis then keeps its full clearance (a misaligned grid would close an 80 cm door).
+    x0 = a[0] - math.ceil((a[0] - (min(a[0], b[0]) - margin)) / CELL) * CELL
+    y0 = a[1] - math.ceil((a[1] - (min(a[1], b[1]) - margin)) / CELL) * CELL
+    x1, y1 = max(a[0], b[0]) + margin, max(a[1], b[1]) + margin
+    nx, ny = int((x1 - x0) / CELL) + 1, int((y1 - y0) / CELL) + 1
+    if nx * ny > 60000:
+        return None
+    L = _len(_sub(b, a)) or 1.0
+
+    def cell(p): return (int(round((p[0] - x0) / CELL)), int(round((p[1] - y0) / CELL)))
+    def pos(c): return (x0 + c[0] * CELL, y0 + c[1] * CELL)
+    def zat(p):
+        t = max(0.0, min(1.0, _len(_sub(p, a)) / L))
+        return za + (zb - za) * t
+
+    s, g = cell(a), cell(b)
+    openq = [(0.0, s)]
+    cost = {s: 0.0}
+    came = {}
+    nbrs = [(1, 0, 1.0), (-1, 0, 1.0), (0, 1, 1.0), (0, -1, 1.0), (1, 1, 1.414), (1, -1, 1.414), (-1, 1, 1.414), (-1, -1, 1.414)]
+    while openq:
+        _f, c = heapq.heappop(openq)
+        pc = pos(c)
+        # Done at the goal cell, or anywhere close to the goal with a clear straight run onto it (the goal
+        # is usually off-grid, often in a doorway).
+        if c == g or (_len(_sub(pc, b)) < 75.0 and clr.segment_free(pc, b, zat(pc), zb, r)):
+            path = [b] if c == g else [b, pc]
+            while c in came:
+                c = came[c]
+                path.append(pos(c))
+            if len(path) > 1:
+                path[-1] = a
+            else:
+                path.append(a)
+            return list(reversed(path))
+        for dx, dy, w in nbrs:
+            n = (c[0] + dx, c[1] + dy)
+            if not (0 <= n[0] < nx and 0 <= n[1] < ny):
+                continue
+            p = pos(n)
+            if n != g and not clr.free(p[0], p[1], zat(p), r):
+                continue
+            nc = cost[c] + w
+            if nc < cost.get(n, 1e18):
+                cost[n] = nc
+                came[n] = c
+                h = math.hypot(g[0] - n[0], g[1] - n[1])
+                heapq.heappush(openq, (nc + h, n))
+    return None
+
+
+def _pull(clr, pts, za, zb, r):
+    """String-pull a grid path: keep a point only where the straight line to a later one is blocked."""
+    out = [pts[0]]
+    i = 0
+    while i < len(pts) - 1:
+        j = len(pts) - 1
+        while j > i + 1 and not clr.segment_free(pts[i], pts[j], za, zb, r):
+            j -= 1
+        out.append(pts[j])
+        i = j
+    return out
+
+
+def _doorway(clr, a, b, z):
+    """A doorway between route ends a and b (either side of a wall): its centre in the wall, found by
+    scanning across the crossing for the free span, and the crossing direction. None when no gap is found."""
+    d = _sub(b, a)
+    ax = (1.0 if d[0] > 0 else -1.0, 0.0) if abs(d[0]) >= abs(d[1]) else (0.0, 1.0 if d[1] > 0 else -1.0)
+    lat = (-ax[1], ax[0])
+    mid = _mul(_add(a, b), 0.5)
+    free = [o for o in range(-80, 81, 5) if clr.free(mid[0] + lat[0] * o, mid[1] + lat[1] * o, z, 12.0)]
+    if not free:
+        return None
+    # The longest run of consecutive free offsets is the opening.
+    runs, cur = [], [free[0]]
+    for o in free[1:]:
+        if o - cur[-1] == 5:
+            cur.append(o)
+        else:
+            runs.append(cur); cur = [o]
+    runs.append(cur)
+    best = max(runs, key=len)
+    c = (best[0] + best[-1]) * 0.5
+    return _add(mid, _mul(lat, c)), ax
+
+
+def _clear_lanes(g, world, lane_half, indoor):
+    """Make every run of the graph clear for a pedestrian walking either of its lanes.
+
+    Doorway crossings are straightened through the middle of the opening. Every other run end is nudged
+    off furniture and out of door jambs, back toward its own room. A run whose line hits something is
+    rerouted around it on a grid (first with room for both lanes, then with room for one person); a run
+    with no way through is dropped."""
+    clr = _Clearance(world)
+    r_lane = lane_half + AGENT_RADIUS          # both lanes clear
+    r_min = AGENT_RADIUS + 6.0                 # one person squeezing through a pinch point
+    stats = {"rerouted": 0, "dropped": 0, "doorways": 0}
+    z = {n: _ground_z(world, g.nodes[n][0], g.nodes[n][1], g.z[n]) for n in range(len(g.nodes))}
+    links = getattr(g, "links", set())
+
+    # 1. Doorways: the crossing becomes a straight run through the opening's centre, 45 cm either side
+    #    of the wall line, so the lane never clips a jamb.
+    for k in list(links):
+        if k not in g.edges:
+            continue
+        a, b, _pts = g.edges[k]
+        dw = _doorway(clr, g.nodes[a], g.nodes[b], z[a])
+        if dw is None:
+            continue
+        c, ax = dw
+        p0, p1 = _sub(c, _mul(ax, 45.0)), _add(c, _mul(ax, 45.0))
+        g.edges[k][2] = [(p0[0], p0[1], z[a]), (c[0], c[1], z[a]), (p1[0], p1[1], z[b])]
+        stats["doorways"] += 1
+
+    # 2. Run ends: off furniture and jambs, moving back along the node's own (non-doorway) runs.
+    for n in range(len(g.nodes)):
+        inc = g.incident(n)
+        if not inc or clr.free(g.nodes[n][0], g.nodes[n][1], z[n], r_min):
+            continue
+        dirs = []
+        for k in inc:
+            if k in links:
+                continue
+            a, b, pts = g.edges[k]
+            chain = [g.nodes[a]] + [(p[0], p[1]) for p in pts] + [g.nodes[b]]
+            nxt = chain[1] if a == n else chain[-2]
+            dirs.append(_unit(_sub(nxt, g.nodes[n])))
+        q = None
+        if dirs:
+            dv = _unit((sum(d[0] for d in dirs), sum(d[1] for d in dirs)))
+            for step in range(1, 31):
+                cand = _add(g.nodes[n], _mul(dv, step * 5.0))
+                if clr.free(cand[0], cand[1], z[n], r_min):
+                    q = cand
+                    break
+        if q is None:
+            q = clr.nearest_free(g.nodes[n], z[n], r_min, 150.0)
+        if q is None:
+            for k in inc:
+                del g.edges[k]
+                stats["dropped"] += 1
+            continue
+        g.nodes[n] = q
+
+    # 3. Runs.
+    margin = 300.0 if indoor else 450.0
+    for k in list(g.edges):
+        a, b, pts = g.edges[k]
+        chain = [g.nodes[a]] + [(p[0], p[1]) for p in pts] + [g.nodes[b]]
+        za, zb = z[a], z[b]
+        segs = range(len(chain) - 1)
+        if all(clr.segment_free(chain[i], chain[i + 1], za, zb, r_lane) for i in segs):
+            continue
+        if k in links:
+            # A doorway: passable if a person fits along the straightened line; otherwise rerouted.
+            if all(clr.segment_free(chain[i], chain[i + 1], za, zb, 15.0) for i in segs):
+                continue
+        ok_min = all(clr.segment_free(chain[i], chain[i + 1], za, zb, r_min) for i in segs)
+        path = _astar(clr, chain[0], chain[-1], za, zb, r_lane, margin)
+        r_used = r_lane
+        if path is None and not ok_min:
+            path = _astar(clr, chain[0], chain[-1], za, zb, r_min, margin)
+            r_used = r_min
+        if path is None and not ok_min:
+            path = _astar(clr, chain[0], chain[-1], za, zb, 24.0, margin)
+            r_used = 24.0
+        if path is None:
+            if ok_min:
+                continue            # tight but passable as laid out: keep it
+            del g.edges[k]
+            stats["dropped"] += 1
+            stats.setdefault("dropped_runs", []).append([round(v) for v in chain[0] + chain[-1]])
+            continue
+        path = _pull(clr, path, za, zb, r_used)
+        g.edges[k][2] = [(p[0], p[1], za + (zb - za) * (i / max(len(path) - 1, 1))) for i, p in enumerate(path[1:-1], 1)]
+        stats["rerouted"] += 1
+    stats["queries"] = clr.calls
+    return stats
 
 
 # --- level actors ---------------------------------------------------------------------------------
@@ -309,6 +559,7 @@ def _pt(x, y, z, ptype, yaw=0.0):
 def _emit(g, profile_kind, world, label_prefix):
     """Polygon junctions at branch nodes, splines along the runs between them. Returns (shapes, lane cm)."""
     ref, width = _profile_ref(profile_kind)
+    clr = _Clearance(world)
     T = unreal.FZoneShapePointType
     # Junctions: nodes of degree >= 3, plus one node on any loop without one.
     junction = {n for n in range(len(g.nodes)) if g.degree(n) >= 3}
@@ -358,7 +609,11 @@ def _emit(g, profile_kind, world, label_prefix):
     radius = {}
     for n in junction:
         lens = [g.length(k) for k in g.incident(n)]
-        radius[n] = max(min(width * 0.5 + 25.0, (min(lens) if lens else 1e9) * 0.35), 40.0)
+        radius[n] = max(min(width * 0.5 + 25.0, (min(lens) if lens else 1e9) * 0.35), 30.0)
+        # The junction's lanes curve inside this circle: keep it clear of walls, jambs and props.
+        zc = _ground_z(world, g.nodes[n][0], g.nodes[n][1], g.z[n])
+        while radius[n] > 30.0 and not clr.free(g.nodes[n][0], g.nodes[n][1], zc, max(radius[n], width * 0.5) + AGENT_RADIUS * 0.5):
+            radius[n] -= 5.0
 
     shapes = 0
     lane_cm = 0.0
@@ -387,10 +642,13 @@ def _emit(g, profile_kind, world, label_prefix):
         clean.append(pts[-1])
         if _len(_sub(clean[-1][:2], clean[0][:2])) < 30.0:
             continue
+        # Sharp points with a small turn radius: auto-bezier corners bulge out over the street.
         sp = []
         for i, p in enumerate(clean):
             z = _ground_z(world, p[0], p[1], p[2]) + 1.0
-            sp.append(_pt(p[0], p[1], z, T.AUTO_BEZIER))
+            q = _pt(p[0], p[1], z, T.SHARP)
+            q.inner_turn_radius = 40.0
+            sp.append(q)
         _shape(sp, unreal.FZoneShapeType.SPLINE, ref, "%s_Lane%02d" % (label_prefix, idx))
         shapes += 1
         lane_cm += sum(_len(_sub(clean[i + 1][:2], clean[i][:2])) for i in range(len(clean) - 1))
@@ -411,11 +669,34 @@ def _emit(g, profile_kind, world, label_prefix):
             if gap < 1e-3:
                 gap = 2.0 * math.pi
             mid = ang + gap * 0.5
-            r = radius[n] * (1.25 if gap < math.pi else 1.0) + width * 0.25
+            # On the junction's (cleared) circle, not beyond it: the outline must not poke through a wall.
+            r = radius[n] * (1.0 if gap < math.pi else 0.85)
             poly.append(_pt(c[0] + math.cos(mid) * r, c[1] + math.sin(mid) * r, cz, T.SHARP))
         _shape(poly, unreal.FZoneShapeType.POLYGON, ref, "%s_Junction%02d" % (label_prefix, n))
         shapes += 1
     return shapes, lane_cm
+
+
+def check_lanes(world=None):
+    """Audit the level's crowd shapes against the geometry: (spline segments whose centre line comes within
+    15 cm of something, polygon outline edges that cross something). Both should be 0."""
+    world = world or unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
+    clr = _Clearance(world)
+    bad_lane = bad_poly = 0
+    for a in unreal.get_editor_subsystem(unreal.EditorActorSubsystem).get_all_level_actors():
+        if not isinstance(a, unreal.ZoneShape) or not a.actor_has_tag(TAG):
+            continue
+        comp = a.get_component_by_class(unreal.ZoneShapeComponent)
+        P = [(p.position.x, p.position.y, p.position.z - 1.0) for p in comp.get_editor_property("points")]
+        poly = "POLYGON" in str(comp.get_shape_type())
+        segs = list(zip(P, P[1:] + ([P[0]] if poly else [])))
+        for p0, p1 in segs:
+            if not clr.segment_free(p0[:2], p1[:2], p0[2], p1[2], 4.0 if poly else 15.0):
+                if poly:
+                    bad_poly += 1
+                else:
+                    bad_lane += 1
+    return bad_lane, bad_poly
 
 
 def build_crowd(gen, count=None):
@@ -429,7 +710,20 @@ def build_crowd(gen, count=None):
     indoor = str(m.get("sceneKind", "")).lower().startswith("indoor") or all(r.get("name", "").startswith("Room") for r in routes)
     g = _indoor_graph(routes, m.get("features", [])) if indoor else _outdoor_graph(routes)
     world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
-    shapes, lane_cm = _emit(g, "narrow" if indoor else "wide", world, "Crowd")
+    kind = "narrow" if indoor else "sidewalk"
+    lane_half = LANE_PROFILES[kind][2] * 0.25        # each lane's centre sits a quarter of the profile off the run
+    cleared = _clear_lanes(g, world, lane_half, indoor)
+    par = list(range(len(g.nodes)))
+
+    def _root(x):
+        while par[x] != x:
+            par[x] = par[par[x]]
+            x = par[x]
+        return x
+    for a, b, _p in g.edges.values():
+        par[_root(a)] = _root(b)
+    cleared["components"] = len({_root(n) for n in range(len(g.nodes)) if g.degree(n) > 0})
+    shapes, lane_cm = _emit(g, kind, world, "Crowd")
     unreal.RammsCrowdZoneGraphLibrary.rebuild_zone_graph()
     for a in unreal.get_editor_subsystem(unreal.EditorActorSubsystem).get_all_level_actors():
         if isinstance(a, unreal.ZoneGraphData):
@@ -458,7 +752,8 @@ def build_crowd(gen, count=None):
         spawner.apply_crowd_configuration()
     elif not profile:
         H.warn("crowd: %s not found; lanes laid, no spawner" % PROFILE_ASSET)
-    res = {"shapes": shapes, "nodes": len(g.nodes), "edges": len(g.edges), "lane_m": round(lane_cm / 100.0),
+    bad_lane, bad_poly = check_lanes(world)
+    res = {"cleared": cleared, "blocked_lane_segments": bad_lane, "blocked_junction_edges": bad_poly, "shapes": shapes, "nodes": len(g.nodes), "edges": len(g.edges), "lane_m": round(lane_cm / 100.0),
            "count": count if spawner else 0, "removed": removed, "indoor": indoor}
     H.log("crowd: %s" % res)
     return res

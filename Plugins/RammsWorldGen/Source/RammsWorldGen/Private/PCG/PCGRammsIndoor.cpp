@@ -316,6 +316,12 @@ bool FPCGRammsIndoorLayoutElement::ExecuteInternal(FPCGContext* Context) const
 			Rooms[W.RoomB].Keepouts.Add(Strip(FMath::Max(S->PreferredClearWidth, 120.0), -IntoA, 15.0));
 		}
 	};
+	// Doors swing into the room, never into a corridor (two leaves standing open opposite each other would
+	// close it): room A, the side the leaf opens to, is the non-corridor room.
+	for (FWallSeg& W : Walls)
+	{
+		if (W.RoomB >= 0 && Rooms[W.RoomA].bCorridor && !Rooms[W.RoomB].bCorridor) { Swap(W.RoomA, W.RoomB); }
+	}
 	for (const FWallSeg& W : Walls) { if (W.bHasDoor) { AddDoorKeepouts(W); } }
 	// Exterior walls, one of them with the entrance: into the corridor when there is one, else the largest room.
 	{

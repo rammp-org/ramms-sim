@@ -463,9 +463,20 @@ After a level is generated, `ramms_worldgen.crowd.build_crowd` (run by
   furniture) are linked through the doorways, and a shop's aisles become a
   ladder tied to the door routes.
 
+Agents follow lane centre lines and Mass avoidance only steers around other
+agents, so the lanes themselves are kept clear of geometry: every run is
+tested with a person-sized capsule against everything that blocks (walls,
+furniture, shelving, props, cars); doorway crossings are straightened
+through the middle of the opening, run ends are nudged off furniture, and a
+run that hits something is rerouted around it on a 25 cm grid (A*, then
+string-pulled), or dropped when there is no way through. Junctions shrink to
+fit the free space around them. `crowd.check_lanes()` audits a level
+(verify.py fails a level whose lanes touch geometry).
+
 Branch nodes become polygon `ZoneShape` junctions, the runs between them
-spline `ZoneShape`s on the `PedestrianLanes` profile (2 x 150 cm) outdoors or
-`PedestrianLanesNarrow` (2 x 75 cm, `Config/DefaultPlugins.ini`) indoors.
+spline `ZoneShape`s on the `PedestrianLanesSidewalk` profile (2 x 60 cm)
+outdoors or `PedestrianLanesNarrow` (2 x 25 cm, one person each way through
+an 80 cm door) indoors (`Config/DefaultPlugins.ini`).
 The ZoneGraph is rebuilt and a `RammsCrowdSpawner` in ZoneGraphLanes mode is
 placed with `/Game/NPCs/DA_CrowdAgentProfile` (about one pedestrian per 9 m
 of lane outdoors, per 8 m indoors). Everything sits in the `WorldGen/Crowd`

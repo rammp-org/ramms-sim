@@ -295,6 +295,8 @@ def _finish_level(name):
         err("level %s: crowd lanes failed: %s" % (name, crowd["error"]))
     elif isinstance(crowd, dict) and not crowd.get("shapes"):
         err("level %s: no crowd lanes (%s)" % (name, crowd))
+    elif isinstance(crowd, dict) and (crowd.get("blocked_lane_segments") or crowd.get("blocked_junction_edges")):
+        err("level %s: crowd lanes run into geometry: %s lane segments, %s junction edges" % (name, crowd.get("blocked_lane_segments"), crowd.get("blocked_junction_edges")))
     res = {
         "crowd": crowd,
         "map": unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world().get_path_name(),
