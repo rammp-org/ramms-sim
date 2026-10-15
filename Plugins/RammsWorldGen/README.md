@@ -256,8 +256,10 @@ Kinds and the issues they can carry:
 | `Hazard` | AFrame, Scooter, BinOut, Cafe, Barrier, Upheaval, or a furniture slot indoors | ClearWidthBelowMinimum, VerticalChangeTooHigh, ObstacleInRoute |
 | `Building` / `House` | house footprint | — |
 | `Prop`, `Furniture`, `Decor`, `Tree`, `Shrub` | palette slot | ClearWidthBelowMinimum when a prop spills out of the furniture zone |
-| `Surface` | Cobbled | SurfaceUneven |
-| `Room` | Living, Bedroom, Office, Meeting, Kitchen, Dining, Bathroom, Corridor, Shop, Storage | — |
+| `Surface` | Cobbled, GravelTrail / Gravel, Dirt, Mud (park patches) | SurfaceUneven |
+| `Terrain`, `Water` | Mound (measure = steepest grade) / Pond | — |
+| `Room` | Living, Bedroom, Office, Meeting, Kitchen, Dining, Bathroom, Restroom, Corridor, Shop, Storage | — |
+| `Stall` | Standard, Accessible (restroom toilet stalls; measure = stall width, threshold 152.4 for the accessible one) | — |
 | `Aisle` | Standard, Narrow (shop floors; measure = aisle width) | ClearWidthBelowMinimum |
 | `Path`, `Driveway`, `Vehicle`, `CarPark` | FrontWalk / Concrete / Parked, Driveway, CarPark / SingleRow, DoubleRow, MultiRow | — |
 | `CheckoutLane` | Standard, Narrow (store checkouts; measure = lane width) | ClearWidthBelowMinimum |
@@ -366,6 +368,16 @@ runs it at 0.2, the office at 0.1.
 - **Yards**: foundation shrubs along the house front, flowers by the walk, a
   mailbox at the street end of the walk or driveway, a garage driveway, back
   yard fences, grass clumps (`GrassDensity`) over lawns, parks and strips.
+- **Houses**: whole houses are the captured `ResidentialHouses` blueprints
+  (porch, stairs and front door included); the backdrop-only meshes are not
+  used, so every house has a door and steps the front walk meets.
+- **Lawns**: grass clumps plus a denser layer of short tufts (`LawnTuft`) in
+  front yards and parks.
+- **Parks**: besides the loop and cross paths, each quarter of a park gets
+  grassy mounds (`Mound` pieces, smooth cosine bumps), boulders (`Rock`),
+  a patch of gravel, dirt or mud, and one quarter a pond (water in a mud
+  ring, edged with stones); a gravel trail cuts across one quarter and the
+  crossing is a cobbled plaza. Trees and grass follow the mounds' height.
 - **Wear**: `Decal` pieces project cracks, potholes, patches, manholes and
   puddles onto roads and cracks / stains onto sidewalks (`DecalDensity`;
   palette `Decal.*` material sets, deferred-decal materials only).
@@ -395,14 +407,25 @@ Rooms are furnished the way a person would arrange them, in groups: a sofa
 with its coffee table, armchair and a TV on a stand opposite; a bed with
 night tables and lamps; desks in a row along the long wall with a chair at
 each; a table in the middle with chairs on every side; a counter of
-cupboards in a kitchen; a toilet and bathtub in the bathroom; a picture on
-the wall. `OfficeFraction` turns a home (living rooms, bedrooms) into a
+cupboards in a kitchen; a toilet, bathtub and vanity with a mirror in the
+bathroom; a picture on the wall. Offices are dense: desks along both long
+walls and, in a deep room, a back-to-back bench down the middle, each desk
+with a chair, a monitor and a keyboard.
+
+Bathrooms are kept to a real size: a home bathroom longer than ~3.2 m is cut
+into two bathrooms (a closet takes a third piece). In a workplace or shop the
+bathroom is a restroom: a run of 90 cm toilet stalls (partitions on legs, an
+open door each) with a 155 cm accessible stall at the end away from the
+entrance, and sinks, a mirror and a hand dryer on the opposite wall; a very
+long one becomes two restrooms. `OfficeFraction` turns a home (living rooms, bedrooms) into a
 workplace (offices, meeting rooms, a break room).
 
 Every piece is a footprint box in its mesh's *facing frame* (the palette
 builder detects the front of seating, beds and toilets from where their
 upper vertices gather, and stores the footprint and pivot offset in that
-frame). A piece is placed only if its box lies inside the room's inner
+frame; `FACING_FIX` in `palettes.py` corrects the meshes the heuristics get
+wrong, checked with `Scripts/worldgen/lineup.py`, which lines a slot's meshes
+up facing a camera). A piece is placed only if its box lies inside the room's inner
 rectangle, overlaps nothing placed before it, and stays out of every door's
 swing and approach strip, so furniture never penetrates a wall, a door or
 another piece. The verification pass checks that against the spawned
@@ -440,7 +463,11 @@ chair, cart or plant is deliberately pulled into an aisle.
   the `House` slot or a gable roof piece. Street parking (`ParkingDensity`)
   puts cars along the curbs. Roads carry a dashed centre line, edge lines and stop
   lines in solid marking materials.
-- Generated geometry is Unreal collision. The Chaos backend drives on it
+- Everything generated collides (block-all): the spawners' instances, and
+  every palette mesh is given usable collision when the palette is built
+  (its own simple shapes, else its triangles; a box around the trunk for
+  trees; none for grass and flowers). The palette builder edits and saves
+  those pack meshes. Generated geometry is Unreal collision. The Chaos backend drives on it
   directly; the MuJoCo / Newton backends only know what URLab has imported, so
   a generated world is not yet visible to them.
 - Pieces are one actor each (walls, ramps, doors, trees). A dense downtown

@@ -45,6 +45,8 @@ enum class ERammsProcPieceKind : uint8
 	Stairs    UMETA(ToolTip = "Alias of Step with StepCount >= 3; kept for manifest readability."),
 	Roof      UMETA(ToolTip = "Gable roof: SizeX span across the ridge, SizeY ridge length, SizeZ rise; sits with its eaves at the origin."),
 	Decal     UMETA(ToolTip = "Projected decal (crack, pothole, stain): SizeX length, SizeY width, SizeZ projection depth; MaterialPath is a deferred-decal material; centred on the origin, projecting down."),
+	Mound     UMETA(ToolTip = "Grassy mound (or, with a negative Rise, a hollow): SizeX/SizeY plan diameters of an elliptical cosine bump Rise high, centred on the origin; its rim sits 2 cm under the ground."),
+	Patch     UMETA(ToolTip = "Flat elliptical ground patch (pond water, mud, gravel): SizeX/SizeY diameters, top SizeZ above the origin."),
 };
 
 /** Why a generated feature is tagged non-compliant. Carried into the manifest. */

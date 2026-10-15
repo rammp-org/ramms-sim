@@ -42,15 +42,18 @@ MESH_SLOTS = {
     "Stairs": ["stairs_street"],
     "RoofUnit": ["SM_AC_Box", "SM_AC_Exaust", "SM_ac_01", "SM_ac_02"],
     # foliage
-    # leafy trees only (the AmericanCityPacks SM_Tree1-3 are bare winter trees)
-    "Tree": ["SM_BeechTree02", "SM_BeechTree03", "SM_MapleTree_Pivot", "SM_TreeLarge_Static", "SM_Alder_Desktop_Forest_modded_01_rep",
+    # leafy trees only (the AmericanCityPacks SM_Tree1-3 are bare winter trees; SM_MapleTree_Pivot is left out:
+    # its pivot-painter wind lifts the whole tree up and down when instanced)
+    "Tree": ["SM_BeechTree02", "SM_BeechTree03", "SM_TreeLarge_Static", "SM_Alder_Desktop_Forest_modded_01_rep",
              "SM_Sycamore_American_Sapling_SF_rep", "SM_SF_Broadleaf_Desktop_Field_rep"],
     # big old street trees for canopy streets (the 300k-triangle oaks only when they are Nanite meshes)
-    "TreeLarge": ["SM_SF_Broadleaf_Desktop_Field_rep", "SM_JacarandaTree", "SM_TreeLarge_Static", "SM_BeechTree03", "SM_MapleTree_Pivot",
+    "TreeLarge": ["SM_SF_Broadleaf_Desktop_Field_rep", "SM_JacarandaTree", "SM_TreeLarge_Static", "SM_BeechTree03",
                   "SM_Tree_Q_Rubra_Adult_vertcol_02", "SM_tree_Rubra_old_tall_01"],
     # lawn cover: low clumps (spawned at 60-130% scale), a few weeds
     "GrassClump": ["SM_Grass_Clump_01_1m", "SM_GrassClump02", "SM_grass_bermuda_01_main", "SM_grass_bermuda_02_main", "SM_Plant_Grass_Small",
                    "SM_grass_bermuda_01_weeds"],
+    # a dense, short second layer that hides the lawn texture's flatness (spawned at 45-90% scale)
+    "LawnTuft": ["SM_grass_bermuda_01_main", "SM_grass_bermuda_02_main", "SM_Grass_Clump_01_1m", "SM_GrassClump02"],
     "Flowers": ["SM_Flowers01", "SM_Flowers02", "SM_Flowers03", "SM_Flower_Red_01", "SM_Flower_Red_02", "SM_Flower_Yellow_01", "SM_grass_bermuda_03_flower",
                 "SM_Plant_FlowersRedBush"],
     "FoundationShrub": ["SM_shrub_03_a", "SM_shrub_03_b", "SM_shrub_03_c", "SM_shrub_03_d", "SM_Plant_Bush_A", "SM_Plant_Bush_B", "SM_Shrub01",
@@ -64,7 +67,9 @@ MESH_SLOTS = {
     "Shrub": ["SM_Shrub01", "SM_Shrub01_b", "SM_Plant_Bush_A", "SM_Plant_Bush_B", "SM_Plant_Treebush", "SM_Hedge_Sphere", "SM_Plant_FlowersRedBush", "SM_Plant_FlowersWhiteBush"],
     "Hedge": ["SM_Hedge_4m_Half", "SM_Hedge02_4m_Half", "SM_Hedge_4m"],
     # buildings
-    "House": ["SM_Background_House_A", "SM_Background_House_B"],
+    # whole houses come from the captured blueprints (COMPOSITE_SLOTS); the SuburbNeighborhood
+    # SM_Background_House_A/B are backdrop shells with no door or steps, so they are left out
+    "House": [],
     # hazards: things that end up in the access route
     "Hazard.Upheaval": ["adoquines_levantados_alcorque"],
     "Hazard.BinOut": ["SM_TrashCan_WithTrash_01", "SM_TrashCan_WithTrash_02", "SM_BinOpenedWithTrash", "SM_Trashbag", "SM_Trashbin01"],
@@ -86,7 +91,8 @@ MESH_SLOTS = {
     "Furniture.Bed": ["SM_Bed_queen", "SM_Bed_small", "SM_Bed_king", "SM_Bed_single_person", "SM_Modern_Bed_1", "SM_Modern_Bed_2"],
     "Furniture.BedTable": ["SM_Sidetable_small", "SM_Nightstand_A", "SM_Nightstand_B", "SM_Bed_Table"],
     "Furniture.Cupboard": ["SM_Classic_Cupboard", "SM_Modern_Cupboard", "SM_Dresser_C", "SM_Dresser_large_A", "SM_Shelf_standing_A", "SM_Commode", "SM_Classic_Commode", "SM_Garage_shelf"],
-    "Furniture.Bookshelf": ["SM_Book_set_bookshelf_A", "SM_Book_set_bookshelf_B", "SM_Bookshelf", "SM_BookShelf_01a"],
+    # (the Book_set_bookshelf meshes are just the books, with no case: they floated)
+    "Furniture.Bookshelf": ["SM_Bookshelf", "SM_BookShelf_01a"],
     "Furniture.Fireplace": ["SM_Fireplace_Single"],
     "Furniture.TVStand": ["SM_Sidetable_dark_large", "SM_Tv_stand", "SM_Commode", "SM_Classic_Commode_2"],
     "Furniture.TV": ["SM_TV_standing", "SM_TV", "SM_TVFlat_01a"],
@@ -98,6 +104,15 @@ MESH_SLOTS = {
     "Furniture.FloorLamp": ["SM_Lamp_standing"],
     "Furniture.Toilet": ["SM_Toilet"],
     "Furniture.Bathtub": ["SM_To_bathtub", "SM_Bathtub"],
+    "Furniture.Sink": ["SM_Sink"],
+    "Furniture.RestroomSink": ["SM_RestroomSinks"],
+    "Furniture.Mirror": ["SM_Mirror", "SM_Mirror1"],
+    "Furniture.HandDryer": ["SM_HandDryer"],
+    "Furniture.Monitor": ["SM_Monitor1", "SM_Monitor2"],
+    "Furniture.Keyboard": ["SM_Computer_02a_Keyboard", "SM_Keyboard"],
+    # park dressing: boulders and loose stones
+    "Rock": ["SM_Boulder01", "SM_Boulder02", "SM_Boulder03", "SM_Stone_01", "SM_Stone_02", "SM_Stone_A", "SM_Stone_B", "SM_Stone_C",
+             "SM_Ground_Moss_Stones"],
     "Furniture.Appliance": ["SM_Washingmachine", "SM_Refrigerator_04a", "SM_Fridge_01a"],
     "Furniture.KitchenLow": ["SM_Kitcabinet_low_1x_A", "SM_Kitcabinet_low_1x_B", "SM_Kitcabinet_low_1halfx_A"],
     "Furniture.KitchenSink": ["SM_Kitcabinet_low_1halfx_sink"],
@@ -152,7 +167,7 @@ SLOT_HEIGHTS = {
     "Hazard.Cone": 75, "Hazard.Dumpster": 150, "Car": 150,
 }
 # Slots whose meshes keep their native size whatever the height (poles, trees, buildings, hedges).
-NO_NORMALISE = {"TreeLarge", "GrassClump", "Flowers", "FoundationShrub", "Door.Interior", "Door.Exterior", "Store.ProduceTable", "Store.Crate",
+NO_NORMALISE = {"TreeLarge", "GrassClump", "LawnTuft", "Flowers", "FoundationShrub", "Door.Interior", "Door.Exterior", "Store.ProduceTable", "Store.Crate",
                 "Store.Produce", "Store.DeliCase", "Store.DeliItem", "Store.Sign", "Store.ExitSign", "Store.Basket", "Store.Clutter",
                 "Tree", "TreeSmall", "Shrub", "Hedge", "House", "Car", "Store.Shelf", "Store.Fridge", "Store.ChestFreezer",
                 "Store.Counter", "Store.Register", "Store.Cart", "Store.Display", "Store.Product", "StreetLight", "UtilityPole", "StreetSign", "BusStop",
@@ -208,6 +223,12 @@ MATERIAL_SLOTS = {
     "Mat.Wall.Interior": ["MI_qj2luvs0", "MI_umridamn"],
     "Mat.Ceiling": ["MI_ufgnagwew", "MI_ugtmehro"],
     "Mat.Door": ["MI_vlznbajfw", "MI_ugcwcevaw"],
+    # park ground: water surface for ponds, and paths / patches of gravel, dirt and mud
+    "Mat.Water": ["MI_Water", "MI_PoolWater2_Inst", "MI_PoolWater2"],
+    "Mat.Gravel": ["M_RammsGravel", "M_RammsPath"],
+    "Mat.Dirt": ["M_RammsDirt", "M_RammsPath"],
+    "Mat.Mud": ["M_RammsMud", "M_RammsDirt"],
+    "Mat.Partition": ["M_RammsTrimWhite"],
 }
 
 # slot -> material set (FRammsPaletteSlot::Materials): a node picks one per room / per decal. Names are
@@ -342,6 +363,7 @@ FACADE_MATERIAL_SETS = {
 
 def _module_entry(mesh):
     """Palette entry for a facade module: native pivot (start of run, base on the ground), no facing fix."""
+    _ensure_collision(mesh, "Facade")
     bounds = mesh.get_bounds()
     ext = bounds.box_extent
     e = unreal.RammsPaletteMesh()
@@ -435,7 +457,8 @@ def _vertex_positions(mesh):
 
 # slot -> which local axis the mesh's long side should end up on: "x" = along the facing direction
 # (vehicles), "y" = across it (shelving, counters, freezers: their front is a long face).
-LONG_AXIS_SLOTS = {"Car": "x", "Hedge": "y", "Fence": "y", "Store.Shelf": "y", "Store.Fridge": "y", "Store.ChestFreezer": "y", "Store.Counter": "y",
+LONG_AXIS_SLOTS = {"Furniture.Mirror": "y", "Furniture.HandDryer": "y", "Furniture.RestroomSink": "y", "Furniture.Monitor": "y", "Furniture.Keyboard": "y",
+                   "Car": "x", "Hedge": "y", "Fence": "y", "Store.Shelf": "y", "Store.Fridge": "y", "Store.ChestFreezer": "y", "Store.Counter": "y",
                    "Door.Interior": "y", "Door.Exterior": "y", "Store.DeliCase": "y", "Store.ProduceTable": "y", "Store.Sign": "y", "Store.ExitSign": "y"}
 
 
@@ -523,8 +546,62 @@ def _shelf_heights(mesh, scale):
 
 
 HEAVY_OK_IF_NANITE = {"TreeLarge"}
+NO_COLLISION_SLOTS = {"GrassClump", "Flowers", "LawnTuft"}  # ground cover: wheels and arms pass through it
+_COLLISION_DONE = set()
+
+
+def _ensure_collision(mesh, slot=""):
+    """Make a palette mesh solid. The PCG spawners use BlockAll, but a mesh with no simple collision has no
+    physics shape at all (pack props often ship that way): trees get a box around the trunk (so canopies
+    do not block), everything else collides against its own triangles (complex as simple). Edits the mesh
+    asset once per build; ground cover is left alone."""
+    if mesh is None or slot in NO_COLLISION_SLOTS:
+        return
+    path = mesh.get_path_name()
+    if path in _COLLISION_DONE:
+        return
+    _COLLISION_DONE.add(path)
+    try:
+        if unreal.EditorStaticMeshLibrary.get_simple_collision_count(mesh) > 0:
+            return
+        bs = mesh.get_editor_property("body_setup")
+        if bs is None:
+            return
+        if slot in TREE_SLOTS:
+            t = _trunk_xy(mesh)
+            if t is None:
+                return
+            b = mesh.get_bounds()
+            zmin = b.origin.z - b.box_extent.z
+            h = min(400.0, b.box_extent.z * 2.0 * 0.45)
+            ag = bs.get_editor_property("agg_geom")
+            ag.import_text("(BoxElems=((Center=(X=%.1f,Y=%.1f,Z=%.1f),Rotation=(Pitch=0,Yaw=0,Roll=0),X=50.0,Y=50.0,Z=%.1f)))" % (t[0], t[1], zmin + h * 0.5, h))
+            bs.set_editor_property("agg_geom", ag)
+        else:
+            if str(bs.get_editor_property("collision_trace_flag")).find("COMPLEX_AS_SIMPLE") >= 0:
+                return
+            bs.set_editor_property("collision_trace_flag", unreal.CollisionTraceFlag.CTF_USE_COMPLEX_AS_SIMPLE)
+        try:
+            mesh.modify()
+        except Exception:  # noqa: BLE001
+            pass
+        unreal.EditorAssetLibrary.save_loaded_asset(mesh, False)
+    except Exception as exc:  # noqa: BLE001
+        H.warn("collision for %s: %s" % (mesh.get_name(), exc))
 TREE_SLOTS = {"Tree", "TreeSmall", "TreeLarge"}
 DOOR_SLOTS = {"Door.Interior", "Door.Exterior"}
+
+# Per-mesh corrections (degrees, added to the measured facing yaw) where the heuristics pick a side or the
+# back. Checked with Scripts/worldgen/lineup.py: every mesh's front should face the camera at +X.
+FACING_FIX = {
+    "SM_TV": -90.0, "SM_TV_standing": 180.0,
+    "SM_Refrigerator_04a": 180.0, "SM_Refridgerator_05a": 180.0, "SM_Fridge_01a": -90.0,
+    "SM_Classic_Leather_Armchair": 180.0, "SM_Classic_Leather_Sofa": 180.0, "SM_Classic_Leather_sofa_2": 180.0, "SM_Sofa_02a": -90.0,
+    "SM_Classic_Cupboard": -90.0, "SM_Modern_Cupboard": 90.0, "SM_Dresser_C": 180.0, "SM_Dresser_large_A": 180.0,
+    "SM_VendingMachine_01a": 180.0,
+    "SM_Freezer3": -90.0, "SM_Freezer4": -90.0,
+    "SM_Mailbox": 180.0,
+}
 
 
 def _nanite(mesh):
@@ -581,10 +658,13 @@ def _handle_side(mesh, yaw):
 
 def _mesh_entry(mesh, slot=""):
     import math
+    _ensure_collision(mesh, slot)
     bounds = mesh.get_bounds()
     ext = bounds.box_extent
     origin = bounds.origin
     yaw = _facing_yaw(mesh, bounds, slot)
+    if mesh.get_name() in FACING_FIX:
+        yaw = (yaw + FACING_FIX[mesh.get_name()] + 180.0) % 360.0 - 180.0
     e = unreal.RammsPaletteMesh()
     e.set_editor_property("mesh", mesh)
     e.set_editor_property("weight", 1.0)
@@ -675,6 +755,7 @@ def _composite_entry(cls_path, slot=""):
                 mesh = smc.get_editor_property("static_mesh")
                 loc = smc.get_world_location()
                 rel = unreal.Transform(unreal.Vector(loc.x - base.x, loc.y - base.y, loc.z - base.z), smc.get_world_rotation(), smc.get_world_scale())
+                _ensure_collision(mesh, "House")
                 part = unreal.RammsPalettePart()
                 part.set_editor_property("mesh", mesh)
                 part.set_editor_property("relative_transform", rel)

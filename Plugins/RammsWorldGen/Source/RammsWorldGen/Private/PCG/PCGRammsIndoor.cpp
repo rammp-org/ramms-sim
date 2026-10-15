@@ -191,6 +191,36 @@ bool FPCGRammsIndoorLayoutElement::ExecuteInternal(FPCGContext* Context) const
 		for (const FRoom& R : Rooms) { if (!R.bCorridor && R.Rect.GetArea() < SmallestArea) { SmallestArea = R.Rect.GetArea(); Smallest = R.Id; } }
 		for (FRoom& R : Rooms) { R.Kind = R.bCorridor ? FName(TEXT("Corridor")) : KindForRoom(Rng, R.Rect.GetArea(), R.Id == Smallest && Rooms.Num() > 2, FMath::Clamp(S->OfficeFraction, 0.0, 1.0), FMath::Clamp(S->RetailFraction, 0.0, 1.0)); }
 	}
+	// Bathrooms at a real size. A home bathroom longer than ~3.2 m is cut into two bathrooms (the third piece
+	// of a very long one becomes a closet); in a workplace or a shop the bathroom is a restroom with toilet
+	// stalls, and one longer than ~9 m is cut into two restrooms.
+	{
+		const bool bCommercial = S->OfficeFraction > 0.3 || S->RetailFraction > 0.0;
+		const double MaxLong = bCommercial ? 900.0 : 320.0, MinPiece = bCommercial ? 380.0 : 170.0;
+		const int32 N0 = Rooms.Num();
+		for (int32 i = 0; i < N0; ++i)
+		{
+			if (Rooms[i].Kind != FName(TEXT("Bathroom"))) { continue; }
+			const FName PieceKind = bCommercial ? FName(TEXT("Restroom")) : FName(TEXT("Bathroom"));
+			Rooms[i].Kind = PieceKind;
+			const FBox2D Rc = Rooms[i].Rect;
+			const FVector2D Sz = Rc.GetSize();
+			const bool bX = Sz.X >= Sz.Y;
+			const double Long = bX ? Sz.X : Sz.Y;
+			const int32 N = FMath::Clamp(FMath::Min(FMath::CeilToInt(Long / MaxLong), FMath::FloorToInt(Long / MinPiece)), 1, 3);
+			if (N < 2) { continue; }
+			const double Step = Long / N;
+			for (int32 k = 0; k < N; ++k)
+			{
+				FBox2D Pc = Rc;
+				if (bX) { Pc.Min.X = Rc.Min.X + Step * k; Pc.Max.X = Rc.Min.X + Step * (k + 1); }
+				else { Pc.Min.Y = Rc.Min.Y + Step * k; Pc.Max.Y = Rc.Min.Y + Step * (k + 1); }
+				if (k == 0) { Rooms[i].Rect = Pc; continue; }
+				const int32 j = AddRoom(Pc, false);
+				Rooms[j].Kind = (!bCommercial && k == 2) ? FName(TEXT("Storage")) : PieceKind;
+			}
+		}
+	}
 
 	// --- walls between rooms, and doors -------------------------------------------------------------
 	TArray<FWallSeg> Walls;
@@ -338,6 +368,7 @@ bool FPCGRammsIndoorLayoutElement::ExecuteInternal(FPCGContext* Context) const
 	const FString MatTrimIn = Palette && Palette->HasSlot(FName(TEXT("Mat.Trim.Interior"))) ? RammsPCG::Mat(Palette, FName(TEXT("Mat.Trim.Interior"))) : MatTrim;
 	const FString MatGlass = RammsPCG::Mat(Palette, RammsPaletteSlots::MatGlass);
 	const FString MatConcreteFloor = RammsPCG::Mat(Palette, RammsPaletteSlots::MatConcrete);
+	const FString MatPartition = Palette && Palette->HasSlot(RammsPaletteSlots::MatPartition) ? RammsPCG::Mat(Palette, RammsPaletteSlots::MatPartition) : MatTrimIn;
 	auto PickMat = [&](FName Slot, const FString& Fallback) -> FString
 	{
 		const FString M = Palette ? Palette->PickMaterialPath(Slot, Rng) : FString();
@@ -348,8 +379,9 @@ bool FPCGRammsIndoorLayoutElement::ExecuteInternal(FPCGContext* Context) const
 		const FName K = R.Kind;
 		const bool bHome = K == FName(TEXT("Living")) || K == FName(TEXT("Bedroom")) || K == FName(TEXT("Dining"));
 		R.WallMat = (bHome && Rng.FRand() < 0.3) ? PickMat(RammsPaletteSlots::MatWallPaper, MatWall) : PickMat(RammsPaletteSlots::MatWallPaint, MatWall);
-		if (K == FName(TEXT("Bathroom")) || (K == FName(TEXT("Kitchen")) && Rng.FRand() < 0.5)) { R.WallMatLow = PickMat(RammsPaletteSlots::MatWallTile, R.WallMat); }
-		if (K == FName(TEXT("Bathroom")) || K == FName(TEXT("Kitchen"))) { R.FloorMat = PickMat(RammsPaletteSlots::MatFloorTile, MatTile); }
+		const bool bWet = K == FName(TEXT("Bathroom")) || K == FName(TEXT("Restroom"));
+		if (bWet || (K == FName(TEXT("Kitchen")) && Rng.FRand() < 0.5)) { R.WallMatLow = PickMat(RammsPaletteSlots::MatWallTile, R.WallMat); }
+		if (bWet || K == FName(TEXT("Kitchen"))) { R.FloorMat = PickMat(RammsPaletteSlots::MatFloorTile, MatTile); }
 		else if (K == FName(TEXT("Shop"))) { R.FloorMat = PickMat(Rng.FRand() < 0.6 ? RammsPaletteSlots::MatFloorVinyl : RammsPaletteSlots::MatFloorTile, MatTile); }
 		else if (K == FName(TEXT("Storage"))) { R.FloorMat = MatConcreteFloor; }
 		else if (K == FName(TEXT("Bedroom"))) { R.FloorMat = Rng.FRand() < 0.55 ? PickMat(RammsPaletteSlots::MatFloorCarpet, MatCarpet) : PickMat(RammsPaletteSlots::MatFloorWood, MatWood); }
@@ -371,7 +403,7 @@ bool FPCGRammsIndoorLayoutElement::ExecuteInternal(FPCGContext* Context) const
 			if (!bTouch) { continue; }
 			const double Ra = FMath::Max(W.bAlongX ? R.Rect.Min.X : R.Rect.Min.Y, W.A), Rb = FMath::Min(W.bAlongX ? R.Rect.Max.X : R.Rect.Max.Y, W.B);
 			const double Len = Rb - Ra;
-			const bool bBath = R.Kind == FName(TEXT("Bathroom"));
+			const bool bBath = R.Kind == FName(TEXT("Bathroom")) || R.Kind == FName(TEXT("Restroom"));
 			const bool bShop = R.Kind == FName(TEXT("Shop"));
 			const double Ww = bBath ? 60.0 : (bShop ? 180.0 : RammsPCG::RandRange(Rng, 100.0, 140.0));
 			const double Sill = bBath ? 140.0 : (bShop ? 60.0 : 90.0), Head = FMath::Min(210.0, H - 25.0);
@@ -430,7 +462,8 @@ bool FPCGRammsIndoorLayoutElement::ExecuteInternal(FPCGContext* Context) const
 				// Facing-frame +Y = (-sin yaw, cos yaw) must point along V.
 				double LeafYaw = FMath::RadiansToDegrees(FMath::Atan2(-V.X, V.Y));
 				if (Leaf.HandleSide < 0.0) { LeafYaw += 180.0; } // handle on the free edge, away from the hinge
-				const FVector Centre = Hinge + U * (Thick * 0.5 + 1.0) + V * (T * 0.5 + 2.5 + LeafW * 0.5) + FVector(0, 0, Thresh);
+				// Thick is the bounds depth, handles included; the leaf panel itself is ~4-5 cm, so sit its face on the jamb.
+				const FVector Centre = Hinge + U * (FMath::Min(Thick, 5.0) * 0.5 + 1.0) + V * (T * 0.5 + 2.5 + LeafW * 0.5) + FVector(0, 0, Thresh);
 				const FRotator YawRot(0.0, LeafYaw, 0.0);
 				const FRotator Rot = (YawRot.Quaternion() * Leaf.RotationOffset.Quaternion()).Rotator();
 				const bool bSwap = FMath::Abs(FMath::Abs(FMath::Fmod(Leaf.RotationOffset.Yaw, 180.0)) - 90.0) < 1.0;
@@ -770,6 +803,19 @@ bool FPCGRammsIndoorLayoutElement::ExecuteInternal(FPCGContext* Context) const
 			}
 		};
 		auto Picture = [&]() { WallItem(RammsPaletteSlots::FurniturePicture, 150.0); };
+		// A mirror on the wall above a sink (no floor footprint).
+		auto MirrorOver = [&](const FItem& Sink)
+		{
+			FRammsPaletteMesh M; if (!Pick(RammsPaletteSlots::FurnitureMirror, M)) { return; }
+			double fx, fy; Dims(M, fx, fy);
+			double sx, sy; Dims(Sink.M, sx, sy);
+			if (fy > sy + 40.0) { return; }
+			// The wall is behind the sink: its facing points into the room.
+			const FVector2D Back = -Facing(Sink.Yaw) * (sx * 0.5 - fx * 0.5 - 1.0);
+			FItem It; It.Slot = RammsPaletteSlots::FurnitureMirror; It.M = M; It.P = Sink.P + Back; It.Yaw = Sink.Yaw;
+			It.Box = BoxFor(It.P, Sink.Yaw, fx, fy); It.Z = Z0 + FMath::Max(Sink.M.Height + 15.0, 160.0 - M.Height * 0.5);
+			Emit(It, FName(TEXT("Decor")));
+		};
 
 		const double AreaM2 = Sz.X * Sz.Y / 10000.0;
 		const double Density = FMath::Clamp(S->FurnitureDensity, 0.0, 1.0);
@@ -840,19 +886,74 @@ bool FPCGRammsIndoorLayoutElement::ExecuteInternal(FPCGContext* Context) const
 			}
 			else if (R.Kind == FName(TEXT("Office")))
 			{
-				// Desks in a row along the long wall, each with its chair on the room side.
+				// Workstations: a row of desks along each long wall and, in a deep room, a back-to-back bench
+				// down the middle (with a gap at the centre for the walking routes). Every desk gets a chair,
+				// a monitor and a keyboard.
 				FRammsPaletteMesh Dk; double dx = 0, dy = 0;
-				const int32 NumDesks = Pick(RammsPaletteSlots::FurnitureDesk, Dk) ? (Dims(Dk, dx, dy), FMath::Clamp(static_cast<int32>(AreaM2 / 9.0), 1, 4)) : 0;
-				double Lo, Hi; WallRange(LongWall, Lo, Hi);
-				for (int32 i = 0; i < NumDesks; ++i)
+				const bool bDesk = Pick(RammsPaletteSlots::FurnitureDesk, Dk);
+				if (bDesk) { Dims(Dk, dx, dy); }
+				// Something on the desk top, Inset -1 = against the back edge, +1 = the front edge; skipped when it
+				// would not fit or would touch what is already on the desk (Taken).
+				auto OnDesk = [&](FName Slot, const FItem& D, double Inset, FBox2D& Taken)
 				{
-					const double Along = Lo + (Hi - Lo) * (i + 0.5) / NumDesks;
-					FItem D;
-					if (!TryWall(RammsPaletteSlots::FurnitureDesk, LongWall, false, 10.0, D, Along)) { continue; }
+					FRammsPaletteMesh Mo; if (!Pick(Slot, Mo)) { return; }
+					double mx, my; Dims(Mo, mx, my);
+					double ddx, ddy; Dims(D.M, ddx, ddy);
+					if (mx > ddx - 4.0 || my > ddy - 4.0) { return; }
+					FItem It; It.Slot = Slot; It.M = Mo; It.Yaw = D.Yaw;
+					It.P = D.P + Facing(D.Yaw) * Inset * (ddx * 0.5 - mx * 0.5 - 4.0) + Side(D.Yaw) * RammsPCG::RandRange(Rng, -8.0, 8.0);
+					It.Box = BoxFor(It.P, It.Yaw, mx, my); It.Z = Z0 + D.M.Height + 0.5;
+					if (Taken.bIsValid && Taken.ExpandBy(4.0).Intersect(It.Box)) { return; }
+					Taken = Taken.bIsValid ? Taken + It.Box : It.Box;
+					Emit(It, FName(TEXT("Decor")));
+				};
+				auto Workstation = [&](const FItem& D, bool bChair)
+				{
 					Emit(D);
+					FBox2D Taken(ForceInit);
+					OnDesk(RammsPaletteSlots::FurnitureMonitor, D, -1.0, Taken);  // at the back, facing the seat
+					OnDesk(RammsPaletteSlots::FurnitureKeyboard, D, 1.0, Taken);
+					if (!bChair) { return; }
 					double ddx, ddy; Dims(D.M, ddx, ddy);
 					FRammsPaletteMesh Ch; double cx = 0, cy = 0; if (Pick(RammsPaletteSlots::FurnitureOfficeChair, Ch)) { Dims(Ch, cx, cy); }
-					FItem C2; if (TryRel(RammsPaletteSlots::FurnitureOfficeChair, D, Facing(D.Yaw) * (ddx * 0.5 + cx * 0.5 + 12.0), D.Yaw + 180.0, 3.0, C2)) { Emit(C2); }
+					FItem C2; if (TryRel(RammsPaletteSlots::FurnitureOfficeChair, D, Facing(D.Yaw) * (ddx * 0.5 + cx * 0.5 + 10.0), D.Yaw + 180.0, 3.0, C2)) { Emit(C2); }
+				};
+				const double Depth = (LongWall == 0 || LongWall == 2) ? Inner.GetSize().Y : Inner.GetSize().X;
+				const double RowDepth = dx + 85.0; // desk plus the chair zone in front of it
+				for (int32 Side2 = 0; Side2 < 2 && bDesk; ++Side2)
+				{
+					const int32 Wl = Side2 == 0 ? LongWall : (LongWall + 2) % 4;
+					if (Side2 == 1 && Depth < 2.0 * RowDepth + 110.0) { break; }
+					double Lo, Hi; WallRange(Wl, Lo, Hi);
+					const int32 NumDesks = FMath::Clamp(static_cast<int32>((Hi - Lo - 60.0) / (dy + 25.0)), 1, 7);
+					for (int32 i = 0; i < NumDesks; ++i)
+					{
+						const double Along = Lo + 30.0 + (Hi - Lo - 60.0) * (i + 0.5) / NumDesks;
+						FItem D;
+						if (TryWall(RammsPaletteSlots::FurnitureDesk, Wl, false, 6.0, D, Along)) { Workstation(D, true); }
+					}
+				}
+				if (bDesk && Depth >= 2.0 * RowDepth + 2.0 * (dx + 80.0) + 2.0 * 110.0)
+				{
+					// The bench: desk pairs back to back along the room's long axis, chairs on both sides.
+					const bool bAlongX = LongWall == 0 || LongWall == 2;
+					const double Len = bAlongX ? Inner.GetSize().X : Inner.GetSize().Y;
+					const int32 Pairs = FMath::Clamp(static_cast<int32>((Len - 240.0) / (dy + 10.0)), 0, 8);
+					const double Y0 = bAlongX ? Inner.GetCenter().Y : Inner.GetCenter().X;
+					const double A0 = (bAlongX ? Inner.GetCenter().X : Inner.GetCenter().Y) - (Pairs * (dy + 10.0)) * 0.5;
+					for (int32 i = 0; i < Pairs; ++i)
+					{
+						const double Along = A0 + (i + 0.5) * (dy + 10.0);
+						if (FMath::Abs(Along - (bAlongX ? Inner.GetCenter().X : Inner.GetCenter().Y)) < dy * 0.5 + 45.0) { continue; } // centre aisle
+						for (int32 sgn = -1; sgn <= 1; sgn += 2)
+						{
+							// Facing outward from the bench's spine: the seat is on the outside.
+							const double Off = sgn * (dx * 0.5 + 1.0);
+							const FVector2D P = bAlongX ? FVector2D(Along, Y0 + Off) : FVector2D(Y0 + Off, Along);
+							const double Yaw = bAlongX ? (sgn > 0 ? 90.0 : -90.0) : (sgn > 0 ? 0.0 : 180.0);
+							FItem D; if (TryAt(RammsPaletteSlots::FurnitureDesk, Dk, P, Yaw, 1.0, D)) { Workstation(D, true); }
+						}
+					}
 				}
 				// Storage opposite the desks (filing cabinets, shelving), then a printer / water cooler in a corner.
 				if (TryWall(RammsPaletteSlots::FurnitureOfficeStorage, (LongWall + 2) % 4, false, 8.0, B) || TryWall(RammsPaletteSlots::FurnitureCupboard, (LongWall + 2) % 4, false, 8.0, B)) { Emit(B); }
@@ -985,9 +1086,15 @@ bool FPCGRammsIndoorLayoutElement::ExecuteInternal(FPCGContext* Context) const
 				int32 DoorWall = 0; for (int32 w = 1; w < 4; ++w) { if (Dw[w] < Dw[DoorWall]) { DoorWall = w; } }
 				const double DoorAlong = (DoorWall == 0 || DoorWall == 2) ? DoorP.X : DoorP.Y;
 				const bool bWallZ = H >= 290.0; // room for hanging signs
-				auto Hang = [&](FName Slot, const FVector2D& P, double Yaw, double Z)
+				auto Hang = [&](FName Slot, const FVector2D& P, double Yaw, double Z, double MaxW = 0.0)
 				{
 					FRammsPaletteMesh M; if (!Pick(Slot, M)) { return; }
+					// Shrink a sign wider than the space it hangs over (aisle signs must not reach the next aisle's).
+					if (MaxW > 0.0 && M.Footprint.Y > MaxW)
+					{
+						const double K = MaxW / M.Footprint.Y;
+						M.Scale *= K; M.Footprint *= K; M.Height *= K; M.LocationOffset *= K;
+					}
 					FItem It; It.Slot = Slot; It.M = M; It.P = P; It.Yaw = Yaw; It.Box = BoxFor(P, Yaw, M.Footprint.X, M.Footprint.Y); It.Z = Z;
 					Emit(It, FName(TEXT("Decor")));
 				};
@@ -1175,7 +1282,7 @@ bool FPCGRammsIndoorLayoutElement::ExecuteInternal(FPCGContext* Context) const
 									bNarrow ? ERammsComplianceIssue::ClearWidthBelowMinimum : ERammsComplianceIssue::None, AW, S->MinClearWidth);
 								Features.SetInt(f, RammsPCG::RoomId, R.Id);
 								// Aisle number sign hanging over the middle of the aisle.
-								if (bWallZ) { Hang(RammsPaletteSlots::StoreSign, AC, bAlongX ? 0.0 : 90.0, Z0 + 240.0); }
+								if (bWallZ) { Hang(RammsPaletteSlots::StoreSign, AC, bAlongX ? 0.0 : 90.0, Z0 + 240.0, AW + RowDepth - 30.0); }
 							}
 							Cursor += AW;
 							// Row centre line, then the units end to end along it, facing both aisles.
@@ -1223,6 +1330,90 @@ bool FPCGRammsIndoorLayoutElement::ExecuteInternal(FPCGContext* Context) const
 			{
 				if (TryWall(RammsPaletteSlots::FurnitureToilet, -1, false, 10.0, A)) { Emit(A); }
 				if (TryWall(RammsPaletteSlots::FurnitureBathtub, -1, true, 6.0, B)) { Emit(B); }
+				// A vanity with the mirror over it.
+				if (TryWall(RammsPaletteSlots::FurnitureSink, -1, true, 6.0, Cc)) { Emit(Cc); MirrorOver(Cc); }
+			}
+			else if (R.Kind == FName(TEXT("Restroom")))
+			{
+				// Toilet stalls along one long wall: partitions 175 cm high on 15 cm legs, a 60 cm door in each
+				// 90 cm stall, standing open into the room, and one 155 cm accessible stall with a 90 cm door at
+				// the end away from the entrance. Sinks with a mirror and a hand dryer on the opposite wall.
+				const int32 Sw = LongWall;
+				const double Wy = WallYaw(Sw);
+				const FVector2D SF = Facing(Wy);
+				const FVector2D Al = (Sw == 0 || Sw == 2) ? FVector2D(1.0, 0.0) : FVector2D(0.0, 1.0);
+				double Lo, Hi; WallRange(Sw, Lo, Hi);
+				const double SD = 150.0, PT = 3.0, PH = 175.0, PZ = 15.0;
+				// Start from the end farthest from the first door, so the accessible stall is the deepest one.
+				bool bFromHi = false;
+				if (R.DoorCentres.Num() > 0) { const double Dc = FVector2D::DotProduct(R.DoorCentres[0], Al); bFromHi = (Dc - Lo) < (Hi - Dc); }
+				const double RoomDepth = FVector2D::DotProduct(Inner.GetSize(), FVector2D(FMath::Abs(SF.X), FMath::Abs(SF.Y)));
+				int32 NumStalls = 0;
+				if (RoomDepth >= SD + 120.0)
+				{
+					double Cur = bFromHi ? Hi : Lo;
+					TArray<double> Edges;
+					for (int32 k = 0; k < 8; ++k)
+					{
+						const bool bAcc = k == 0;
+						const double SW = bAcc ? 155.0 : 90.0, DW = bAcc ? 90.0 : 60.0;
+						const double A0 = bFromHi ? Cur - SW : Cur, A1 = A0 + SW;
+						if (A0 < Lo - 0.5 || A1 > Hi + 0.5) { break; }
+						const FVector2D Cs = WallPos(Sw, (A0 + A1) * 0.5, SD);
+						const FBox2D Box = BoxFor(Cs, Wy, SD, SW);
+						// Leave the stall out where a door swing or approach needs the floor; the next one may still fit.
+						bool bFree = InsideInner(Box);
+						for (const FBox2D& K : R.Keepouts) { if (K.Intersect(Box)) { bFree = false; } }
+						for (const FBox2D& P : Placed) { if (P.Intersect(Box)) { bFree = false; } }
+						// The door leaf stands open in the room, 90 degrees from the front, hinged on the side away from the toilet run.
+						const FVector2D Front = WallPos(Sw, (A0 + A1) * 0.5, 2.0 * SD);
+						const FBox2D LeafBox = BoxFor(Front + SF * (DW * 0.5) + Al * (DW * 0.5), Wy, DW, 6.0);
+						if (bFree) { for (const FBox2D& K : R.Keepouts) { if (K.Intersect(LeafBox)) { bFree = false; } } }
+						Cur = bFromHi ? A0 : A1;
+						if (!bFree) { continue; }
+						FItem Tl;
+						FRammsPaletteMesh Tm;
+						if (Pick(RammsPaletteSlots::FurnitureToilet, Tm))
+						{
+							double tx, ty; Dims(Tm, tx, ty);
+							if (TryAt(RammsPaletteSlots::FurnitureToilet, Tm, WallPos(Sw, (A0 + A1) * 0.5 + (bAcc ? (bFromHi ? -1.0 : 1.0) * 30.0 : 0.0), tx), Wy, 0.0, Tl)) { Emit(Tl); }
+						}
+						Placed.Add(Box);
+						Placed.Add(LeafBox);
+						// Side partitions (the wall end of the run gets one too: stalls never lean on a finish).
+						for (const double Ae : { A0, A1 })
+						{
+							if (Edges.ContainsByPredicate([Ae](double E) { return FMath::Abs(E - Ae) < 1.0; })) { continue; } // shared with the last stall
+							Edges.Add(Ae);
+							const FVector2D Pc = WallPos(Sw, Ae, SD);
+							RammsPCG::WriteCube(Primitives, FVector(Pc.X, Pc.Y, Z0 + PZ + PH * 0.5), FVector(SD - 2.0, PT, PH), Wy, MatPartition, NextSeed());
+						}
+						// Front: a pilaster each side of the door opening.
+						const double Pw = (SW - DW) * 0.5;
+						for (int32 sgn = -1; sgn <= 1; sgn += 2)
+						{
+							const FVector2D Pc = Front + Al * sgn * (SW * 0.5 - Pw * 0.5);
+							RammsPCG::WriteCube(Primitives, FVector(Pc.X, Pc.Y, Z0 + PZ * 0.5 + PH * 0.5), FVector(PT, Pw, PH + PZ), Wy, MatPartition, NextSeed());
+						}
+						// The open door, hinged on the pilaster at +Al.
+						{
+							const FVector2D Lc = Front + Al * (DW * 0.5 + 1.0) + SF * (DW * 0.5);
+							RammsPCG::WriteCube(Primitives, FVector(Lc.X, Lc.Y, Z0 + PZ + PH * 0.5), FVector(DW - 2.0, PT, PH - 10.0), Wy, MatPartition, NextSeed());
+						}
+						const int32 f = Features.AddBox(FVector(Cs.X, Cs.Y, Z0), Wy, FVector(SD, SW, PH + PZ), NextSeed());
+						RammsPCG::WriteManifest(Features, f, FName(TEXT("Stall")), bAcc ? FName(TEXT("Accessible")) : FName(TEXT("Standard")), true, ERammsComplianceIssue::None, SW, bAcc ? 152.4 : 0.0);
+						Features.SetInt(f, RammsPCG::RoomId, R.Id);
+						++NumStalls;
+					}
+				}
+				if (NumStalls == 0 && TryWall(RammsPaletteSlots::FurnitureToilet, -1, false, 10.0, A)) { Emit(A); }
+				const int32 Opp = (Sw + 2) % 4;
+				if (TryWall(RammsPaletteSlots::FurnitureRestroomSink, Opp, true, 6.0, B) || TryWall(RammsPaletteSlots::FurnitureSink, Opp, true, 6.0, B)) { Emit(B); MirrorOver(B); }
+				{
+					FItem Hd;
+					if (TryWall(RammsPaletteSlots::FurnitureHandDryer, Opp, false, 20.0, Hd)) { Hd.Z = Z0 + 100.0; Emit(Hd, FName(TEXT("Decor"))); }
+				}
+				if (Rng.FRand() < 0.5) { Corner(RammsPaletteSlots::FurniturePlant); }
 			}
 			else
 			{

@@ -62,6 +62,13 @@ SURFACES = {
         bc="/Game/TownShops/Textures/Tileable/Dirt/T_Dirt_BC", n="/Game/TownShops/Textures/Tileable/Dirt/T_Dirt_N",
         rma="/Game/TownShops/Textures/Tileable/Dirt/T_Dirt_RMA", tile=300.0, mask=_MASK),
     # curbs: a finer concrete so the 15 cm face reads as cast concrete, slightly darker than the walk
+    # park ground patches
+    "M_RammsGravel": dict(
+        bc=_CBS + "Tileable/Soil/T_Stones01_BC", n=_CBS + "Tileable/Soil/T_Stones01_N", rma=_CBS + "Tileable/Soil/T_Stones01_RMA",
+        tile=160.0, mask=_MASK, macro=(0.85, 1.1), tint=(0.92, 0.9, 0.86)),
+    "M_RammsMud": dict(
+        bc=_CBS + "Tileable/Soil/T_Soil01_BC", n=_CBS + "Tileable/Soil/T_Soil01_N", rma=_CBS + "Tileable/Soil/T_Soil01_RMA",
+        tile=220.0, mask=_MASK, macro=(0.7, 0.95), tint=(0.55, 0.47, 0.38)),
     "M_RammsCurb": dict(
         bc="/Game/RealCitySF/Textures/Remastered/T_Sidewalk_conc_tan_tile_01_BaseColor", n="/Game/RealCitySF/Textures/Remastered/T_Sidewalk_conc_tan_tile_01_Normal",
         rma="/Game/RealCitySF/Textures/Remastered/T_Sidewalk_conc_tan_tile_01_MRAO", layout="mrao", tile=140.0, mask=_MASK, second=False, tint=(0.82, 0.82, 0.82)),

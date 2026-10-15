@@ -933,6 +933,23 @@ bool FPCGRammsBuildingMassingElement::ExecuteInternal(FPCGContext* Context) cons
 							RammsPCG::WritePickedMesh(Props, G, ToWorld(P.X, P.Y, Z0), RammsPCG::RandRange(Rng, 0.0, 360.0), NextSeed(), RammsPCG::RandRange(Rng, 0.7, 1.3));
 						}
 					}
+					// Short tufts, denser, in the front yard: the lawn reads as grass, not a green texture.
+					if (Palette->HasSlot(RammsPaletteSlots::LawnTuft))
+					{
+						const double TStep = 75.0 / FMath::Sqrt(FMath::Max(S->GrassDensity, 0.05));
+						for (double gx = FrontX + 20.0; gx < LotFront - 20.0; gx += TStep)
+						{
+							for (double gy = -Width * 0.5 + 20.0; gy < Width * 0.5 - 20.0; gy += TStep)
+							{
+								const FVector2D P(gx + RammsPCG::RandRange(Rng, -TStep * 0.5, TStep * 0.5), gy + RammsPCG::RandRange(Rng, -TStep * 0.5, TStep * 0.5));
+								bool bOut = false;
+								for (const FBox2D& B : NoGrass) { if (B.bIsValid && B.IsInside(P)) { bOut = true; break; } }
+								if (bOut) { continue; }
+								FRammsPaletteMesh G; if (!Palette->PickMesh(RammsPaletteSlots::LawnTuft, Rng, G)) { break; }
+								RammsPCG::WritePickedMesh(Props, G, ToWorld(P.X, P.Y, Z0), RammsPCG::RandRange(Rng, 0.0, 360.0), NextSeed(), RammsPCG::RandRange(Rng, 0.45, 0.9));
+							}
+						}
+					}
 				}
 				// The planting strip in front of the lot (between the walk and the curb): street trees spaced along it
 				// and a street light, both clear of the driveway apron, plus grass. Canopy streets get big old trees.

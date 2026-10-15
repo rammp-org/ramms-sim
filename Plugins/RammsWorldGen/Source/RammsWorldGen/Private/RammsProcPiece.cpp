@@ -5,6 +5,7 @@
 #include "Components/DecalComponent.h"
 #include "Components/BillboardComponent.h"
 #include "UDynamicMesh.h"
+#include "DynamicMesh/DynamicMesh3.h"
 #include "GeometryScript/MeshPrimitiveFunctions.h"
 #include "GeometryScript/MeshMaterialFunctions.h"
 #include "GeometryScript/MeshNormalsFunctions.h"
@@ -70,7 +71,7 @@ ARammsProcPiece::ARammsProcPiece()
 
 ERammsProcPieceKind ARammsProcPiece::GetEffectiveKind() const
 {
-	if (KindId >= 0 && KindId <= static_cast<int32>(ERammsProcPieceKind::Decal))
+	if (KindId >= 0 && KindId <= static_cast<int32>(ERammsProcPieceKind::Patch)) // keep in step with the last enum value
 	{
 		return static_cast<ERammsProcPieceKind>(KindId);
 	}
@@ -133,6 +134,8 @@ void ARammsProcPiece::Rebuild()
 	case ERammsProcPieceKind::Roof:     BuildRoof(Mesh); break;
 	case ERammsProcPieceKind::Planter:  BuildPlanter(Mesh); break;
 	case ERammsProcPieceKind::Column:   BuildColumn(Mesh); break;
+	case ERammsProcPieceKind::Mound:    BuildMound(Mesh); break;
+	case ERammsProcPieceKind::Patch:    BuildPatch(Mesh); break;
 	default: BuildSlab(Mesh); break;
 	}
 
@@ -142,7 +145,7 @@ void ARammsProcPiece::Rebuild()
 	FGeometryScriptMeshSelection WholeMesh;
 	UGeometryScriptLibrary_MeshUVFunctions::SetMeshUVsFromBoxProjection(
 		Mesh, 0, FTransform(FRotator::ZeroRotator, FVector::ZeroVector, FVector(S, S, S)), WholeMesh, 2);
-	if (GetEffectiveKind() == ERammsProcPieceKind::Tree || GetEffectiveKind() == ERammsProcPieceKind::Shrub)
+	if (GetEffectiveKind() == ERammsProcPieceKind::Tree || GetEffectiveKind() == ERammsProcPieceKind::Shrub || GetEffectiveKind() == ERammsProcPieceKind::Mound)
 	{
 		FGeometryScriptCalculateNormalsOptions NormalOpts;
 		UGeometryScriptLibrary_MeshNormalsFunctions::RecomputeNormals(Mesh, NormalOpts);
@@ -424,6 +427,32 @@ void ARammsProcPiece::BuildColumn(UDynamicMesh* M)
 {
 	const double S = FMath::Max(SizeX, 10.0), H = FMath::Max(SizeZ, 50.0);
 	Box(M, FVector(0.0, 0.0, H * 0.5), FVector(S, S, H));
+}
+
+void ARammsProcPiece::BuildMound(UDynamicMesh* M)
+{
+	// A grid over the ellipse's bounding box, lifted by a cosine bump: smooth to the rim, where it meets
+	// the ground tangentially (the rim and the corners sit 2 cm under it so the lawn shows there).
+	const double SX = FMath::Max(SizeX, 100.0), SY = FMath::Max(SizeY, 100.0), Hm = Rise;
+	const int32 NX = FMath::Clamp(FMath::RoundToInt(SX / 40.0), 8, 64), NY = FMath::Clamp(FMath::RoundToInt(SY / 40.0), 8, 64);
+	UGeometryScriptLibrary_MeshPrimitiveFunctions::AppendRectangleXY(M, Opts(0), FTransform::Identity, static_cast<float>(SX), static_cast<float>(SY), NX, NY);
+	M->EditMesh([&](UE::Geometry::FDynamicMesh3& Mesh)
+	{
+		for (const int32 Vid : Mesh.VertexIndicesItr())
+		{
+			FVector3d P = Mesh.GetVertex(Vid);
+			const double E = FMath::Sqrt(FMath::Square(2.0 * P.X / SX) + FMath::Square(2.0 * P.Y / SY));
+			P.Z = (E < 1.0 ? Hm * 0.5 * (1.0 + FMath::Cos(PI * E)) : 0.0) - 2.0;
+			Mesh.SetVertex(Vid, P);
+		}
+	}, EDynamicMeshChangeType::GeneralEdit, EDynamicMeshAttributeChangeFlags::Unknown);
+}
+
+void ARammsProcPiece::BuildPatch(UDynamicMesh* M)
+{
+	const double SX = FMath::Max(SizeX, 20.0), SY = FMath::Max(SizeY, 20.0);
+	const FTransform Xf(FRotator::ZeroRotator, FVector(0.0, 0.0, FMath::Max(SizeZ, 0.2)), FVector(SX / 100.0, SY / 100.0, 1.0));
+	UGeometryScriptLibrary_MeshPrimitiveFunctions::AppendDisc(M, Opts(0), Xf, 50.0f, 40, 1);
 }
 
 // --- materials and collision ------------------------------------------------------

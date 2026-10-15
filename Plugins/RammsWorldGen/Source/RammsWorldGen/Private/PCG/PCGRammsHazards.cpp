@@ -421,6 +421,12 @@ bool FPCGRammsParkLayoutElement::ExecuteInternal(FPCGContext* Context) const
 	const FString MatCobble = RammsPCG::Mat(Palette, RammsPaletteSlots::MatCobble);
 	const FString MatFoliage = RammsPCG::Mat(Palette, RammsPaletteSlots::MatFoliage);
 	const FString MatTrunk = RammsPCG::Mat(Palette, RammsPaletteSlots::MatTrunk);
+	const FString MatLawn = RammsPCG::Mat(Palette, RammsPaletteSlots::MatLawn);
+	auto MatOr = [&](FName Slot, const FString& Fallback) { return Palette && Palette->HasSlot(Slot) ? RammsPCG::Mat(Palette, Slot) : Fallback; };
+	const FString MatWater = MatOr(RammsPaletteSlots::MatWater, MatPath);
+	const FString MatGravel = MatOr(RammsPaletteSlots::MatGravel, MatPath);
+	const FString MatDirt = MatOr(RammsPaletteSlots::MatDirt, MatPath);
+	const FString MatMud = MatOr(RammsPaletteSlots::MatMud, MatDirt);
 
 	FRammsPointWriter Primitives, Pieces, Props, Paths, Features;
 	int32 Counter = 0;
@@ -454,7 +460,21 @@ bool FPCGRammsParkLayoutElement::ExecuteInternal(FPCGContext* Context) const
 			{
 				const double Len = FVector::Dist(Sg.A, Sg.B);
 				const bool bUneven = Rng.FRand() < S->NonCompliance * 0.5;
-				RammsPCG::WriteCube(Primitives, (Sg.A + Sg.B) * 0.5 + FVector(0, 0, -9.6), FMath::IsNearlyEqual(Sg.Yaw, 0.0) || FMath::IsNearlyEqual(Sg.Yaw, 180.0) ? FVector(Len + PW, PW, 20.0) : FVector(PW, Len + PW, 20.0), 0.0, bUneven ? MatCobble : MatPath, NextSeed());
+				if (bUneven)
+				{
+					// Cobbles as a slab piece: the cobble material uses mesh UVs, which a scaled cube would stretch.
+					FRammsPieceDesc D;
+					D.Kind = ERammsProcPieceKind::Slab;
+					D.SizeX = Len + PW; D.SizeY = PW; D.SizeZ = 20.0; D.UVScale = 200.0;
+					D.MaterialPath = MatCobble;
+					D.Transform = FTransform(FRotator(0.0, Sg.Yaw, 0.0), Sg.A - (Sg.B - Sg.A).GetSafeNormal() * (PW * 0.5) + FVector(0, 0, 0.4));
+					D.Seed = NextSeed();
+					RammsPCG::WritePiece(Pieces, D);
+				}
+				else
+				{
+					RammsPCG::WriteCube(Primitives, (Sg.A + Sg.B) * 0.5 + FVector(0, 0, -9.6), FMath::IsNearlyEqual(Sg.Yaw, 0.0) || FMath::IsNearlyEqual(Sg.Yaw, 180.0) ? FVector(Len + PW, PW, 20.0) : FVector(PW, Len + PW, 20.0), 0.0, MatPath, NextSeed());
+				}
 				PathBoxes.Add(FBox2D(FVector2D(FMath::Min(Sg.A.X, Sg.B.X) - PW, FMath::Min(Sg.A.Y, Sg.B.Y) - PW), FVector2D(FMath::Max(Sg.A.X, Sg.B.X) + PW, FMath::Max(Sg.A.Y, Sg.B.Y) + PW)));
 				// Path-side record: origin at the path's left edge so the Hazard Placer's +Y spans the width.
 				const FRotator Rot(0.0, Sg.Yaw, 0.0);
@@ -482,6 +502,149 @@ bool FPCGRammsParkLayoutElement::ExecuteInternal(FPCGContext* Context) const
 				++SegIndex;
 			}
 
+			// The lawn between the paths is not flat: each quadrant gets a pond (one per park), grassy mounds,
+			// boulders, and patches of gravel, dirt or mud; the crossing is a cobbled plaza.
+			struct FMound { FVector2D C; double SX, SY, Hm; };
+			TArray<FMound> Mounds;
+			TArray<FBox2D> Avoid; // ponds and patches: no trees or grass clumps
+			auto GroundZ = [&](const FVector2D& P)
+			{
+				double Z = Z0;
+				for (const FMound& Mn : Mounds)
+				{
+					const double E = FMath::Sqrt(FMath::Square(2.0 * (P.X - Mn.C.X) / Mn.SX) + FMath::Square(2.0 * (P.Y - Mn.C.Y) / Mn.SY));
+					if (E < 1.0) { Z = FMath::Max(Z, Z0 + Mn.Hm * 0.5 * (1.0 + FMath::Cos(PI * E)) - 2.0); }
+				}
+				return Z;
+			};
+			auto RockAt = [&](const FVector2D& P, double ScaleLo, double ScaleHi)
+			{
+				FRammsPaletteMesh Rk;
+				if (!Palette || !Palette->PickMesh(RammsPaletteSlots::Rock, Rng, Rk)) { return; }
+				const double K = RammsPCG::RandRange(Rng, ScaleLo, ScaleHi);
+				// Sunk a little into the ground so it does not sit on it like a prop.
+				const int32 r = RammsPCG::WritePickedMesh(Props, Rk, FVector(P.X, P.Y, GroundZ(P) - Rk.Height * K * 0.15), RammsPCG::RandRange(Rng, 0.0, 360.0), NextSeed(), K);
+				if (r >= 0) { RammsPCG::WriteManifest(Props, r, FName(TEXT("Prop")), FName(TEXT("Rock")), true, ERammsComplianceIssue::None, 0.0, 0.0); }
+			};
+			auto Patch = [&](const FVector2D& P, double SX, double SY, double Top, const FString& Mat, FName Sub)
+			{
+				FRammsPieceDesc D;
+				D.Kind = ERammsProcPieceKind::Patch;
+				D.SizeX = SX; D.SizeY = SY; D.SizeZ = Top; D.UVScale = 300.0;
+				D.MaterialPath = Mat;
+				D.ManifestKind = Sub == FName(TEXT("Pond")) ? FName(TEXT("Water")) : FName(TEXT("Surface"));
+				D.ManifestSubtype = Sub;
+				D.Measure = FMath::Min(SX, SY);
+				D.Transform = FTransform(FRotator(0.0, RammsPCG::RandRange(Rng, 0.0, 180.0), 0.0), FVector(P.X, P.Y, Z0));
+				D.Seed = NextSeed();
+				RammsPCG::WritePiece(Pieces, D);
+				Avoid.Add(FBox2D(P - FVector2D(FMath::Max(SX, SY) * 0.5), P + FVector2D(FMath::Max(SX, SY) * 0.5)));
+			};
+			{
+				const double M = PW * 0.5 + 160.0; // keep clear of paths and the benches beside them
+				const FBox2D Quads[4] = {
+					FBox2D(FVector2D(x0 + M, y0 + M), FVector2D(C.X - M, C.Y - M)), FBox2D(FVector2D(C.X + M, y0 + M), FVector2D(x1 - M, C.Y - M)),
+					FBox2D(FVector2D(x0 + M, C.Y + M), FVector2D(C.X - M, y1 - M)), FBox2D(FVector2D(C.X + M, C.Y + M), FVector2D(x1 - M, y1 - M)) };
+				const int32 PondQuad = Rng.RandRange(0, 3);
+				for (int32 q = 0; q < 4; ++q)
+				{
+					const FBox2D& Q = Quads[q];
+					const FVector2D Qs = Q.GetSize();
+					if (Qs.X < 300.0 || Qs.Y < 300.0) { continue; }
+					const FVector2D Qc = Q.GetCenter();
+					if (q == PondQuad && Qs.X > 700.0 && Qs.Y > 700.0)
+					{
+						// Pond: water in a ring of mud, edged with boulders.
+						const double SX = Qs.X * RammsPCG::RandRange(Rng, 0.45, 0.7), SY = Qs.Y * RammsPCG::RandRange(Rng, 0.45, 0.7);
+						Patch(Qc, SX + 120.0, SY + 120.0, 0.8, MatMud, FName(TEXT("Mud")));
+						Patch(Qc, SX, SY, 1.6, MatWater, FName(TEXT("Pond")));
+						const int32 NR = FMath::Clamp(static_cast<int32>((SX + SY) / 90.0), 6, 30);
+						for (int32 k = 0; k < NR; ++k)
+						{
+							if (Rng.FRand() < 0.35) { continue; }
+							const double A = 2.0 * PI * k / NR + RammsPCG::RandRange(Rng, -0.1, 0.1);
+							RockAt(Qc + FVector2D(FMath::Cos(A) * (SX * 0.5 + 25.0), FMath::Sin(A) * (SY * 0.5 + 25.0)), 0.5, 1.1);
+						}
+						continue;
+					}
+					// One or two mounds.
+					const int32 NM = Qs.X * Qs.Y > 1200.0 * 1200.0 ? 2 : 1;
+					for (int32 k = 0; k < NM; ++k)
+					{
+						const double SX = FMath::Min(Qs.X * RammsPCG::RandRange(Rng, 0.5, 0.85), 1800.0), SY = FMath::Min(Qs.Y * RammsPCG::RandRange(Rng, 0.5, 0.85), 1800.0);
+						const FVector2D Mc(RammsPCG::RandRange(Rng, Q.Min.X + SX * 0.5, FMath::Max(Q.Min.X + SX * 0.5, Q.Max.X - SX * 0.5)), RammsPCG::RandRange(Rng, Q.Min.Y + SY * 0.5, FMath::Max(Q.Min.Y + SY * 0.5, Q.Max.Y - SY * 0.5)));
+						const double Hm = FMath::Min(SX, SY) * RammsPCG::RandRange(Rng, 0.06, 0.12);
+						Mounds.Add({ Mc, SX, SY, Hm });
+						FRammsPieceDesc D;
+						D.Kind = ERammsProcPieceKind::Mound;
+						D.SizeX = SX; D.SizeY = SY; D.Rise = Hm; D.UVScale = 300.0;
+						D.MaterialPath = MatLawn;
+						D.ManifestKind = FName(TEXT("Terrain")); D.ManifestSubtype = FName(TEXT("Mound"));
+						D.Measure = Hm * PI / FMath::Min(SX, SY); // steepest grade of the cosine bump
+						D.Transform = FTransform(FRotator::ZeroRotator, FVector(Mc.X, Mc.Y, Z0));
+						D.Seed = NextSeed();
+						RammsPCG::WritePiece(Pieces, D);
+						if (Rng.FRand() < 0.5) { for (int32 r = 0; r < 3; ++r) { RockAt(Mc + FVector2D(RammsPCG::RandRange(Rng, -SX, SX) * 0.3, RammsPCG::RandRange(Rng, -SY, SY) * 0.3), 0.6, 1.4); } }
+					}
+					// A ground patch: gravel, dirt (worn grass) or mud, away from the mounds' tops.
+					{
+						static const TCHAR* Subs[3] = { TEXT("Gravel"), TEXT("Dirt"), TEXT("Mud") };
+						const int32 Pk = Rng.RandRange(0, 2);
+						const FString& Mat = Pk == 0 ? MatGravel : (Pk == 1 ? MatDirt : MatMud);
+						const double SX = RammsPCG::RandRange(Rng, 150.0, 400.0), SY = RammsPCG::RandRange(Rng, 120.0, 300.0);
+						const FVector2D Pc(RammsPCG::RandRange(Rng, Q.Min.X + 150.0, Q.Max.X - 150.0), RammsPCG::RandRange(Rng, Q.Min.Y + 150.0, Q.Max.Y - 150.0));
+						if (GroundZ(Pc) <= Z0 + 1.0) { Patch(Pc, SX, SY, 0.6, Mat, FName(Subs[Pk])); }
+					}
+					// A boulder group.
+					{
+						const FVector2D Gc(RammsPCG::RandRange(Rng, Q.Min.X + 80.0, Q.Max.X - 80.0), RammsPCG::RandRange(Rng, Q.Min.Y + 80.0, Q.Max.Y - 80.0));
+						const int32 NR = Rng.RandRange(1, 4);
+						for (int32 r = 0; r < NR; ++r) { RockAt(Gc + FVector2D(RammsPCG::RandRange(Rng, -90.0, 90.0), RammsPCG::RandRange(Rng, -90.0, 90.0)), 0.5, 1.5); }
+					}
+				}
+				// A gravel trail cutting across one quadrant, path edge to path edge (a desire line).
+				{
+					const int32 q = (PondQuad + 1 + Rng.RandRange(0, 2)) % 4;
+					const FBox2D& Q = Quads[q];
+					if (Q.GetSize().X > 400.0 && Q.GetSize().Y > 400.0)
+					{
+						const FVector2D A2(Q.Min.X - 100.0, Q.Min.Y - 100.0), B2(Q.Max.X + 100.0, Q.Max.Y + 100.0);
+						const bool bFlip = Rng.FRand() < 0.5;
+						const FVector2D Ta = bFlip ? FVector2D(A2.X, B2.Y) : A2, Tb = bFlip ? FVector2D(B2.X, A2.Y) : B2;
+						const double TLen = (Tb - Ta).Size();
+						const double TYaw = FMath::RadiansToDegrees(FMath::Atan2(Tb.Y - Ta.Y, Tb.X - Ta.X));
+						const FVector2D Tc = (Ta + Tb) * 0.5;
+						bool bClear = true;
+						for (const FMound& Mn : Mounds) { if ((Mn.C - Tc).Size() < FMath::Max(Mn.SX, Mn.SY) * 0.5 + 80.0) { bClear = false; } }
+						if (bClear)
+						{
+							// A slab piece rather than a cube instance: pack ground materials use mesh UVs, which a long
+							// scaled cube would stretch; the piece's world box-projected UVs keep the gravel at scale.
+							FRammsPieceDesc D;
+							D.Kind = ERammsProcPieceKind::Slab;
+							D.SizeX = TLen; D.SizeY = 110.0; D.SizeZ = 20.0; D.UVScale = 250.0;
+							D.MaterialPath = MatGravel;
+							D.ManifestKind = FName(TEXT("Surface")); D.ManifestSubtype = FName(TEXT("GravelTrail"));
+							D.bCompliant = false; D.Issue = ERammsComplianceIssue::SurfaceUneven; D.Measure = 110.0; D.Threshold = S->MinClearWidth;
+							D.Transform = FTransform(FRotator(0.0, TYaw, 0.0), FVector(Ta.X, Ta.Y, Z0 + 0.6));
+							D.Seed = NextSeed();
+							RammsPCG::WritePiece(Pieces, D);
+							for (double t = 0.0; t <= 1.0; t += 0.1) { const FVector2D P = Ta + (Tb - Ta) * t; Avoid.Add(FBox2D(P - FVector2D(70.0), P + FVector2D(70.0))); }
+						}
+					}
+				}
+				// Cobbled plaza where the cross paths meet.
+				{
+					FRammsPieceDesc D;
+					D.Kind = ERammsProcPieceKind::Slab;
+					D.SizeX = PW * 3.0; D.SizeY = PW * 3.0; D.SizeZ = 20.0; D.UVScale = 200.0;
+					D.MaterialPath = MatCobble;
+					D.Transform = FTransform(FRotator::ZeroRotator, FVector(C.X - PW * 1.5, C.Y, Z0 + 0.6));
+					D.Seed = NextSeed();
+					RammsPCG::WritePiece(Pieces, D);
+				}
+			}
+
 			// Grass clumps over the lawn, off the paths.
 			if (S->GrassDensity > 0.0 && Palette && Palette->HasSlot(RammsPaletteSlots::GrassClump))
 			{
@@ -493,9 +656,21 @@ bool FPCGRammsParkLayoutElement::ExecuteInternal(FPCGContext* Context) const
 						const FVector2D P(gx + RammsPCG::RandRange(Rng, -Step * 0.45, Step * 0.45), gy + RammsPCG::RandRange(Rng, -Step * 0.45, Step * 0.45));
 						bool bOnPath = false;
 						for (const FBox2D& B : PathBoxes) { if (B.ExpandBy(-PW * 0.35).IsInside(P)) { bOnPath = true; break; } }
+						for (const FBox2D& B : Avoid) { if (B.IsInside(P)) { bOnPath = true; break; } }
 						if (bOnPath) { continue; }
 						FRammsPaletteMesh G; if (!Palette->PickMesh(RammsPaletteSlots::GrassClump, Rng, G)) { break; }
-						RammsPCG::WritePickedMesh(Props, G, FVector(P.X, P.Y, Z0), RammsPCG::RandRange(Rng, 0.0, 360.0), NextSeed(), RammsPCG::RandRange(Rng, 0.7, 1.3));
+						RammsPCG::WritePickedMesh(Props, G, FVector(P.X, P.Y, GroundZ(P)), RammsPCG::RandRange(Rng, 0.0, 360.0), NextSeed(), RammsPCG::RandRange(Rng, 0.7, 1.3));
+						// Two short tufts around each clump.
+						for (int32 k = 0; k < 2; ++k)
+						{
+							FRammsPaletteMesh Tf; if (!Palette->PickMesh(RammsPaletteSlots::LawnTuft, Rng, Tf)) { break; }
+							const FVector2D Q(P.X + RammsPCG::RandRange(Rng, -Step * 0.5, Step * 0.5), P.Y + RammsPCG::RandRange(Rng, -Step * 0.5, Step * 0.5));
+							bool bBad = false;
+							for (const FBox2D& B : PathBoxes) { if (B.ExpandBy(-PW * 0.35).IsInside(Q)) { bBad = true; break; } }
+							for (const FBox2D& B : Avoid) { if (B.IsInside(Q)) { bBad = true; break; } }
+							if (bBad) { continue; }
+							RammsPCG::WritePickedMesh(Props, Tf, FVector(Q.X, Q.Y, GroundZ(Q)), RammsPCG::RandRange(Rng, 0.0, 360.0), NextSeed(), RammsPCG::RandRange(Rng, 0.45, 0.9));
+						}
 					}
 				}
 			}
@@ -507,10 +682,11 @@ bool FPCGRammsParkLayoutElement::ExecuteInternal(FPCGContext* Context) const
 				const FVector2D P(RammsPCG::RandRange(Rng, C.X - Size.X * 0.5 + 200.0, C.X + Size.X * 0.5 - 200.0), RammsPCG::RandRange(Rng, C.Y - Size.Y * 0.5 + 200.0, C.Y + Size.Y * 0.5 - 200.0));
 				bool bOnPath = false;
 				for (const FBox2D& B : PathBoxes) { if (B.IsInside(P)) { bOnPath = true; break; } }
+				for (const FBox2D& B : Avoid) { if (B.ExpandBy(100.0).IsInside(P)) { bOnPath = true; break; } }
 				if (bOnPath) { continue; }
 				const bool bShrub = (t % 2) == 1;
 				RammsPCG::WriteFoliage(Props, Pieces, Palette, bShrub ? RammsPaletteSlots::Shrub : (Rng.FRand() < 0.3 ? RammsPaletteSlots::TreeSmall : RammsPaletteSlots::Tree), Rng,
-					FVector(P.X, P.Y, Z0), RammsPCG::RandRange(Rng, 0.0, 360.0), NextSeed(),
+					FVector(P.X, P.Y, GroundZ(P) - 3.0), RammsPCG::RandRange(Rng, 0.0, 360.0), NextSeed(),
 					bShrub ? RammsPCG::RandRange(Rng, 60.0, 140.0) : RammsPCG::RandRange(Rng, 350.0, 700.0),
 					bShrub ? RammsPCG::RandRange(Rng, 50.0, 110.0) : RammsPCG::RandRange(Rng, 600.0, 1100.0),
 					MatFoliage, MatTrunk, bShrub ? FName(TEXT("Shrub")) : FName(TEXT("Tree")));

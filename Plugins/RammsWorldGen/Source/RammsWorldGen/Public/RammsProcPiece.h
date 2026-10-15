@@ -120,6 +120,8 @@ private:
 	void BuildRoof(UDynamicMesh* Mesh);
 	void BuildPlanter(UDynamicMesh* Mesh);
 	void BuildColumn(UDynamicMesh* Mesh);
+	void BuildMound(UDynamicMesh* Mesh);
+	void BuildPatch(UDynamicMesh* Mesh);
 	void BuildDecal();
 
 	void ApplyMaterials();

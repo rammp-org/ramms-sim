@@ -5,6 +5,7 @@
 #include "Elements/PCGStaticMeshSpawner.h"
 #include "MeshSelectors/PCGMeshSelectorByAttribute.h"
 #include "Metadata/PCGAttributePropertySelector.h"
+#include "Engine/CollisionProfile.h"
 #include "Metadata/PCGObjectPropertyOverride.h"
 #include "PCG/RammsPCGCommon.h"
 #include "RammsProcPiece.h"
@@ -49,6 +50,9 @@ void URammsWorldGenGraphLibrary::ConfigureModuleSpawner(UPCGStaticMeshSpawnerSet
 	if (UPCGMeshSelectorByAttribute* Sel = Cast<UPCGMeshSelectorByAttribute>(Settings->MeshSelectorParameters))
 	{
 		Sel->AttributeName = RammsPCG::Mesh;
+		// PCG's ISM template defaults to NoCollision: everything generated must be solid (players, the wheelchair
+		// and the arm collide with it); meshes without simple collision get complex-as-simple at palette build.
+		Sel->TemplateDescriptor.BodyInstance.SetCollisionProfileName(UCollisionProfile::BlockAll_ProfileName);
 		Sel->bUseAttributeMaterialOverrides = true;
 		Sel->MaterialOverrideAttributes.Reset();
 		for (int32 i = 0; i < RammsPCG::NumModuleMaterials; ++i)
@@ -70,6 +74,7 @@ void URammsWorldGenGraphLibrary::ConfigureMeshSpawner(UPCGStaticMeshSpawnerSetti
 	if (UPCGMeshSelectorByAttribute* Sel = Cast<UPCGMeshSelectorByAttribute>(Settings->MeshSelectorParameters))
 	{
 		Sel->AttributeName = RammsPCG::Mesh;
+		Sel->TemplateDescriptor.BodyInstance.SetCollisionProfileName(UCollisionProfile::BlockAll_ProfileName);
 		Sel->bUseAttributeMaterialOverrides = bMaterialFromAttribute;
 		Sel->MaterialOverrideAttributes.Reset();
 		if (bMaterialFromAttribute)

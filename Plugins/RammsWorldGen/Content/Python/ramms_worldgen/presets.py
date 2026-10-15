@@ -20,7 +20,7 @@ PRESETS = {
              LotWidthMin=1200.0, LotWidthMax=2400.0, SetbackMin=0.0, SetbackMax=0.0, FloorsMin=3, FloorsMax=9,
              FloorHeight=380.0, LotCoverage=0.95, EntranceStepChance=0.35, EntranceRampChance=0.6, WindowSpacing=300.0, RearParkingChance=0.4,
              PropDensity=7.0, HazardDensity=4.0, TreeSpacing=900.0, HazardIntrusionChance=0.5, ParkFraction=0.08,
-             ParkingDensity=0.6, CanopyChance=0.15, StreetLightSpacing=2500.0, DecalDensity=10.0, GrassDensity=0.6),
+             ParkingDensity=0.6, CanopyChance=0.15, StreetLightSpacing=2500.0, DecalDensity=10.0, GrassDensity=0.9),
     ),
     "PRE_Suburban": (
         unreal.RammsSceneKind.SUBURBAN, STREETS_GRAPH,
@@ -33,7 +33,7 @@ PRESETS = {
              LotWidthMin=2300.0, LotWidthMax=3300.0, SetbackMin=400.0, SetbackMax=900.0, FloorsMin=1, FloorsMax=2,
              FloorHeight=320.0, LotCoverage=0.6, EntranceStepChance=0.7, EntranceRampChance=0.3, WindowSpacing=250.0,
              PropDensity=1.5, HazardDensity=1.5, TreeSpacing=1100.0, CanopyChance=0.45, StreetLightSpacing=3200.0, DecalDensity=6.0,
-             GrassDensity=0.7, HazardIntrusionChance=0.6,
+             GrassDensity=1.0, HazardIntrusionChance=0.6,
              ParkFraction=0.3, LawnLots=1.0, YardTreeChance=0.85, DrivewayChance=0.8, FrontBoundaryChance=0.6, FoliageDensity=0.8, ParkingDensity=0.35,
              PathWidth=180.0),
     ),
@@ -45,7 +45,7 @@ PRESETS = {
              BlockSizeMin=10000.0, BlockSizeMax=10500.0, RoadWidth=700.0, SidewalkWidth=240.0, FurnitureZoneWidth=80.0,
              StreetJitter=0.0, StreetDropout=0.0, MidblockCrossingChance=0.5, PropDensity=4.0, HazardDensity=1.0,
              TreeSpacing=1200.0, ParkFraction=1.0, FoliageDensity=1.0, PathWidth=200.0, ParkingDensity=0.3,
-             CanopyChance=0.3, StreetLightSpacing=2800.0, DecalDensity=5.0, GrassDensity=0.6),
+             CanopyChance=0.3, StreetLightSpacing=2800.0, DecalDensity=5.0, GrassDensity=0.9),
     ),
     "PRE_Indoor_Home": (
         unreal.RammsSceneKind.INDOOR, INDOOR_GRAPH,
@@ -75,7 +75,7 @@ PRESETS = {
              FloorHeight=350.0, LotCoverage=1.0, EntranceStepChance=0.3, EntranceRampChance=0.5, WindowSpacing=300.0,
              FacadeStyles="sb01,sb02,sb03,dt02", RearParkingChance=0.85,
              PropDensity=9.0, HazardDensity=4.5, TreeSpacing=1000.0, HazardIntrusionChance=0.5, ParkFraction=0.1,
-             ParkingDensity=0.75, FoliageDensity=0.6, CanopyChance=0.2, StreetLightSpacing=2200.0, DecalDensity=8.0, GrassDensity=0.6),
+             ParkingDensity=0.75, FoliageDensity=0.6, CanopyChance=0.2, StreetLightSpacing=2200.0, DecalDensity=8.0, GrassDensity=0.9),
     ),
     "PRE_Indoor_Store": (
         unreal.RammsSceneKind.INDOOR, INDOOR_GRAPH,
