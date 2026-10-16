@@ -216,7 +216,7 @@ class RammsWorldGenToolset(unreal.ToolsetDefinition):
     @staticmethod
     def worldgen_build_assets(what: str = "all") -> str:
         """Create or refresh the generated-content assets from code: the default palette (from the
-        Fab packs), the accessibility profile, the presets, and the two PCG graphs.
+        Fab packs), the accessibility profile, the presets, and the PCG graphs.
 
         Args:
             what: all, palette, presets, graphs.

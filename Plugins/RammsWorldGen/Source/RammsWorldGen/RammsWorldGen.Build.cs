@@ -34,6 +34,8 @@ public class RammsWorldGen : ModuleRules
 		{
 			// URammsWorldGenBridge::OpenMap loads a map into the editor when no game is running.
 			PrivateDependencyModuleNames.AddRange(new string[] { "UnrealEd" });
+			// URammsWorldGenGraphLibrary::CaptureGraphPanel: screenshots of the PCG graph editor for docs.
+			PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore", "GraphEditor" });
 		}
 	}
 }

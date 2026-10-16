@@ -41,7 +41,7 @@ python Scripts/editor_remote_exec.py --file Scripts/worldgen/build_levels.py
 
 The first writes the palette (mapping semantic slots like `Bench`,
 `Hazard.Upheaval`, `Mat.Sidewalk` to the Fab assets it finds), the ADA
-profile, the presets and the two PCG graphs under `/Game/WorldGen/`. The
+profile, the presets and the PCG graphs under `/Game/WorldGen/`. The
 second creates the example levels. Both are also MCP tools
 (`worldgen_build_assets`, `worldgen_build_level`).
 
@@ -81,6 +81,65 @@ Content/WorldGen/                generated assets: Palettes, Profiles, Presets, 
 Content/Maps/Gen/                example levels
 Scripts/worldgen/                build_assets.py, build_levels.py, regenerate.py
 ```
+
+## The PCG graphs
+
+The graphs are written as code (`ramms_worldgen/graphs.py`, using the small
+builder in `_graph.py`) and rebuilt by `build_assets.py`, so do not edit them
+in the PCG editor: changes there are overwritten on the next build. There are
+three:
+
+| Graph | Used by | What it does |
+|---|---|---|
+| `PCG_Streets` | downtown, suburban, park and main street presets | street network, lots, buildings, parks, sidewalk hazards |
+| `PCG_Indoor` | home, office and store presets | rooms, corridors, doors, restrooms, furniture, aisles |
+| `PCG_SpawnAndRecord` | subgraph of both | turns point streams into meshes and actors, writes the manifest |
+
+```
+PCG_Streets
+  Params --(named reroute "Params" -> Overrides of every node)
+  Street Network --Blocks--> Subdivide Lots --Lots--> Building Massing
+        |                         `--Parks--> Park Layout
+        `--Sidewalks--> Hazard Placer <--Sidewalks-- Park Layout
+  every layout node --Primitives/Props/Modules/Grass/Pieces/Routes/Features--> Spawn And Record --> Output
+
+PCG_Indoor
+  Params --> Indoor Layout --streams--> Spawn And Record --> Output
+
+PCG_SpawnAndRecord (inputs = the seven streams)
+  Primitives -> Static Mesh Spawner (cube + Material attribute)
+  Props      -> Static Mesh Spawner (Mesh attribute)          \
+  Modules    -> Static Mesh Spawner (Mesh + Material0..7)       all BlockAll collision
+  Pieces     -> Spawn Actor ARammsProcPiece (attributes -> properties) /
+  Grass      -> Static Mesh Spawner (no collision, culled)
+  Routes + Features + Props -> Manifest -> Output "Manifest" (JSON the generator reads)
+```
+
+How it works:
+
+- **No numbers in the graphs.** The `Params` node reads the generator's
+  `FRammsWorldGenParams` (one attribute per member) and every Ramms node takes
+  it on its `Overrides` pin. A preset is just a set of parameters, which is
+  why one graph serves several presets. A named reroute carries `Params` to
+  each node, so the graph has no long wires.
+- **Layout nodes emit point streams.** Each custom node (C++, `Source/.../PCG/`)
+  writes points with attributes into a fixed set of output pins: `Primitives`
+  (cubes with a material), `Props` (palette meshes), `Modules` (facade
+  kit), `Grass`, `Pieces` (procedural ramps, steps, walls, doors and mounds),
+  `Routes` and `Features` (ground truth).
+- **One shared spawn stage.** Both graphs end in `PCG_SpawnAndRecord`, so the
+  spawner configuration (collision, culling, attribute-to-property mapping)
+  and the manifest wiring live in one place. A new graph, for example a
+  campus or a transit station, only has to emit the same streams and add this
+  subgraph.
+- **Shared code below the graphs.** The nodes share `RammsPCGCommon`: the
+  `URammsPCGSettingsBase` / `FRammsPCGElementBase` base classes (common
+  properties, params overrides, output pins), the point writers (`WritePiece`,
+  `WriteCube`, `WritePaletteMesh`, `WriteComposite`, `WriteFoliage`,
+  `WriteManifest`) and the palette lookups. The spawners are configured by `URammsWorldGenGraphLibrary`,
+  because attribute selectors cannot be set from Python.
+- **Screenshots.** `Scripts/worldgen/graph_shots.py` opens each graph and
+  saves it as 1:1 PNG tiles under `Saved/WorldGen/graph_shots/`.
 
 ## Adding content
 

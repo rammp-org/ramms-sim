@@ -3,7 +3,7 @@
     python Scripts/editor_remote_exec.py --file Scripts/worldgen/build_assets.py
 
 Creates/refreshes /Game/WorldGen/Palettes/PAL_Default (from the Fab packs),
-/Game/WorldGen/Profiles/PROF_ADA, the presets, and the two PCG graphs. Safe to
+/Game/WorldGen/Profiles/PROF_ADA, the presets, and the PCG graphs. Safe to
 re-run: everything is rebuilt in place. Requires the RammsWorldGen C++ module
 to be compiled and the editor to have loaded it.
 """

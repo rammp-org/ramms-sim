@@ -21,8 +21,12 @@ def _pin_labels(pins):
 
 
 class GraphBuilder:
-    def __init__(self, path, clear=True):
+    def __init__(self, path, clear=True, inputs=None, outputs=None, description=None):
+        """`inputs` / `outputs` replace the Input / Output node pins (for graphs used as subgraphs)."""
         self.path = path
+        self.inputs = inputs
+        self.outputs = outputs
+        self.description = description
         self.clear = clear
         self.graph = None
         self.input = None
@@ -40,6 +44,15 @@ class GraphBuilder:
             remaining = len(self.graph.get_editor_property("nodes"))
             if remaining:
                 raise RuntimeError("%s still has %d nodes after clearing" % (self.path, remaining))
+        # An open PCG editor keeps its own copy of the comment boxes and writes it back on close.
+        try:
+            unreal.get_editor_subsystem(unreal.AssetEditorSubsystem).close_all_editors_for_asset(self.graph)
+        except Exception:
+            pass
+        L = unreal.RammsWorldGenGraphLibrary
+        L.clear_graph_comments(self.graph)
+        if self.inputs is not None or self.outputs is not None:
+            L.set_graph_pins(self.graph, [unreal.Name(n) for n in (self.inputs or [])], [unreal.Name(n) for n in (self.outputs or [])])
         self.input = self.graph.get_input_node()
         self.output = self.graph.get_output_node()
         self.input.set_node_position(-600, 0)
@@ -48,14 +61,17 @@ class GraphBuilder:
 
     def __exit__(self, exc_type, exc, tb):
         if exc_type is None:
+            if self.description:
+                self.graph.set_editor_property("description", unreal.Text(self.description))
             self.graph.force_notification_for_editor()
             H.save(self.graph)
             H.log("saved graph %s (%d nodes)" % (self.path, len(self.graph.get_editor_property("nodes"))))
         return False
 
     # --- nodes -----------------------------------------------------------------
-    def node(self, settings_class, title=None, col=None, row=None, **props):
-        """Add a node of `settings_class`, set `props` on its settings, place it on a grid."""
+    def node(self, settings_class, title=None, col=None, row=None, pos=None, comment=None, **props):
+        """Add a node of `settings_class`, set `props` on its settings, place it on a grid (or at `pos`),
+        and give it a pinned comment bubble if `comment` is set."""
         node, settings = self.graph.add_node_of_type(settings_class)
         if settings is None:
             settings = node.get_settings()
@@ -69,8 +85,46 @@ class GraphBuilder:
         r = self._rows.get(col, 0) if row is None else row
         if row is None:
             self._rows[col] = r + 1
-        node.set_node_position(int(col * 420), int(r * 260))
+        if pos is not None:
+            node.set_node_position(int(pos[0]), int(pos[1]))
+        else:
+            node.set_node_position(int(col * 420), int(r * 260))
+        if comment:
+            unreal.RammsWorldGenGraphLibrary.set_node_comment(node, comment)
         return node
+
+    def place(self, node, x, y, comment=None):
+        node.set_node_position(int(x), int(y))
+        if comment:
+            unreal.RammsWorldGenGraphLibrary.set_node_comment(node, comment)
+        return node
+
+    def comment(self, text, x, y, w, h, color=(0.25, 0.25, 0.25), font=20):
+        """A comment box (editor only) around a region of the graph."""
+        unreal.RammsWorldGenGraphLibrary.add_graph_comment(
+            self.graph, text, int(x), int(y), int(w), int(h), unreal.LinearColor(color[0], color[1], color[2], 1.0), int(font))
+
+    def subgraph(self, graph, title=None, **kw):
+        """A Subgraph node calling `graph` (a PCGGraph asset or path); its pins are the subgraph's Input / Output pins."""
+        if isinstance(graph, str):
+            graph = unreal.load_asset(graph)
+        node = self.node(unreal.PCGSubgraphSettings, title=title, **kw)
+        node.get_settings().set_subgraph(graph)
+        unreal.RammsWorldGenGraphLibrary.refresh_node_pins(node)
+        return node
+
+    def named_reroute(self, src, src_pin, name, x, y):
+        """Named reroute declaration fed by src.src_pin; use `reroute_usage` to read it elsewhere without a wire."""
+        decl = self.node(unreal.PCGNamedRerouteDeclarationSettings, title=name, pos=(x, y))
+        self.edge(src, src_pin, decl, "In")
+        return decl
+
+    def reroute_usage(self, decl, x, y):
+        use = self.node(unreal.PCGNamedRerouteUsageSettings, title=str(decl.get_editor_property("node_title")), pos=(x, y))
+        use.get_settings().set_editor_property("declaration", decl.get_settings())
+        # The pairing is an edge from the declaration's invisible pin to the usage's (invisible) "In" pin.
+        self.edge(decl, "InvisiblePin", use, "In")
+        return use
 
     def settings(self, node):
         return node.get_settings()

@@ -80,7 +80,7 @@ def st_assets():
 
 def st_graphs():
     out = {}
-    for path in ("/Game/WorldGen/Graphs/PCG_Streets", "/Game/WorldGen/Graphs/PCG_Indoor"):
+    for path in ("/Game/WorldGen/Graphs/PCG_SpawnAndRecord", "/Game/WorldGen/Graphs/PCG_Streets", "/Game/WorldGen/Graphs/PCG_Indoor"):
         g = unreal.EditorAssetLibrary.load_asset(path)
         if g is None:
             raise RuntimeError("graph missing: " + path)
@@ -93,6 +93,8 @@ def st_graphs():
             connected_in = [str(p.get_editor_property("properties").get_editor_property("label")) for p in n.get_editor_property("input_pins") if p.is_connected()]
             info["nodes"].append({"title": str(n.get_editor_property("node_title")), "class": s.get_class().get_name() if s else None,
                                   "in": ins, "out": outs, "connected_in": connected_in})
+            if s and s.get_class().get_name() == "PCGNamedRerouteUsageSettings" and not connected_in:
+                raise RuntimeError("%s: named reroute usage '%s' is not paired with its declaration" % (path, info["nodes"][-1]["title"]))
         out[path] = info
     return out
 

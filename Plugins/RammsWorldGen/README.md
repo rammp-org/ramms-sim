@@ -58,7 +58,7 @@ The five example levels (`Content/Maps/Gen/Map_Gen_*`, built by `Scripts/worldge
 | **Generator** | `ARammsWorldGenerator`: owns the `UPCGComponent`, a seed, a preset; flattens preset + profile + per-instance overrides into `FRammsWorldGenParams`; `Regenerate()` / `Randomize()` / `Cleanup()`; builds the manifest after generation; `PlacePlayerStart()`; `ExportManifest()` | `RammsWorldGenerator.h` |
 | **Procedural pieces** | `ARammsProcPiece`: a GeometryScript dynamic mesh whose dimensions decide usability — curb ramps with flares and detectable-warning strips, curbs, steps, ramps with landings and edge protection, walls with door openings, door leaves and thresholds, bollards, planters, low-poly trees and shrubs. Spawned by PCG's Spawn Actor with every property mapped from a same-named point attribute. Complex-as-simple collision. | `RammsProcPiece.h` |
 | **PCG nodes (C++)** | `Ramms: Street Network`, `Subdivide Lots`, `Building Massing`, `Park Layout`, `Hazard Placer`, `Indoor Layout`, `Manifest`. Deterministic by seed. They emit *oriented points with attributes*; stock spawners do the placing. | `Public/PCG/*.h` |
-| **Graphs** | `PCG_Streets` (downtown, suburban, park) and `PCG_Indoor`, **built from code** by `ramms_worldgen.graphs` so they are reviewable and reproducible. | `/Game/WorldGen/Graphs/` |
+| **Graphs** | `PCG_Streets` (downtown, suburban, park, main street) and `PCG_Indoor` (home, office, store), both ending in the shared subgraph `PCG_SpawnAndRecord`; **built from code** by `ramms_worldgen.graphs` so they are reviewable and reproducible (see `doc/world_generation.md`, "The PCG graphs"). | `/Game/WorldGen/Graphs/` |
 | **Python** | Graph builder DSL, palette/preset builders, example-level assembly, MCP toolset | `Content/Python/ramms_worldgen/` |
 
 The one wiring rule: each custom node's overridable properties are named
@@ -112,8 +112,8 @@ Live Coding — same rule as the rest of the project.
    or, in the editor's Python console, `import ramms_worldgen.build_all as b; b.build("all")`,
    or ask the assistant for `worldgen_build_assets`. This writes
    `/Game/WorldGen/Palettes/PAL_Default`, `/Game/WorldGen/Profiles/PROF_ADA`,
-   `/Game/WorldGen/Presets/PRE_*`, and `/Game/WorldGen/Graphs/PCG_Streets` +
-   `PCG_Indoor`. The report lists every palette slot it could not fill.
+   `/Game/WorldGen/Presets/PRE_*`, and `/Game/WorldGen/Graphs/PCG_Streets`,
+   `PCG_Indoor` and `PCG_SpawnAndRecord`. The report lists every palette slot it could not fill.
 4. Build the example levels:
    ```
    python Scripts/editor_remote_exec.py --file Scripts/worldgen/build_levels.py
@@ -142,8 +142,13 @@ is edited on the preset, the palette, or the profile.
 
 The PCG graphs are ordinary graphs: open `PCG_Streets` to see the wiring, add
 stock nodes between ours, or make a copy and point a preset at it. If you
-re-run the graph builder your edits to those two assets are overwritten —
-copy first.
+re-run the graph builder your edits to those assets are overwritten —
+copy first. A new graph only has to emit the standard point streams
+(`Primitives`, `Props`, `Modules`, `Grass`, `Pieces`, `Routes`, `Features`) and
+end in a `PCG_SpawnAndRecord` subgraph node; the builder's `subgraph()`,
+`comment()` and `named_reroute()` helpers keep it tidy.
+`Scripts/worldgen/graph_shots.py` captures the open graphs as 1:1 PNG tiles
+for docs.
 
 ### From Python
 
