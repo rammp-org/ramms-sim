@@ -80,7 +80,7 @@ def st_assets():
 
 def st_graphs():
     out = {}
-    for path in ("/Game/WorldGen/Graphs/PCG_SpawnAndRecord", "/Game/WorldGen/Graphs/PCG_Streets", "/Game/WorldGen/Graphs/PCG_Indoor"):
+    for path in ("/RammsWorldGen/Graphs/PCG_SpawnAndRecord", "/RammsWorldGen/Graphs/PCG_Streets", "/RammsWorldGen/Graphs/PCG_Indoor"):
         g = unreal.EditorAssetLibrary.load_asset(path)
         if g is None:
             raise RuntimeError("graph missing: " + path)
@@ -242,7 +242,7 @@ def _collision_check():
     # stacked baskets): stock is checked against walls, not against what holds it or against other stock.
     def slot_meshes(slot):
         try:
-            pal = unreal.load_asset("/Game/WorldGen/Palettes/PAL_Default")
+            pal = unreal.load_asset("/RammsWorldGen/Palettes/PAL_Default")
             slots = pal.get_editor_property("slots")
             for k in slots.keys():
                 if str(k) == slot:

@@ -32,7 +32,7 @@ def _bounds(graph):
 
 
 def _plan(name):
-    graph = unreal.load_asset("/Game/WorldGen/Graphs/" + name)
+    graph = unreal.load_asset("/RammsWorldGen/Graphs/" + name)
     unreal.get_editor_subsystem(unreal.AssetEditorSubsystem).open_editor_for_assets([graph])
     return graph
 

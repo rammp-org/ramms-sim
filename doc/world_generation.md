@@ -41,7 +41,7 @@ python Scripts/editor_remote_exec.py --file Scripts/worldgen/build_levels.py
 
 The first writes the palette (mapping semantic slots like `Bench`,
 `Hazard.Upheaval`, `Mat.Sidewalk` to the Fab assets it finds), the ADA
-profile, the presets and the PCG graphs under `/Game/WorldGen/`. The
+profile, the presets and the PCG graphs under `/RammsWorldGen/`. The
 second creates the example levels. Both are also MCP tools
 (`worldgen_build_assets`, `worldgen_build_level`).
 
@@ -67,7 +67,7 @@ game alike.
 ## Where things live
 
 ```
-Plugins/RammsWorldGen/
+Plugins/RammsWorldGen/          (submodule: rammp-org/ramms-worldgen)
   Source/RammsWorldGen/Public/
     RammsWorldGenTypes.h         FRammsWorldGenParams, manifest structs, enums
     RammsWorldPreset.h           URammsWorldPreset
@@ -77,7 +77,8 @@ Plugins/RammsWorldGen/
     RammsProcPiece.h             ARammsProcPiece (GeometryScript pieces)
     PCG/                         the custom PCG nodes
   Content/Python/ramms_worldgen/ graph builder, palettes, presets, levels, MCP toolset
-Content/WorldGen/                generated assets: Palettes, Profiles, Presets, Graphs
+  Content/{Graphs,Presets,Palettes,Profiles,Materials}/
+                                 generated assets (/RammsWorldGen/...), rebuilt by build_assets.py
 Content/Maps/Gen/                example levels
 Scripts/worldgen/                build_assets.py, build_levels.py, regenerate.py
 ```

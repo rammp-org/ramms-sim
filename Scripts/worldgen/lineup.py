@@ -14,7 +14,7 @@ import unreal
 
 
 def _lineup_rows(slots):
-    pal = unreal.load_asset("/Game/WorldGen/Palettes/PAL_Default")
+    pal = unreal.load_asset("/RammsWorldGen/Palettes/PAL_Default")
     smap = pal.get_editor_property("slots")
     rows = []
     for si, slot in enumerate(slots):
