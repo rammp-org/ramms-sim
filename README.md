@@ -389,7 +389,7 @@ command-line builds above.
 
 ### Plugin Submodules
 
-The project uses a modular plugin architecture. Seven plugins are managed as
+The project uses a modular plugin architecture. Fourteen plugins are managed as
 git submodules:
 
 | Plugin | Path | Description |
@@ -401,6 +401,13 @@ git submodules:
 | **RammsHumanPhysics** | `Plugins/RammsHumanPhysics/` | Experimental human body physics plugin for RAMMS |
 | **RammsNewtonPhysics** | `Plugins/RammsNewtonPhysics/` | Experimental Newton Dynamics integration scaffold — third-party detection, fixed-step subsystem, actor bridge component, and articulated robot API for Newton-first full-robot simulation |
 | **RammsMujocoPhysics** | `Plugins/RammsMujocoPhysics/` | Experimental MuJoCo integration scaffold — third-party detection, fixed-step subsystem, and actor bridge component for selective external simulation |
+| **RammsMujocoSupport** | `Plugins/RammsMujocoSupport/` | Support utilities, classes and content for MuJoCo-based simulation, including end-effector IK teleoperation for the URLab Kinova Gen3 and gripper articulation |
+| **unreal-robotics-lab** | `Plugins/unreal-robotics-lab/` | URLab: MuJoCo physics for Unreal Engine, with MJCF import, 40+ sensors, ZMQ networking, debug visualization, and record/replay |
+| **RammsCrowd** | `Plugins/RammsCrowd/` | Mass Entity NPC crowd simulation (ZoneGraph/NavMesh locomotion) with a data-driven framework for NPC reactions to robots and vehicles |
+| **RammsAccess** | `Plugins/RammsAccess/` | Alternative-access input: a normalized intent stream from external devices (BCI, HID/pointer, assistive switches) mapped onto the drive, arm and gripper controllers |
+| **RammsControl** | `Plugins/RammsControl/` | Dependency-light control-surface model: how a robot describes its controls and how any input source drives them (no UMG, no physics) |
+| **RammsUI** | `Plugins/RammsUI/` | User interface components and tools |
+| **RammsPrivateAssets** | `Plugins/RammsPrivateAssets/` | Private content (lift-drive CAD meshes, MJCF-derived articulations, and the pawns, tables and test map built on them). Content only; enabled automatically when present |
 
 An additional local plugin (**VolingaRenderer**) provides custom rendering
 capabilities.
@@ -433,8 +440,7 @@ Ramms/
 │   ├── RammsMujocoPhysics/    Experimental MuJoCo backend integration (submodule)
 │   └── VolingaRenderer/       Custom rendering (local)
 ├── Source/Ramms/              Main game module (game mode, pawn, vehicles)
-├── py/                        Python remote execution scripts
-├── urdf/                      Robot URDF model files
+├── Scripts/                   Build, packaging and editor remote execution scripts
 ├── doc/                       Documentation (pixel streaming, planning docs) & images
 ├── Ramms.uproject             Project file
 └── Ramms.sln                  Visual Studio solution
@@ -604,27 +610,20 @@ global illumination. Key settings in `Config/DefaultEngine.ini`:
 
 ## Python Integration
 
-Python scripts in the `py/` directory enable external control and data
-collection via UE's Remote Execution interface (port 6776):
-
-| Script | Purpose |
-|--------|---------|
-| `mebot_control_example.py` | Control MeBot wheelchair (velocity, drive mode, caster arms) |
-| `camera_capture_example.py` | Discover cameras, read parameters, access render targets |
-| `move_actor_circle_remote.py` | Non-blocking actor animation (circle, figure-8, vertical) |
-| `upyrc_*.py` | Integration examples and utilities |
-
-**Setup:**
+`Scripts/editor_remote_exec.py` is a dependency-free client for UE's Python
+Remote Execution. It runs a snippet or a script file inside a running editor
+and prints the editor-side output:
 
 ```bash
-cd py
-python -m venv env
-env\Scripts\activate      # Windows
-pip install -r requirements.txt
+python Scripts/editor_remote_exec.py --code "unreal.log('hi')"
+python Scripts/editor_remote_exec.py --file path/to/script.py
+python Scripts/editor_remote_exec.py --eval "unreal.SystemLibrary.get_project_directory()"
 ```
 
-Enable **Remote Execution** in the UE Editor: **Edit > Project Settings >
-Plugins > Python > Remote Execution > Enable Remote Execution**.
+Remote Execution is enabled in this project's settings (multicast
+239.0.0.1:6766, loopback). For another project, enable it under **Edit >
+Project Settings > Plugins > Python > Remote Execution > Enable Remote
+Execution**.
 
 ## MCP Server (AI assistants in the editor)
 
