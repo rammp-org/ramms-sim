@@ -42,3 +42,6 @@
 [submodule "Plugins/RammsControl"]
 	path = Plugins/RammsControl
 	url = git@github.com:rammp-org/ramms-control
+[submodule "Plugins/RammsWorldGen"]
+	path = Plugins/RammsWorldGen
+	url = git@github.com:rammp-org/ramms-worldgen

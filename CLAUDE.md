@@ -10,12 +10,14 @@ Unreal Engine 5.8 C++ simulation for robotic assistive mobility/manipulation: Me
 - **GPU sensor shaders have a fixed path.** `.usf` compute shaders live in `Plugins/RammsCore/Shaders/Private/` (e.g. `RammsSensorTrace.usf`) and are mapped to virtual path `/RammsCore` in `FRammsCoreModule::StartupModule()`; include them as `/RammsCore/...`. RammsCore pulls engine `Renderer/Private` + `Internal` headers for the RDG TLAS SRV, so the GPU trace path is coupled to UE 5.8 internals and needs Lumen HW RT to populate the TLAS.
 - **Never set `r.RayTracing.ForceAllRayTracingEffects=1`** - it breaks the `DrawDebugMesh` used for sensor/camera frustum visualization. Keep `r.RayTracing` and `r.Lumen.HardwareRayTracing` enabled in `Config/DefaultEngine.ini` so the sensor TLAS stays populated.
 - **All sensors trace along their local +X axis.** Orient ToF/Sonar/IMU components accordingly.
+- **World generation lives in `Plugins/RammsWorldGen`** (not yet a submodule). PCG graphs under `/Game/WorldGen/Graphs` are *built from code* by `Content/Python/ramms_worldgen/graphs.py`; edit the builder, not the graph asset, or your change is overwritten by the next `build_assets.py`. Every custom PCG node property that mirrors a `FRammsWorldGenParams` member must keep the same name — that is how one `Get Actor Property(Self, Params)` node drives the whole graph. Point attributes written by `RammsPCG::WritePiece` must match `ARammsProcPiece` UPROPERTY names and `_graph.PIECE_PROPERTIES`. See `Plugins/RammsWorldGen/README.md`.
 
 ## Stack & layout
 - C++ (UE 5.8) + Blueprints; HLSL compute shaders; Python for URDF/remote control. IK uses **Eigen** (see `RammsCore.Build.cs`).
 - `Source/Ramms/` - main runtime module (game mode, pawn, Chaos vehicle); `Source/*.Target.cs` define the `Ramms` and `RammsEditor` targets.
 - `Plugins/RammsCore/Source/RammsCore/` - controllers, sensors, IK (`Public/`+`Private/`); `Shaders/Private/`; `Content/Python/urdf/` conversion scripts.
 - `Config/` - `.ini` project/renderer settings; `Content/` - maps, robot/vehicle blueprints.
+- `Plugins/RammsWorldGen/` - procedural world generation (PCG nodes, generator actor, procedural pieces, Python builders, MCP toolset); `Content/WorldGen/` its generated assets; `Content/Maps/Gen/` the example levels; `Scripts/worldgen/` the editor runners.
 
 ## Build, run, test
 - Set `$UE = "C:\Program Files\Epic Games\UE_5.8"` (adjust to your install).
