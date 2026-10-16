@@ -403,6 +403,7 @@ git submodules:
 | **RammsHumanPhysics** | `Plugins/RammsHumanPhysics/` | Experimental human body physics plugin for RAMMS |
 | **RammsNewtonPhysics** | `Plugins/RammsNewtonPhysics/` | Experimental Newton Dynamics integration scaffold — third-party detection, fixed-step subsystem, actor bridge component, and articulated robot API for Newton-first full-robot simulation |
 | **RammsMujocoPhysics** | `Plugins/RammsMujocoPhysics/` | Experimental MuJoCo integration scaffold — third-party detection, fixed-step subsystem, and actor bridge component for selective external simulation |
+| **RammsWorldGen** | `Plugins/RammsWorldGen/` | Procedural, seed-driven pedestrian / wheelchair worlds on PCG (streets, parks, homes, offices, stores) with crowds and a ground-truth accessibility manifest ([ramms-worldgen](https://github.com/rammp-org/ramms-worldgen)); see [doc/world_generation.md](doc/world_generation.md) |
 
 An additional local plugin (**VolingaRenderer**) provides custom rendering
 capabilities.
