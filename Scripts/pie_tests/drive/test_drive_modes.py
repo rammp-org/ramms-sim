@@ -180,9 +180,15 @@ if low is not None and "low_level" in modes:
 # --- exposure follows the mode, not the authored flag -----------------------
 # Deliberately not "the authored value is restored": on a robot that carries a
 # low-level mode the flag is the mode's to drive, and putting the authored one
-# back (it defaults to true) would leave every motor exposed in every mode.
-check(surface.get_editor_property("expose_unclaimed_motors") is False,
-      "outside low level the raw motors are gated off at the surface")
+# back (it defaults to true) would leave every motor exposed in every mode. A
+# robot without one keeps the surface's authored flag (as the per-mode checks
+# above already allow).
+if low is not None:
+    check(surface.get_editor_property("expose_unclaimed_motors") is False,
+          "outside low level the raw motors are gated off at the surface")
+else:
+    check(surface.get_editor_property("expose_unclaimed_motors") == start_exposure,
+          "no low-level mode: the surface's motor exposure is left as authored (%s)" % start_exposure)
 check(str(surface.get_editor_property("unclaimed_motor_group")) == start_group,
       "the motor group is unchanged (%s)" % start_group)
 
