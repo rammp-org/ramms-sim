@@ -33,6 +33,14 @@ Run inside the editor with PIE started on a holonomic test level:
 Two phases, because motion needs frames to happen in:
     unreal._ramms_drive_phase = "kinematics"   # default; also arms the motion run
     unreal._ramms_drive_phase = "motion"       # report what moved
+
+A switch at rest makes the incoming mode active at once, but it drives nothing
+until the stance has put its own wheels down, and nothing the outgoing mode's
+wheels cannot carry until the change is done -- a stick pushed meanwhile waits.
+So the motion run waits for the selector to finish the switch to holonomic
+(IsSwitchingMode false) before it settles and drives; it times out after
+SWITCH_WAIT frames. With no command the holonomic mode holds the robot still
+where it comes to rest, so the drift it is measured against is about zero.
 """
 
 import math
@@ -163,12 +171,16 @@ if PHASE == "kinematics":
     unreal._ramms_drive_data = {"samples": [], "rolled": 0.0, "radius": radius,
                                 "speed_sum": 0.0, "speed_n": 0, "peak_speed": 0.0,
                                 "error": None, "world": world.get_path_name()}
-    st = {"n": 0}
+    # Frames: n counts every frame; `start` is the frame the settle began,
+    # once the switch to holonomic was done (or SWITCH_WAIT frames passed).
+    st = {"n": 0, "start": None}
     HOLD = 45
     # Switching to holonomic raises the centre wheels off the ground, and the
     # base then drops onto the omni wheels. Drive before that settles and the
-    # first leg measures the fall, not the command.
-    SETTLE = 60
+    # first leg measures the fall, not the command. The switch itself is waited
+    # out first: at rest the mode drives nothing until its wheels are down.
+    SETTLE = 30
+    SWITCH_WAIT = 400
 
     def stop_sampling():
         h = getattr(unreal, "_ramms_drive_h", None)
@@ -188,6 +200,16 @@ if PHASE == "kinematics":
             stop_sampling()
 
     def sample_inner(dt):
+        if st["start"] is None:
+            # Wait for the switch to holonomic to finish its stance: until then
+            # the mode drives nothing (or nothing the treads cannot carry).
+            switching = selector is not None and selector.is_switching_mode()
+            st["wait"] = st.get("wait", 0) + 1
+            if switching and st["wait"] < SWITCH_WAIT:
+                return
+            st["start"] = 0
+            unreal._ramms_drive_data["switch_frames"] = st["wait"]
+            unreal._ramms_drive_data["switch_done"] = not switching
         n = st["n"]
         st["n"] = n + 1
         loc = chassis.get_world_location()
@@ -252,8 +274,10 @@ else:
     s = data["samples"]
     HOLD = getattr(unreal, "_ramms_drive_hold", 45)
     SETTLE = getattr(unreal, "_ramms_drive_settle", 0)
-    print("[drive] %d samples collected (%d settle + 3 x %d expected)"
-          % (len(s), SETTLE, HOLD))
+    print("[drive] %d samples collected (%d settle + 3 x %d expected), after %s frames waiting for the switch"
+          % (len(s), SETTLE, HOLD, data.get("switch_frames")))
+    check(data.get("switch_done", False), "the switch to holonomic finished its stance before the legs (%s frames)"
+          % data.get("switch_frames"))
     if len(s) < SETTLE + HOLD * 3:
         print("[drive] NOTE the run was cut short; give it more wall time next run")
 

@@ -16,6 +16,15 @@ contributors and rewrites the surface's motor exposure, and a stand-down that
 skipped either would strand the robot with no drive controls and limp linkages,
 recoverable only by restarting play.
 
+A switch at rest makes the incoming mode active when SetActiveMode returns
+(checked here), but between two modes with stances the stance then ramps, and
+the incoming mode drives nothing until its own wheels are down (the stick
+waits; the selector's IsSwitchingMode is true meanwhile, also checked). A robot
+may also carry a curb mode (URammsCurbNegotiationController): it offers no
+drive axes of its own -- curb.negotiate is how it is entered -- and, selected
+by hand with nothing to cross, hands back on its next tick; this script runs in
+one call, so it is still active when its checks run.
+
 Run inside the editor with PIE started on a level whose pawn has a selector:
     python3 Scripts/editor_remote_exec.py \
         --file Scripts/pie_tests/drive/test_drive_modes.py
@@ -39,6 +48,9 @@ if surface is None:
     raise RuntimeError("the pawn has a selector but no control surface to rebuild")
 
 low = pawn.get_component_by_class(unreal.RammsLowLevelDriveMode)
+curb = pawn.get_component_by_class(unreal.RammsCurbNegotiationController) if hasattr(unreal, "RammsCurbNegotiationController") else None
+CURB_ID = str(curb.get_drive_mode_id()) if curb is not None and hasattr(curb, "get_drive_mode_id") else ("curb" if curb is not None else None)
+STANCE_MODES = ("differential", "holonomic")  # the modes with a drive stance of their own
 
 failures = []
 
@@ -84,9 +96,14 @@ print("[modes] starting in '%s', surface exposure=%s group=%s"
 
 # --- each mode in turn ------------------------------------------------------
 per_mode = {}
+previous = start_mode
 for mid in modes:
     check(selector.set_active_mode(unreal.Name(mid)), "selector switched to '%s'" % mid)
     check(str(selector.get_active_mode_id()) == mid, "'%s' reports itself active" % mid)
+    if mid in STANCE_MODES and previous in STANCE_MODES and mid != previous and hasattr(selector, "is_switching_mode"):
+        # Active at once, its stance still ramping: the stick waits for it.
+        check(selector.is_switching_mode(), "'%s' -> '%s' at rest: the stance ramps on (the stick waits for it)" % (previous, mid))
+    previous = mid
     s = shape()
     per_mode[mid] = s
     print("[modes] %-14s drive=%s motors=%d linkage=%d"
@@ -97,6 +114,14 @@ for mid in modes:
         # only mode that offers the raw ones.
         check(not s["drive"], "low level offers no drive axes (%s)" % s["drive"])
         check(len(s["motors"]) > 0, "low level offers the raw motor axes (%d)" % len(s["motors"]))
+    elif mid == CURB_ID:
+        # A crossing drives the robot, not a stick: no drive axes of its own,
+        # and the raw motor axes still gated off.
+        check(not s["drive"], "'%s' offers no drive axes (%s)" % (mid, s["drive"]))
+        check("curb.negotiate" in s["ids"], "'%s' still offers curb.negotiate" % mid)
+        if low is not None:
+            check(len(s["motors"]) == 0,
+                  "'%s' leaves the raw motor axes gated off (%d offered)" % (mid, len(s["motors"])))
     else:
         check("drive.forward" in s["drive"], "'%s' offers drive.forward" % mid)
         # The raw axes are low level's alone: a robot carrying one has its
@@ -113,7 +138,7 @@ for mid in modes:
 # ever sees one of them, which is the property this whole mechanism rests on.
 # --- the round trip that used to strand the robot ---------------------------
 if low is not None and "low_level" in modes:
-    other = next((m for m in modes if m != "low_level"), None)
+    other = next((m for m in modes if m != "low_level" and "drive.forward" in per_mode[m]["drive"]), None)
 
     for claim_all in (False, True):
         low.set_claim_all_actuators(claim_all)
