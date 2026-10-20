@@ -29,8 +29,12 @@ friction is the engine default. Ground is a slab plus paving cubes.
 
 Levels are generated in the editor and saved (`Content/Maps/Gen/Map_Gen_*.umap`).
 `ARammsWorldGenerator` also has `Regenerate()`, `RegenerateWithSeed(int32)` and
-`Randomize()`, calls `Regenerate()` from `BeginPlay`, and broadcasts
-`OnWorldGenerated(const FRammsWorldManifest&)` when done.
+`Randomize()`, and broadcasts `OnWorldGenerated(const FRammsWorldManifest&)`
+when done. It regenerates at `BeginPlay` only when `bGenerateOnBeginPlay` is
+set (default off, and off in `Map_Gen_MainStreet`).
+
+`Map_Gen_MainStreet` holds 38 curbs, 26 curb ramps and 2 steps as
+`ARammsProcPiece` actors, with a 15 cm rise: sidewalks at Z=0, road at Z=-15.
 
 ## Why quick-convert does not fit as is
 
@@ -103,24 +107,46 @@ something (no numeric guidance found; measure it).
 `SuggestedStart` (`FTransform`), or clip to `Bounds` (`FBox`). Log the geom
 and mesh-asset counts at compile.
 
-**When it runs.** URLab compiles at `BeginPlay`, while the generator also
-calls `Regenerate()` from `BeginPlay`, and the order between the two is not
-defined. Recompiling mid-PIE is supported: `AAMjManager::CompileModel`
-reruns every contributor's `AuthorSceneSpec`, installs the new model
-transactionally (a failed compile keeps the old one), and migrates robot
-qpos, qvel, ctrl and mocap state. So the contributor binds `OnWorldGenerated`
-and requests a recompile, which covers both PIE start and runtime
-regeneration. Cost: two compiles at PIE start, unless the first compile is
-deferred until generation finishes.
+**When it runs.** URLab compiles at `BeginPlay`. For saved levels the
+geometry is already there, so that one compile is enough. Runtime
+regeneration (`Regenerate()`, or a level with `bGenerateOnBeginPlay` set,
+whose order against URLab's compile is not defined) needs a recompile, which
+URLab supports mid-PIE: `AAMjManager::CompileModel` reruns every
+contributor's `AuthorSceneSpec`, installs the new model transactionally (a
+failed compile keeps the old one), and migrates robot qpos, qvel, ctrl and
+mocap state. So the contributor binds `OnWorldGenerated` and requests a
+recompile.
 
 ## Zero-code baseline to try first
 
 URLab already ships `AMjHeightfieldActor`, which raycasts the level's complex
 collision inside a box and builds a world-body heightfield geom, cached to
-disk. Dropping one over a MainStreet block should let a MuJoCo robot feel
-curbs, ramps and steps today, with edges limited to the grid resolution and
-no vertical faces (walls become steep slopes). Worth trying before Phase 1 to
-get a reference run and see whether exact parts are needed for the curb work.
+disk. Edges are limited to the grid resolution and there are no vertical
+faces (walls become steep slopes), but it needs no new code.
+
+**Tried 2026-10-20, it works.** The test map lives in the optional private
+assets plugin, because the only MuJoCo-driven bases are the lift-drives; the
+public `BP_Mebot_Mujoco` drives its base on Chaos and only the arm is in
+MuJoCo. It is a copy of `Map_Gen_MainStreet` with an `AMjManager`, the
+lift-drive test game mode, and a
+20 m square `AMjHeightfieldActor` at 512 samples (about 4 cm cells, Z span
+-40 to +40 cm) centred on the curb ramp at (204, 46). The heightfield sampled
+-15 to 0 cm. Driving the lift-drive forward in differential mode from the
+road:
+
+- At full input (about 1 m/s) it climbed the ramp: `base_link` rose 14.9 cm
+  (the 15 cm rise), pitch went from its resting 4 degrees to 9 on the slope
+  (the ramp is 5.7) and back. It later drove off a curb edge and dropped
+  15 cm back to the road without trouble.
+- At half input it climbed about 40% of the ramp and stalled. Not
+  investigated; the drive's low-speed torque is the likely cause, not the
+  terrain.
+- Open loop it drifts: it settled with an 8 degree yaw error and wandered
+  off the ramp line, so scripted runs need heading control.
+
+So the heightfield is good enough to drive WorldGen streets under MuJoCo
+now. Exact parts (Phase 1) still matter for sharp curb edges, walls and
+anything needing vertical faces, and for areas larger than one fine grid.
 
 ## Phases
 
@@ -144,11 +170,7 @@ get a reference run and see whether exact parts are needed for the curb work.
 
 ## Still unverified
 
-- MainStreet's actual contents. The `PRE_MainStreet` preset sets entrance
-  step and ramp chances, and the streets graph builds curbs and curb ramps,
-  but the saved `.umap` was not inspected.
-- Whether `BeginPlay` regeneration is skipped for saved levels, and whether
-  PCG-spawned pieces are transient.
+- Whether PCG-spawned pieces are transient.
 - Packaged builds: CoACD links into runtime builds, but quick-convert reads
   `TriMeshGeometries`, which needs cooked collision data, and the `Saved/`
   cache path was not tested in a package.
@@ -162,5 +184,6 @@ get a reference run and see whether exact parts are needed for the curb work.
    RammsWorldGen plugin (its own repo), including a new public API. OK?
 3. CurbRamp flares: approximate with wedges, or emit the flares as small
    heightfields for exact shape?
-4. Defer URLab's first compile until generation finishes (needs a hook in
-   URLab), or accept two compiles at PIE start?
+4. For levels with `bGenerateOnBeginPlay` set: defer URLab's first compile
+   until generation finishes (needs a hook in URLab), or accept two compiles
+   at PIE start?
