@@ -28,8 +28,29 @@ def _lineup_rows(slots):
     return rows
 
 
+LINEUP_LEVEL = "/Game/Maps/Gen/Map_Gen_Indoor"
+
+
 def _start_lineup(slots, top, only=(), cam_yaw=0):
-    s = {"phase": "level", "until": 0.0, "i": 0, "handle": None, "views": [], "names": {}}
+    import os
+    s = {"phase": "build", "until": 0.0, "i": 0, "handle": None, "views": [], "names": {}}
+    # Load the stage level here, not from the tick callback: loading from a slate tick (above all with a dirty
+    # level open) has crashed the editor. A dirty level is left alone rather than discarded.
+    try:
+        dirty = [p.get_name() for p in unreal.EditorLoadingAndSavingUtils.get_dirty_map_packages()]
+    except Exception:  # noqa: BLE001
+        dirty = []
+    # (An earlier lineup's leftovers in the stage level itself are fine to drop.)
+    dirty = [d for d in dirty if d != LINEUP_LEVEL]
+    if dirty:
+        unreal.log_warning("[lineup] the open level has unsaved changes (%s); save or revert it first" % ", ".join(dirty))
+        return
+    if not unreal.get_editor_subsystem(unreal.LevelEditorSubsystem).load_level(LINEUP_LEVEL):
+        unreal.log_warning("[lineup] could not load %s" % LINEUP_LEVEL)
+        return
+    os.makedirs(os.path.join(unreal.Paths.project_saved_dir(), "WorldGen"), exist_ok=True)
+    os.makedirs(os.path.join(unreal.SystemLibrary.get_project_saved_directory(), "Screenshots", "WindowsEditor"), exist_ok=True)
+    s["until"] = time.time() + 3.0
     eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 
     def spawn(cls, loc, rot=unreal.Rotator(0, 0, 0)):
@@ -112,12 +133,8 @@ def _start_lineup(slots, top, only=(), cam_yaw=0):
         if time.time() < s["until"]:
             return
         try:
-            if s["phase"] == "level":
-                # Built far from the origin of a freshly loaded level (new_level crashes from a tick callback);
-                # nothing is saved.
-                unreal.get_editor_subsystem(unreal.LevelEditorSubsystem).load_level("/Game/Maps/Gen/Map_Gen_Indoor")
-                s["phase"] = "build"; s["until"] = time.time() + 3.0
-            elif s["phase"] == "build":
+            if s["phase"] == "build":
+                # Built far from the origin of the freshly loaded level; nothing is saved.
                 build()
                 s["phase"] = "cam"; s["until"] = time.time() + 5.0
             elif s["phase"] == "cam":
