@@ -138,9 +138,10 @@ road:
   (the 15 cm rise), pitch went from its resting 4 degrees to 9 on the slope
   (the ramp is 5.7) and back. It later drove off a curb edge and dropped
   15 cm back to the road without trouble.
-- At half input it climbed about 40% of the ramp and stalled. Not
-  investigated; the drive's low-speed torque is the likely cause, not the
-  terrain.
+- At half input it climbed about 40% of the ramp and stalled, with both
+  drive wheels at their full commanded torque (9.4 N·m each, about 146 N of
+  traction) and nearly stopped. The cause is the robot model, not the
+  terrain: see "Why the half-input climb stalls" below.
 - Open loop it drifts: it settled with an 8 degree yaw error and wandered
   off the ramp line, so scripted runs need heading control.
 
@@ -165,9 +166,37 @@ at matched speed:
 | MeBot, Chaos, half and full input | 0.94 and 1.8 m/s | climbed fully |
 
 Both rose the full 15 cm and pitched up by roughly the ramp angle (MuJoCo
-lift-drive +5.5 degrees, Chaos MeBot +4.8). Both lose a lot of speed on the
-slope at low command, which points at the drive controllers rather than the
-terrain; the different robots mean this does not isolate the physics engine.
+lift-drive +5.5 degrees, Chaos MeBot +4.8). Both lose speed on the slope at
+low command, but only the lift-drive stalls, for the reason below.
+
+**Why the half-input climb stalls.** The differential controller sends open
+loop torque (input times `MaxTorque`, 20 N·m here), not a speed target, so
+half input is half torque. The base weighs 111.8 kg (MJCF and runtime agree),
+so the 10% grade alone needs about 109 N, well inside the 146 N available.
+The rest is the omni wheels. Live contact forces from the URLab bridge
+(`get_contacts`):
+
+| Snapshot | Rear omni wheels: load, friction force, ratio |
+|---|---|
+| At rest on flat | 73 N and 50 N, about 0 N |
+| Driving on flat at 0.46 m/s | 348 N, 259 N, 0.75 (one wheel) |
+| Stalled on the ramp | 80 N and 79 N, 55 N each, 0.69 |
+
+A ratio near the 0.9 friction coefficient means the wheel is sliding, not
+rolling. The omni wheel axles sit at 30 and 60 degrees to the direction of
+travel, so moving forward needs the rollers to slide along the axle, but the
+MJCF has no rollers: each omni wheel is a plain geom with the shared 0.9
+friction. In differential mode the rear omni wheels still carry load, so they
+act as skids whose drag does not fall with speed. On flat that drag only
+costs speed. On the ramp, grade plus skid exceeds half-input traction, and
+the base stalls.
+
+Fix options, all in the private lift-drive model: model the rollers (small
+jointed roller bodies), give the omni contacts anisotropic friction (low
+along the axle) through explicit `<pair>` friction, or keep the omni wheels
+off the ground in differential mode. Until then, differential-mode runs of
+this model under-report climbing ability, while the heightfield
+(above) over-reports curb climbing at vertical faces.
 
 So the heightfield is good enough to drive WorldGen streets under MuJoCo
 now. Exact parts (Phase 1) still matter for sharp curb edges, walls and
