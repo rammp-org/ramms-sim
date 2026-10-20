@@ -144,6 +144,31 @@ road:
 - Open loop it drifts: it settled with an 8 degree yaw error and wandered
   off the ramp line, so scripted runs need heading control.
 
+**Terrain fidelity.** Tracing the true Unreal surface at 20,000 random
+points in the box and comparing it with the heightfield as MuJoCo sees it
+(linear between samples): 99.8% of points are within 0.5 cm, and the ramp
+profile is within 0.4 cm. The only error is at vertical curb faces, where
+the 15 cm step becomes a slope one cell (3.9 cm) wide, about 75 degrees.
+A wheel meeting that slope is pushed up, which a real vertical face does not
+do, so curb-climbing results on a heightfield will be optimistic.
+
+**Chaos reference.** There is no Chaos lift-drive, so the public MeBot
+(Chaos base) ran the same ramp with the same open-loop commands. It is a
+different robot and goes about twice as fast per unit of input, so compare
+at matched speed:
+
+| Run | Road speed | On the ramp |
+|---|---|---|
+| Lift-drive, MuJoCo, half input | 0.46 m/s | slowed to about 1 cm/s at 40% up, stalled |
+| MeBot, Chaos, quarter input | 0.41 m/s | slowed to about 0.2 m/s, still climbing (14 of 15 cm) when the run ended |
+| Lift-drive, MuJoCo, full input | 1.0 m/s | climbed fully |
+| MeBot, Chaos, half and full input | 0.94 and 1.8 m/s | climbed fully |
+
+Both rose the full 15 cm and pitched up by roughly the ramp angle (MuJoCo
+lift-drive +5.5 degrees, Chaos MeBot +4.8). Both lose a lot of speed on the
+slope at low command, which points at the drive controllers rather than the
+terrain; the different robots mean this does not isolate the physics engine.
+
 So the heightfield is good enough to drive WorldGen streets under MuJoCo
 now. Exact parts (Phase 1) still matter for sharp curb edges, walls and
 anything needing vertical faces, and for areas larger than one fine grid.
