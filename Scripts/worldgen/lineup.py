@@ -4,7 +4,8 @@ with a red marker in front of each, and screenshot them from the front.
     LINEUP = ["Furniture.TV", "Furniture.Sofa"]
     exec(open(r"C:/Users/waemf/data/ramms/Scripts/worldgen/lineup.py").read())
 
-LINEUP_ONLY = {"SM_TV"} limits it to some meshes; LINEUP_CAM_YAW = 90 looks from +Y instead of +X.
+LINEUP_ONLY = {"SM_TV"} limits it to some meshes; LINEUP_CAM_YAW = 90 looks from +Y instead of +X;
+LINEUP_PALETTE = "/RammsWorldGen/Palettes/PAL_UrbanVerse" lines up another palette.
 A mesh whose back (or side) faces the camera has a wrong facing. Screenshots:
 Saved/Screenshots/WindowsEditor/Lineup_<slot>_<n>.png (3 meshes per shot, +Y to the left), names in Saved/WorldGen/lineup.json.
 """
@@ -14,7 +15,7 @@ import unreal
 
 
 def _lineup_rows(slots):
-    pal = unreal.load_asset("/RammsWorldGen/Palettes/PAL_Default")
+    pal = unreal.load_asset(_PALETTE[0])
     smap = pal.get_editor_property("slots")
     rows = []
     for si, slot in enumerate(slots):
@@ -137,7 +138,8 @@ def _start_lineup(slots, top, only=(), cam_yaw=0):
     s["handle"] = unreal.register_slate_post_tick_callback(tick)
 
 
+_PALETTE = [globals().get("LINEUP_PALETTE", "/RammsWorldGen/Palettes/PAL_Default")]
 _start_lineup(list(globals().get("LINEUP", ["Furniture.TV"])), bool(globals().get("LINEUP_TOP", False)),
               set(globals().get("LINEUP_ONLY", ())), float(globals().get("LINEUP_CAM_YAW", 0.0)))
-for _k in ("LINEUP", "LINEUP_TOP", "LINEUP_ONLY", "LINEUP_CAM_YAW"):
+for _k in ("LINEUP", "LINEUP_TOP", "LINEUP_ONLY", "LINEUP_CAM_YAW", "LINEUP_PALETTE"):
     globals().pop(_k, None)

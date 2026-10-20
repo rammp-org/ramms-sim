@@ -85,5 +85,8 @@ DerivedDataCache/*
 Content/Fab/
 Content/CitySampleCrowd/
 Content/CitySampleVehicles/
+# UrbanVerse-100K assets: downloaded and imported locally (gated dataset, per-asset licenses);
+# see Plugins/RammsWorldGen/README.md "UrbanVerse assets".
+Content/UrbanVerse/
 __pycache__
 Packaged/
