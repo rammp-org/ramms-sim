@@ -4,7 +4,7 @@
 S=$(cd "$(dirname "$0")" && pwd); ROOT=$(cd "$S/../../.." && pwd); cd "$ROOT" || exit 1
 FAIL=0
 # Run one script in the editor; keep the Python exit status (the filters only shape the output).
-f(){ python3 Scripts/editor_remote_exec.py --file "$1" 2>&1 | grep -E "\[t1\]|\[s\]|\[pie\]|\[stop\]|\[pos\]|\[mc\]|\[turn\]|\[cs\]|\[arm\]|\[ci\]|\[hud\]|\[access\]|Traceback|Error|^ERROR" | sed 's/.*LogPython: //'
+f(){ python3 Scripts/editor_remote_exec.py --file "$1" 2>&1 | grep -E "\[t1\]|\[s\]|\[pie\]|\[stop\]|\[reset\]|\[pos\]|\[mc\]|\[turn\]|\[cs\]|\[arm\]|\[ci\]|\[hud\]|\[access\]|Traceback|Error|^ERROR" | sed 's/.*LogPython: //'
      local st=${PIPESTATUS[0]}; if [ "$st" -ne 0 ]; then echo "!! $(basename "$1") failed (exit $st)"; FAIL=1; fi; return "$st"; }
 # Set an operation variable in the editor, then run its check script. The
 # assignment's exit status matters: editor_remote_exec.py returns nonzero when
@@ -25,9 +25,15 @@ sleep 14
 f "$S/chaos_t1.py"
 for i in 1 2 3 4 5 6; do f "$S/chaos_sample.py"; sleep 0.5; done
 f "$S/chaos_stop.py"; sleep 2; f "$S/chaos_sample.py"
+# The forward run ends against the building's front, where the parking brakes
+# hold the chair; a turn in place there grinds on the wall. Back off it first.
+cs set drive.forward -0.4; sleep 0.8; cs release drive.forward; sleep 1.5; f "$S/chaos_sample.py"
 echo "--- turn: X=+1 must turn right ---"
 op turn_op "$S/chaos_turn.py" start; sleep 2
 op turn_op "$S/chaos_turn.py" check; sleep 2
+# Facing open ground after the turn, the later drive stream would carry the
+# chair off the edge of the map; start the rest from the spawn pose.
+f "$S/chaos_reset_pose.py"; sleep 2
 echo "--- constraint position motors (elevators / translators / caster arms) ---"
 f "$S/chaos_pos_cmd.py"; sleep 3; f "$S/chaos_pos_read.py"; sleep 2
 echo "--- control surface: lift axes, arbitration ---"

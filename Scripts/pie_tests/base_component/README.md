@@ -41,6 +41,17 @@ doesn't. `move_private_assets.py` is the one-shot migration that put them there.
   RammsUISubsystem registry is checked, Enhanced Input actions are injected
   through `ControlInput` (lift motor group, gripper open / close, arm up —
   `control_input_check.py`), and the MebotController API is exercised.
+- `make_ramp_map.py` — builds `/Game/Maps/Map_RampTest` from the engine's
+  default template: a 1:12 (4.8°, the ADA maximum) and a 1:8 (7.1°) ramp with
+  landings, rising along +X, and a PlayerStart on the first one's approach.
+  Idempotent (rebuilds the ramps in place).
+- `run_ramp.sh` — PIE on Map_RampTest: for each ramp the chair is teleported
+  to the approach (`ARammsRobotPawn::TeleportRobot`), driven up through the
+  control surface, let go halfway up, and must stay put: no more than 5 cm
+  back from its furthest point before it holds and 2 cm either way over the
+  next 6 s (`chaos_ramp.py go|check A|B`); then the same driving *down* from
+  the landing (`Ad`, `Bd`). It reports the parking brakes' state; on Chaos
+  they are what holds it.
 - `run_mj_full.sh` — PIE on Map_BaseTest_URL with `BP_LiftDriveLinkage_Ramms`:
   points `BP_LiftDriveTestGameMode.DefaultPawnClass` at the linkage pawn for the
   run (unsaved; `mj_restore.py` reloads the game mode from disk afterwards), lets
@@ -54,6 +65,9 @@ doesn't. `move_private_assets.py` is the one-shot migration that put them there.
   next / pause / reset by injecting the Enhanced Input actions (W, Q, N, P,
   Backspace) into `ControlInput` and checks URLab's hotkey handler is off
   (`control_input_check.py`).
+- `chaos_reset_pose.py` — puts the chair back at its PlayerStart, at rest;
+  `run_chaos.sh` runs it after the turn check so the later sections start
+  from the spawn pose.
 - `cs_common.py` — the runners' helpers: find the pawn's surface, pause the
   per-tick local input writers, `set_control` that raises when refused.
 - `strip_bp_input.py` — removes a robot Blueprint's direct input wiring (key
