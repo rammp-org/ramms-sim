@@ -55,12 +55,35 @@ assets:
 
 | | Before | Now |
 |---|---|---|
-| Root body (`mebot`) mass | forced to 50 kg by the vehicle movement's `Mass` | the physics asset's, 61.7 kg |
+| Root body mass (`mebot` plus the seat, rails, mounts and sensors welded to it) | forced to 50 kg by the vehicle movement's `Mass` | 61.7 kg: 21.9 kg `mebot` from its physics asset, 39.9 kg of welded parts from their meshes |
 | Root angular damping | 3.0, always (the "in the air" damping, and with no wheels it never saw the ground) | the asset's, 0 |
 | Flipped | teleported upright after 3–6 s on its side | stays where it fell |
 | Vehicle sleep logic, drag, tick | `ChaosWheeledVehicleMovementComponent` with no wheels, ticking | none |
 | Respawn when destroyed | a `BP_SportsCar_Pawn` at the first PlayerStart | none |
 | Keys | `IMC_Vehicle_Default` added by the controller | the robot's `ControlInput` only |
+
+### Arm and gripper masses
+
+The Kinova arm (`gen3_6dof`, which despite the name is the 7-DOF Gen3: base + 7 links) and the gripper
+(`kinova_gripper`, a Robotiq 2F-85) override every body's mass with the link masses of MuJoCo
+Menagerie's `kinova_gen3/gen3.xml` and `robotiq_2f85/2f85.xml`, so the Chaos and MuJoCo robots agree:
+
+| Arm bone | Gen3 link | kg | | Gripper bone (per side) | 2F-85 body | kg |
+|---|---|---|---|---|---|---|
+| `base_link` | base_link | 1.697 | | `base` | base | 0.777 |
+| `link_0` | shoulder_link | 1.377 | | `link_0_*` | driver | 0.009 |
+| `link_1` | half_arm_1_link | 1.164 | | `link_1_*` | coupler | 0.014 |
+| `link_2` | half_arm_2_link | 1.164 | | `link_2_*` | spring_link | 0.022 |
+| `link_3` | forearm_link | 0.930 | | `link_3_*` | follower | 0.013 |
+| `link_4` | spherical_wrist_1_link | 0.678 | | `end_*` | pad | 0.0035 |
+| `link_5` | spherical_wrist_2_link | 0.678 | | | | |
+| `link_6` | bracelet_link (vision) | 0.500 | | | | |
+
+That is 8.19 kg of arm and 0.90 kg of gripper (Kinova lists 8.2 kg for the 7-DOF arm, Robotiq 0.925 kg).
+Centres of mass and inertia still come from the bodies' boxes. Before this the boxes gave 11.3 kg and
+1.15 kg, and the 90 cm `ArmWorkspaceTrigger` sphere on `link_1` (query-and-probe, so welded in as
+if it were solid) added 411 kg to that link. The trigger is now query-only, which keeps it out of the
+body while it still overlaps `Interactable` objects.
 
 If the chair needs mass or damping changed, set it on the physics asset (or a `BodyInstance` override
 in the Blueprint) where it can be seen. `Scripts/pie_tests/base_component/run_chaos.sh` (drive, turn,
