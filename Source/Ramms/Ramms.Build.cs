@@ -14,19 +14,13 @@ public class Ramms : ModuleRules
 			"Engine",
 			"InputCore",
 			"EnhancedInput",
-			"ChaosVehicles",
 			"PhysicsCore",
 			"UMG",
 			"Slate"
 		});
 
 		PublicIncludePaths.AddRange(new string[] {
-			"Ramms",
-			"Ramms/SportsCar",
-			"Ramms/OffroadCar",
-			"Ramms/Variant_OffRoad",
-			"Ramms/Variant_TimeTrial",
-			"Ramms/Variant_TimeTrial/UI"
+			"Ramms"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });

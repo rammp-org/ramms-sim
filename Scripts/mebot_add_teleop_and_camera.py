@@ -93,10 +93,19 @@ for cls, class_name, name in WANTED:
     add(cls, class_name, name)
 
 # The `b` prefix is stripped for booleans on the Python side, which is why
-# reading `b_use_legacy_vehicle_input` reports no such property.
+# reading `b_use_legacy_vehicle_input` reports no such property. The flag went
+# away with the vehicle template (ARammsRobotPawn binds no input at all), so on
+# a current pawn there is nothing to turn off.
+def legacy_input_on(obj):
+    try:
+        return bool(obj.get_editor_property("use_legacy_vehicle_input"))
+    except Exception:
+        return False
+
 cdo = unreal.get_default_object(bp.generated_class())
-cdo.set_editor_property("use_legacy_vehicle_input", False)
-print("[mebot] use_legacy_vehicle_input -> %s" % cdo.get_editor_property("use_legacy_vehicle_input"))
+if legacy_input_on(cdo):
+    cdo.set_editor_property("use_legacy_vehicle_input", False)
+print("[mebot] legacy vehicle input on: %s" % legacy_input_on(cdo))
 
 unreal.BlueprintEditorLibrary.compile_blueprint(bp)
 if not unreal.EditorAssetLibrary.save_loaded_asset(bp):
@@ -116,7 +125,7 @@ for _, class_name, _ in WANTED:
         missing.append(class_name)
 if missing:
     raise RuntimeError("compile/save dropped: %s" % ", ".join(missing))
-if fresh_cdo.get_editor_property("use_legacy_vehicle_input"):
+if legacy_input_on(fresh_cdo):
     raise RuntimeError("compile/save dropped the legacy-input change")
 
 print("[mebot] verified on the saved asset: both components present, legacy vehicle input off")

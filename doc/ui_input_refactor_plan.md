@@ -345,6 +345,8 @@ the differential drive does) replaces those raw rows when it lands.
 **Result (2026-09-15): works.** PIE on `Map_Demo` with the chair
 (`BP_Mebot_Ramms`, whose throttle is an Enhanced Input action `IA_Throttle` in
 `IMC_Vehicle_Default`, bound in `ARammsPawn::SetupPlayerInputComponent`).
+(Since then the vehicle template is gone altogether: the robots derive from
+`ARammsSkeletalRobotPawn`, which binds no input; see `doc/robot_pawn.md`.)
 From the Pixel Streaming player page in Chrome, holding **W** (a keyboard
 event on the video element) drove `RammsDifferentialDriveController::DriveInput`
 to (0, 1) within a frame and the chair from x = −349 to x = −18 (it stopped

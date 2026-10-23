@@ -416,7 +416,7 @@ Ramms/
 ├── Content/                 Blueprint assets, materials, meshes, levels
 │   ├── Blueprints/            Game logic (BP_MebotGameMode, etc.)
 │   ├── Maps/                  Game levels
-│   ├── Robots/                Robot actor blueprints (BP_Kinova_Gen3, BP_Mebot_Ramms)
+│   ├── Robots/                Robot actor blueprints (BP_Kinova_Gen3, BP_Mebot_Ramms; pawns: doc/robot_pawn.md)
 │   ├── Vehicles/              Vehicle variants (AdaptedVanRamp, IDBuzz, etc.)
 │   ├── ada_door/              Accessible door system
 │   ├── Fab/                   Downloaded Fab marketplace assets
@@ -601,8 +601,8 @@ global illumination. Key settings in `Config/DefaultEngine.ini`:
 
 ### Game Settings
 
-- **Default map:** `VehicleTemplate/Maps/VehicleBasic`
-- **Default game mode:** `BP_VehicleAdvGameMode`
+- **Default map:** `Maps/Map_Demo`
+- **Default game mode:** `BP_MebotGameMode` (pawn `BP_Mebot_Ramms`, controller `ARammsPlayerController`)
 - **Splitscreen:** Enabled (2-player horizontal, 3-player top-favored)
 
 ## Python Integration

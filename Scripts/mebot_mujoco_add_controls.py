@@ -114,10 +114,19 @@ copy_props(component_of(src, "RammsRobotBaseComponent"),
 copy_props(component_of(src, "RammsDifferentialDriveController"),
            component_of(dst, "RammsDifferentialDriveController"), DRIVE_PROPS, "DiffDrive")
 
-# Last, once there is a surface path to drive through.
+# Last, once there is a surface path to drive through. (The flag went away with
+# the vehicle template: ARammsRobotPawn binds no input, so a current pawn has
+# nothing to turn off.)
+def legacy_input_on(obj):
+    try:
+        return bool(obj.get_editor_property("use_legacy_vehicle_input"))
+    except Exception:
+        return False
+
 cdo = unreal.get_default_object(dst.generated_class())
-cdo.set_editor_property("use_legacy_vehicle_input", False)
-print("[mujoco] use_legacy_vehicle_input -> %s" % cdo.get_editor_property("use_legacy_vehicle_input"))
+if legacy_input_on(cdo):
+    cdo.set_editor_property("use_legacy_vehicle_input", False)
+print("[mujoco] legacy vehicle input on: %s" % legacy_input_on(cdo))
 
 unreal.BlueprintEditorLibrary.compile_blueprint(dst)
 if not unreal.EditorAssetLibrary.save_loaded_asset(dst):
@@ -127,7 +136,7 @@ fresh = load_bp(TARGET)
 for _, class_name, _ in WANTED:
     if component_of(fresh, class_name) is None:
         raise RuntimeError("compile/save dropped %s" % class_name)
-if unreal.get_default_object(fresh.generated_class()).get_editor_property("use_legacy_vehicle_input"):
+if legacy_input_on(unreal.get_default_object(fresh.generated_class())):
     raise RuntimeError("compile/save dropped the legacy-input change")
 base = component_of(fresh, "RammsRobotBaseComponent")
 print("[mujoco] verified: base backend=%s table=%s, all four components present, legacy input off"

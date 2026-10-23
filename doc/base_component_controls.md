@@ -303,9 +303,8 @@ motor holds where you let go). Ids may be wildcards (`linkage.*.height`,
 | P, Backspace, / | `IA_Ramms_SimPause` / `SimReset` / `SimStep` | `sim.pause` / `sim.reset` / `sim.step` |
 | 1 – 7 | `IA_Ramms_SimDebug1..7` | `sim.debug.*` |
 
-The chair's vehicle-template parent (`ARammsPawn`) bound throttle / steering
-straight to the Chaos vehicle movement; `bUseLegacyVehicleInput` is false on
-`BP_Mebot_Ramms`, so those keys reach only the surface.
+The chair's pawn class (`ARammsSkeletalRobotPawn`, see `doc/robot_pawn.md`)
+binds no input of its own, so these keys reach the chair only through the surface.
 
 Mouse drag orbit and wheel zoom stay on `RammsRobotCameraComponent` (its
 per-frame mouse deltas don't map onto rate axes). In RAMMS MuJoCo game modes
