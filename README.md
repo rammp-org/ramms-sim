@@ -1,79 +1,171 @@
-# RAMMS-Sim
+<h1 align="center">RAMMS-Sim</h1>
 
-Robotic Assistive Mobility and Manipulation Simulation (RAMMS) — An Unreal
-Engine 5.8 simulation environment for robotic assistive technologies.
+<p align="center">
+  <b>Robotic Assistive Mobility and Manipulation Simulation</b><br>
+  A physics-based Unreal Engine 5.8 simulator for wheelchair-mounted robots:
+  a powered wheelchair base with a lift and articulated casters, a Kinova Gen3
+  arm with a Robotiq 2F-85 gripper, and the sidewalks, curb ramps, parks, homes,
+  offices and stores they have to work in.
+</p>
 
-<!-- markdown-toc start - Don't edit this section. Run M-x markdown-toc-refresh-toc -->
-**Table of Contents**
+<p align="center">
+  <img alt="Unreal Engine 5.8" src="https://img.shields.io/badge/Unreal%20Engine-5.8-0E1128?logo=unrealengine&logoColor=white">
+  <img alt="Platforms" src="https://img.shields.io/badge/platforms-Windows%20%7C%20Linux%20%7C%20macOS-4c8eda">
+  <img alt="Physics" src="https://img.shields.io/badge/physics-Chaos%20%7C%20MuJoCo%20%7C%20Newton-7a42f4">
+  <img alt="Interfaces" src="https://img.shields.io/badge/drive%20it%20from-Python%20%7C%20browser%20%7C%20BCI%20%7C%20MCP-2ea44f">
+</p>
 
-- [RAMMS-Sim](#ramms-sim)
-  - [Overview](#overview)
-  - [Prerequisites](#prerequisites)
-  - [Installation](#installation)
-    - [1. Clone with submodules](#1-clone-with-submodules)
-    - [2. Build the unreal-robotics-lab third-party dependencies](#2-build-the-unreal-robotics-lab-third-party-dependencies)
-    - [3. Download content packs from Fab](#3-download-content-packs-from-fab)
-    - [4. Open the project](#4-open-the-project)
-  - [Building from the Command Line](#building-from-the-command-line)
-    - [Locate your engine installation](#locate-your-engine-installation)
-    - [Compile the editor target](#compile-the-editor-target)
-    - [Compile a standalone game target](#compile-a-standalone-game-target)
-    - [Package the project](#package-the-project)
-    - [Cross-compile for Linux from Windows](#cross-compile-for-linux-from-windows)
-    - [Regenerate IDE project files (optional)](#regenerate-ide-project-files-optional)
-  - [Project Structure](#project-structure)
-    - [Plugin Submodules](#plugin-submodules)
-    - [Directory Layout](#directory-layout)
-  - [Simulation Features](#simulation-features)
-    - [Mobile Robotic Base (MeBot)](#mobile-robotic-base-mebot)
-    - [Kinova Gen 3 Manipulator](#kinova-gen-3-manipulator)
-    - [Accessible Van with Ramp](#accessible-van-with-ramp)
-    - [Sensor Simulation](#sensor-simulation)
-    - [Camera Capture System](#camera-capture-system)
-    - [Real-Time Streaming](#real-time-streaming)
-  - [Pixel Streaming (Remote Browser Access)](#pixel-streaming-remote-browser-access)
-  - [Configuration](#configuration)
-    - [Renderer & Ray Tracing](#renderer--ray-tracing)
-    - [Game Settings](#game-settings)
-  - [Python Integration](#python-integration)
-    - [ramms-tools (Remote Control API)](#ramms-tools-remote-control-api)
-  - [MCP Server (AI assistants in the editor)](#mcp-server-ai-assistants-in-the-editor)
-  - [World Generation (procedural, randomized environments)](#world-generation-procedural-randomized-environments)
-    - [The RAMMS toolset](#the-ramms-toolset)
-  - [URDF Interoperability](#urdf-interoperability)
-  - [Example Environments](#example-environments)
-  - [Developing](#developing)
-    - [Code Style](#code-style)
-    - [Updating Plugin Submodules](#updating-plugin-submodules)
-    - [Adding C++ Classes to Plugins](#adding-c-classes-to-plugins)
-  - [License](#license)
-  - [Contributing](#contributing)
-  - [Contact](#contact)
+<p align="center">
+  <img src="doc/images/readme/hero.webp" width="100%" alt="The MeBot wheelchair with its Kinova arm driving down a generated downtown sidewalk past pedestrians">
+</p>
 
-<!-- markdown-toc end -->
+<p align="center">
+  <a href="#highlights">Highlights</a> ·
+  <a href="#whats-inside">What's inside</a> ·
+  <a href="#whats-next">What's next</a> ·
+  <a href="#getting-started">Getting started</a> ·
+  <a href="#project-structure">Project structure</a> ·
+  <a href="#simulation-features">Feature reference</a>
+</p>
 
-https://github.com/user-attachments/assets/fdc96795-279f-4ccf-a092-382f6755a65d
+## Highlights
 
-## Overview
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="doc/images/readme/worldgen_seeds.webp" width="100%" alt="One suburban preset regenerated with eight different seeds"><br>
+      <b>Procedural, seed-driven worlds.</b> Streets, curb ramps, crosswalks,
+      parks, homes, offices and stores built on PCG from a preset and a seed,
+      each with a ground-truth accessibility manifest.
+    </td>
+    <td width="50%" valign="top">
+      <img src="doc/images/readme/camera_views.webp" width="100%" alt="The seat, wrist, Orbbec Gemini and LUCI cameras, with depth, recorded together while the chair drives"><br>
+      <b>Every camera on the robot.</b> The seat view plus the wrist, Orbbec
+      Gemini and LUCI cameras, each with its real intrinsics and mounting,
+      rendering RGB, depth and motion vectors.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="doc/images/readme/base_actuators.webp" width="100%" alt="The wheelchair base swinging its casters, lifting its seat and sliding its drive wheels"><br>
+      <b>An articulated base, not a box on wheels.</b> Differential drive,
+      front and rear caster swing arms, a lift that raises and tilts the seat
+      base, and drive wheels that slide fore and aft, each a motor you can
+      command, on a 46-body physics model that holds still on slopes.
+    </td>
+    <td width="50%" valign="top">
+      <img src="doc/images/readme/arm_gripper.webp" width="100%" alt="The Kinova Gen3 arm reaching and the 2F-85 gripper closing"><br>
+      <b>A physics-driven arm and gripper.</b> Kinova Gen3 with DLS, FABRIK and
+      CCD inverse kinematics, end-effector teleoperation and a Robotiq 2F-85,
+      with link masses from the manufacturer's data.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="doc/images/readme/crowd.webp" width="100%" alt="The chair driving across a plaza while pedestrians walk around it"><br>
+      <b>People who notice the robot.</b> Mass Entity pedestrians walk lanes
+      around the chair, avoid it, and react to it by distance and closing
+      speed, in test plazas and on the generated sidewalks.
+    </td>
+    <td width="50%" valign="top">
+      <img src="doc/images/readme/ui_panels.jpg" width="100%" alt="The in-game control panels: drive joystick, caster and lift sliders, camera capture"><br>
+      <b>Drive it from anywhere.</b> In-game panels generated from the
+      robot's own control surface, keyboard and gamepad, Python over Remote
+      Control, a browser over Pixel Streaming, BCI and switch input, or an AI
+      assistant over MCP.
+    </td>
+  </tr>
+</table>
 
-RAMMS-Sim provides a high-fidelity simulation environment for developing and
-testing robotic assistive mobility and manipulation systems. Built on Unreal
-Engine 5.8, it offers:
+## What's inside
 
-- **Physics-based robotics** — Differential drive wheelchair, 7-DOF robotic
-  arm with three IK solvers, two-finger gripper
-- **GPU-accelerated sensors** — Time-of-Flight, Sonar, and IMU with optional
-  inline ray tracing on the GPU (RT cores or software fallback)
-- **Multi-camera capture** — RGB + depth + motion vectors with custom
-  intrinsics and EXR output
-- **Real-time streaming** — Binary protocol (RMSS) over TCP for external
-  control and data consumption
-- **Accessible environment simulation** — Van with controllable door and
-  articulated ramp
-- **Python scripting** — Remote execution for external control and data
-  collection
+**Robots and physics**
+- **MeBot powered wheelchair base**: differential drive with torque and velocity
+  modes, odometry, front/rear caster swing arms, a lift that raises and tilts
+  the base, and drive wheels that slide fore and aft for front-, mid- and
+  rear-wheel drive. A parking brake brings a stopped chair to
+  rest and holds it on ramps.
+- **Kinova Gen3 arm and Robotiq 2F-85 gripper**: a skeletal arm on per-joint
+  physics constraints; joint, end-effector, velocity and torque control; three IK
+  solvers with null-space preferred poses; realistic link masses.
+- **One robot model, three physics engines**: every controller drives motors by
+  id through `RammsRobotBaseComponent`, which resolves a backend once: Chaos
+  skeletal bodies, MuJoCo through
+  [UnrealRoboticsLab](https://github.com/rammp-org/UnrealRoboticsLab), or the
+  experimental [Newton](https://github.com/newton-physics/newton) worker.
+- **A seated person and other robots**: an operator seated in the chair,
+  lift-drive and holonomic research platforms, an accessible van with an
+  articulated ramp, and an ADA door.
 
-## Prerequisites
+**Sensing**
+- **Calibrated cameras**: pixel intrinsics (fx, fy, cx, cy) and reusable sensor
+  presets (e.g. RealSense D435) on cameras mounted where the real Orbbec Gemini,
+  LUCI and wrist cameras sit, writing 32-bit EXR RGB + depth + motion vectors
+  with per-frame JSON metadata.
+- **GPU ray-traced range sensors**: time-of-flight (single point like the
+  VL53L0X or an NxM grid like the VL53L5CX) and sonar cones traced inline on RT cores, plus an IMU with
+  noise, bias and filtering.
+- **Streaming out**: the RMSS binary protocol streams RGB, depth, RGB-D, motion
+  and point clouds over TCP to Python or ROS tooling.
+
+**Worlds and people**
+- **RammsWorldGen**: seed-driven downtown, main-street, suburban, park, home,
+  office and store levels on UE 5.8 PCG, with curb ramps, entrances (level,
+  stepped, ramped), hazards and a `NonCompliance` dial that breaks features on
+  purpose. Every world exports a manifest of routes, clear widths and
+  accessibility violations.
+- **RammsCrowd**: Mass Entity pedestrians on ZoneGraph lanes that avoid the
+  robot and react to it in aware, react and startle zones.
+
+**Ways in**
+- **Control surface**: a robot describes its controls (`drive.forward`,
+  `lift.*`, `arm.*`, `gripper.*`, `camera.*`), and every input source drives
+  that description, with arbitration between them.
+- **In-game UI**: floating panels, joysticks and sliders built from that
+  description, plus camera-capture and status panels.
+- **RammsAccess**: alternative-access input (BCI, head mice, eye gaze, switches)
+  normalized into one intent stream with a watchdog and e-stop.
+- **Remote**: [ramms-tools](https://github.com/rammp-org/ramms-tools) CLIs and
+  a Python library over the Remote Control API, Pixel Streaming to any browser
+  (WASD and touch), and an in-editor MCP server with a RAMMS toolset for AI
+  assistants.
+
+**Scale and testing**
+- Headless rendering builds for Linux, cross-compiled from Windows, with a
+  container definition for GPU clusters.
+- Play-in-Editor suites for the Chaos and MuJoCo bases (drive, turn, lift,
+  arm, stopping on a ramp, remote access), camera capture, the seat, teleop and
+  Newton, a mini-golf course where a Gen3 putts a free ball under MuJoCo, plus
+  C++ automation tests.
+
+## What's next
+
+Work in progress and planned, with the design notes in [`doc/`](doc):
+
+- **Parallel headless simulation** on SLURM GPU clusters for policy training
+  and dataset collection ([plan](doc/PARALLEL_SIM_PLAN.md)).
+- **MuJoCo-first robots**: driving the bases in MuJoCo, seating a person in the
+  simulated chair alongside the crowd, and Python scene generation
+  ([roadmap](doc/mujoco_sim_roadmap.md)).
+- **Generated worlds in MuJoCo**: exporting RammsWorldGen curbs, ramps, steps
+  and walls into the MuJoCo spec so MuJoCo-driven robots collide with them
+  ([design](doc/worldgen_mujoco_export.md)).
+- **Semantic segmentation** as a third CameraCapture plane next to depth and
+  motion ([plan](doc/camera_segmentation_plan.md)).
+- **Controllers as their own plugin**, `ramms-controllers`
+  ([plan](doc/controllers_extraction.md)), and a **holonomic drive** with a
+  positional pad for the 5-bar linkage robots
+  ([scope](doc/holonomic_drive_and_position_pad.md)).
+- **Articulated household assets** (cabinets, drawers, fridges, microwaves)
+  from Blender to Unreal, MuJoCo, Newton and Isaac
+  ([pipeline](doc/dojo_asset_pipeline.md)).
+- **Remote HMI over Pixel Streaming** for the rammp-ui operator interface
+  ([plan](doc/PIXEL_STREAMING_PLAN.md)), and RammsAccess intents driving the
+  physical robot as well as the simulated one.
+
+## Getting started
+
+### Prerequisites
 
 - **Unreal Engine 5.8**
 - **Windows** with DirectX 12 (recommended) or **Linux** with Vulkan SM6
@@ -86,7 +178,7 @@ Engine 5.8, it offers:
   RT cores used when available, software ray tracing otherwise
 - **Python 3.10+** (optional) — For remote execution scripts
 
-## Installation
+### Installation
 
 First-time setup is four steps: clone with submodules, build the
 `unreal-robotics-lab` native third-party dependencies, download the Fab
@@ -94,7 +186,7 @@ content packs, and open the project. Steps 2 and 3 are required **before**
 the first build/launch — skipping step 2 makes the build fail outright, and
 skipping step 3 leaves example maps and the crowd system without their assets.
 
-### 1. Clone with submodules
+#### 1. Clone with submodules
 
 This repository uses git submodules for plugins. Clone recursively:
 
@@ -109,7 +201,7 @@ If you've already cloned without `--recursive`, initialize the submodules:
 git submodule update --init --recursive
 ```
 
-### 2. Build the unreal-robotics-lab third-party dependencies
+#### 2. Build the unreal-robotics-lab third-party dependencies
 
 The `URLab` module (pulled in via `unreal-robotics-lab` and
 `RammsMujocoSupport`) links against native libraries — **MuJoCo**, **CoACD**,
@@ -164,7 +256,7 @@ The script is idempotent — re-run it any time. Flags: `--no-thirdparty` skips
 the dependency build, `--no-projectfiles` skips project file generation;
 `UE_ROOT` defaults to `/Users/Shared/Epic Games/UE_5.8`.
 
-#### The unreal-robotics-lab fork
+##### The unreal-robotics-lab fork
 
 The `unreal-robotics-lab` submodule points at **our fork**,
 `git@github.com:rammp-org/UnrealRoboticsLab`, pinned to branch
@@ -189,7 +281,7 @@ New recursive clones pick up the fork automatically from `.gitmodules`.
 > `build_all.ps1` (Windows) or `Scripts/setup_urlab.sh` (macOS/Linux) to
 > refresh the installs.
 
-### 3. Download content packs from Fab
+#### 3. Download content packs from Fab
 
 Marketplace content under `Content/Fab/` is **not committed** to the
 repository (multi-GB size, and the Fab license requires each user to claim
@@ -212,13 +304,13 @@ proxy meshes.
   under `Content/Fab/`. A map that references a pack you haven't installed
   simply shows missing-asset placeholders for those actors.
 
-### 4. Open the project
+#### 4. Open the project
 
 Open `Ramms.uproject` in Unreal Engine 5.8. The plugins are automatically
 detected and compiled (or build from the command line — see the next
 section).
 
-## Building from the Command Line
+### Building from the Command Line
 
 You can compile the C++ (project module + all plugin modules, including
 `RammsCore`) entirely from a terminal without opening the editor. This is the
@@ -242,7 +334,7 @@ The project defines two targets:
 Valid build configurations: `Debug`, `DebugGame`, `Development` (default),
 `Test`, `Shipping`. Platform tokens: `Win64`, `Mac`, `Linux`.
 
-### Locate your engine installation
+#### Locate your engine installation
 
 Set a variable pointing at your UE 5.8 root, then reuse it below. Adjust the
 path to match your install.
@@ -270,7 +362,7 @@ UE="$HOME/UnrealEngine"   # your UE 5.8 install/build root (no Epic launcher on 
 Run the commands below from the repository root (the folder containing
 `Ramms.uproject`).
 
-### Compile the editor target
+#### Compile the editor target
 
 This is the usual command after changing C++ — it rebuilds the project and every
 plugin module, so you can launch the editor without triggering a Live Coding /
@@ -291,7 +383,7 @@ hot-reload pass.
 "$UE/Engine/Build/BatchFiles/Linux/Build.sh" RammsEditor Linux Development -Project="$PWD/Ramms.uproject" -WaitMutex
 ```
 
-### Compile a standalone game target
+#### Compile a standalone game target
 
 Swap the target to `Ramms` (and pick a configuration, e.g. `Shipping`) to build
 the runtime game module:
@@ -304,7 +396,7 @@ the runtime game module:
 **macOS / Linux:** use the platform's `Build.sh` (as above) with target `Ramms`
 and platform `Mac` / `Linux`.
 
-### Package the project
+#### Package the project
 
 To cook content and produce a runnable build (not just compile), use the
 Unreal Automation Tool (`RunUAT`):
@@ -326,7 +418,7 @@ Unreal Automation Tool (`RunUAT`):
 ```
 (Use `-Platform=Linux` on Linux.) The packaged output lands in `Packaged/`.
 
-### Cross-compile for Linux from Windows
+#### Cross-compile for Linux from Windows
 
 Linux builds (e.g. for headless simulation on clusters — see
 `doc/PARALLEL_SIM_PLAN.md`) can be produced entirely on a Windows machine
@@ -366,7 +458,7 @@ The packaged output lands in `Packaged\Linux` — copy it to a Linux machine
 `Scripts/run_headless.sh`. Both scripts check for the toolchain and fail
 with install instructions if `LINUX_MULTIARCH_ROOT` is missing.
 
-### Regenerate IDE project files (optional)
+#### Regenerate IDE project files (optional)
 
 Only needed for IDE/IntelliSense (Visual Studio, Rider, VS Code, Xcode) or after
 adding modules / editing a `.Build.cs`. It is **not** required for the
@@ -412,41 +504,38 @@ git submodules:
 | **RammsPrivateAssets** | `Plugins/RammsPrivateAssets/` | Private content (lift-drive CAD meshes, MJCF-derived articulations, and the pawns, tables and test map built on them). Content only; enabled automatically when present |
 | **RammsWorldGen** | `Plugins/RammsWorldGen/` | Procedural, seed-driven pedestrian / wheelchair worlds on PCG (streets, parks, homes, offices, stores) with crowds and a ground-truth accessibility manifest ([ramms-worldgen](https://github.com/rammp-org/ramms-worldgen)); see [doc/world_generation.md](doc/world_generation.md) |
 
-An additional local plugin (**VolingaRenderer**) provides custom rendering
-capabilities.
-
 ### Directory Layout
 
 ```
-Ramms/
-├── Config/                  Project configuration (.ini files)
-├── Content/                 Blueprint assets, materials, meshes, levels
-│   ├── Blueprints/            Game logic (BP_MebotGameMode, etc.)
-│   ├── Maps/                  Game levels
-│   ├── Robots/                Robot actor blueprints (BP_Kinova_Gen3, BP_Mebot_Ramms; pawns: doc/robot_pawn.md)
-│   ├── Vehicles/              Vehicle variants (AdaptedVanRamp, IDBuzz, etc.)
-│   ├── ada_door/              Accessible door system
-│   ├── Fab/                   Downloaded Fab marketplace assets
+ramms-sim/
+├── Config/                    Project configuration (.ini files)
+├── Content/                   Blueprints, materials, meshes, levels
+│   ├── Blueprints/              Game logic (BP_MebotGameMode, etc.)
+│   ├── Maps/                    Test and demo levels (Map_Demo, Map_ArmTest, Map_RampTest, ...)
+│   │   └── Gen/                 Generated example worlds (Map_Gen_Downtown, _Park, _Office, ...)
+│   ├── Robots/                  Robot blueprints (BP_Mebot_Ramms, BP_Mebot_Mujoco, BP_Kinova_Gen3, ...; pawns: doc/robot_pawn.md)
+│   ├── Vehicles/                Accessible van with ramp
+│   ├── ada_door/                Accessible door system
+│   ├── Python/                  init_unreal.py and the RAMMS MCP toolset
+│   └── Fab/                     Fab marketplace packs (not committed; see Installation)
+├── Plugins/                   Plugin submodules (see the table above)
+│   ├── RammsCore/               Robot base, controllers, IK, sensors, GPU ray tracing, URDF
+│   ├── RammsControl/            Control-surface model
+│   ├── RammsUI/                 Panels, joysticks, camera widgets
+│   ├── RammsWorldGen/           Procedural worlds
+│   ├── RammsCrowd/              Pedestrian crowds
+│   ├── CameraCapture/           Calibrated cameras and EXR capture
+│   ├── RammsStreaming/          RMSS TCP streaming
+│   ├── RammsAccess/             Alternative-access input
+│   ├── unreal-robotics-lab/     URLab (MuJoCo), our fork
+│   ├── RammsMujoco*/            MuJoCo integration and support
+│   ├── RammsNewtonPhysics/      Newton worker bridge
 │   └── ...
-├── Plugins/
-│   ├── RammsCore/             Core simulation (submodule)
-│   │   ├── Source/RammsCore/    C++ controllers, sensors, IK, GPU ray tracing
-│   │   ├── Source/RammsCoreEditor/  Editor utilities
-│   │   ├── Shaders/Private/     HLSL compute shaders (RammsSensorTrace.usf)
-│   │   └── Content/Python/urdf/  URDF import/export scripts
-│   ├── CameraCapture/         Camera data acquisition (submodule)
-│   ├── RammsStreaming/        TCP binary streaming (submodule)
-│   ├── RammsAssets/           Robot & sensor 3D models (submodule)
-│   ├── RammsCrowd/            NPC crowd simulation (submodule)
-│   ├── RammsHumanPhysics/     Experimental human physics plugin (submodule)
-│   ├── RammsNewtonPhysics/    Experimental Newton backend integration (submodule)
-│   ├── RammsMujocoPhysics/    Experimental MuJoCo backend integration (submodule)
-│   └── VolingaRenderer/       Custom rendering (local)
-├── Source/Ramms/              Main game module (game mode, pawn, vehicles)
-├── Scripts/                   Build, packaging and editor remote execution scripts
-├── doc/                       Documentation (pixel streaming, planning docs) & images
-├── Ramms.uproject             Project file
-└── Ramms.sln                  Visual Studio solution
+├── Source/Ramms/              Main game module (robot pawns, player controller, game mode)
+├── Scripts/                   Build, packaging, editor remote execution, worldgen and PIE test scripts
+├── containers/                Apptainer definition for headless cluster runs
+├── doc/                       Design notes, plans and images (README media in doc/images/readme/)
+└── Ramms.uproject             Project file
 ```
 
 ## Simulation Features
@@ -457,8 +546,9 @@ Complete simulation of the MeBot powered wheelchair base:
 - Differential drive with torque and velocity control modes
 - PID feedback, slip modeling, and odometry tracking
 - Front and rear caster arm articulation
-- Main drive wheel elevation system for multiple drive modes (front/mid/rear
-  wheel drive)
+- A lift (motor swing arms) that raises and tilts the base, and drive wheels
+  that slide fore and aft for front-, mid- and rear-wheel drive
+- A parking brake that brings a stopped chair to rest and holds it on ramps
 - Configurable motor parameters (max RPM, torque curves, braking)
 
 **Components:** `URammsDifferentialDriveController`, `UMebotControllerComponent`,
@@ -466,7 +556,8 @@ Complete simulation of the MeBot powered wheelchair base:
 
 ### Kinova Gen 3 Manipulator
 
-Physics-based 7-DOF robotic arm with:
+Physics-based 7-DOF Kinova Gen3 with a Robotiq 2F-85 gripper (the skeletal mesh
+asset is named `gen3_6dof`, but the arm is the 7-DOF variant):
 - Skeletal mesh with per-joint physics constraints
 - Three IK solver algorithms: **DLS** (Damped Least Squares), **FABRIK**
   (per-joint scalar DLS), and **CCD** (Cyclic Coordinate Descent)
@@ -479,6 +570,27 @@ Physics-based 7-DOF robotic arm with:
 
 See the [RammsCore README](Plugins/RammsCore/README.md) for detailed IK solver
 documentation and tuning guides.
+
+### Physics Backends
+
+Controllers never touch physics directly. A robot carries one
+`URammsRobotBaseComponent`, which loads a motor registry (a DataTable of motor
+ids, types and ranges) and resolves a backend once; every drive, lift and
+linkage controller then commands motors by id. The same controllers run on:
+
+- **Chaos** skeletal bodies (the default `BP_Mebot_Ramms`), with async physics
+  at a fixed 10 ms step, constraint-motor brakes and slope holding.
+- **MuJoCo** through URLab (`BP_Mebot_Mujoco`, `BP_Gen3_Mujoco`), with MJCF
+  import, 40+ sensors and record/replay.
+- **Newton** (experimental): URLab's MuJoCo data model stepped by an
+  out-of-process [Newton](https://github.com/newton-physics/newton) worker on
+  NVIDIA Warp (`BP_Kinova_Gen3_Newton`).
+
+<p align="center"><img src="doc/images/newton_gen3_unreal.gif" width="420" alt="A Kinova Gen3 stepped by the Newton worker inside Unreal"></p>
+
+See [doc/base_component_controls.md](doc/base_component_controls.md),
+[doc/mujoco_sim_roadmap.md](doc/mujoco_sim_roadmap.md) and
+[doc/robot_pawn.md](doc/robot_pawn.md).
 
 ### Accessible Van with Ramp
 
@@ -545,6 +657,37 @@ Binary streaming over TCP for external tools and controllers:
 
 **Components:** `URammsStreamSourceComponent`, `URammsStreamSinkComponent`,
 `URammsStreamingSubsystem`
+
+### Control Surface, UI and Input
+
+A robot **describes** the controls it offers as a control surface (`RammsControl`):
+ids such as `drive.forward`, `lift.front_caster_swing_arm`, `arm.up`,
+`gripper.close` and `camera.next`, each with a kind, units and a range. Every
+input source drives that description through one sink with source
+arbitration, so nothing hard-codes a key map or a motor name:
+
+- **In-game panels** (`RammsUI`): floating drive joystick, caster and lift
+  sliders, arm pad, camera-capture and status panels, generated from the
+  surface.
+- **Keyboard, gamepad and Enhanced Input** maps bound to control ids.
+- **RammsAccess**: BCI (OpenBCI Galea), pointer / HID devices (head mice, eye
+  gaze) and assistive switches, sent as a versioned intent stream over UDP with
+  a silence watchdog and an e-stop latch.
+- **Remote clients**: ramms-tools over the Remote Control API, the MCP toolset,
+  and Pixel Streaming.
+
+See [doc/base_component_controls.md](doc/base_component_controls.md) and
+[doc/ui_input_refactor_plan.md](doc/ui_input_refactor_plan.md).
+
+### Pedestrian Crowds
+
+`RammsCrowd` spawns Mass Entity pedestrians (City Sample Crowds meshes) on
+ZoneGraph lanes and NavMesh. They follow lanes, steer and avoid each other and
+the robot, and react to it through a stimulus registry: aware, react and
+startle zones with hysteresis and a closing-speed rule, tuned per kind in data
+assets. The robot pawn is mirrored into Mass so crowds see it without a
+character capsule. The generated worlds place crowds on their sidewalks. See
+`Plugins/RammsCrowd/README.md`.
 
 ## Pixel Streaming (Remote Browser Access)
 
@@ -628,9 +771,7 @@ Remote Execution is enabled in this project's settings (multicast
 Project Settings > Plugins > Python > Remote Execution > Enable Remote
 Execution**.
 
-`Scripts/editor_remote_exec.py` is a dependency-free client for that interface
-(`--code`, `--file`, `--eval`); the PIE test runners under
-`Plugins/RammsPrivateAssets/Scripts/` drive the editor through it.
+The PIE test runners under `Scripts/pie_tests/` drive the editor through it.
 
 ### Recording a run for video
 
@@ -646,6 +787,7 @@ the first Pawn with a `RammsRobotBaseComponent`). The file's header documents
 the format. The playback side (clustering the meshes into their rigid bodies,
 keying a Level Sequence, rendering) is a consumer's concern; the first one is
 the curb negotiation video.
+
 ### ramms-tools (Remote Control API)
 
 The sister repository [ramms-tools](https://github.com/rammp-org/ramms-tools)
@@ -770,9 +912,24 @@ furniture — and emits a ground-truth manifest of routes, clear widths and
 accessibility violations per world. `NonCompliance` dials how often features
 are generated broken on purpose.
 
+<table>
+  <tr>
+    <td width="25%" valign="top"><img src="doc/images/readme/world_downtown.jpg" alt="Generated downtown"><br><sub><b>Downtown</b>: street grid, crosswalks, curb ramps</sub></td>
+    <td width="25%" valign="top"><img src="doc/images/readme/world_mainstreet.jpg" alt="Generated main street"><br><sub><b>Main street</b>: street parking, a green square</sub></td>
+    <td width="25%" valign="top"><img src="doc/images/readme/world_suburban.jpg" alt="Generated suburb"><br><sub><b>Suburban</b>: lots, lawns, a pocket park</sub></td>
+    <td width="25%" valign="top"><img src="doc/images/readme/world_park.jpg" alt="Generated park"><br><sub><b>Park</b>: paths, benches, a pond, hills</sub></td>
+  </tr>
+  <tr>
+    <td width="25%" valign="top"><img src="doc/images/readme/world_home.jpg" alt="Generated home interior"><br><sub><b>Home</b>: rooms, doors, thresholds, furniture</sub></td>
+    <td width="25%" valign="top"><img src="doc/images/readme/world_office.jpg" alt="Generated office interior"><br><sub><b>Office</b>: corridors, offices, desks</sub></td>
+    <td width="25%" valign="top"><img src="doc/images/readme/world_store.jpg" alt="Generated store interior"><br><sub><b>Store</b>: aisles and shelving</sub></td>
+    <td width="25%" valign="top"><img src="doc/images/readme/world_plan.jpg" alt="A generated suburb from above"><br><sub><b>From above</b>: a suburban block plan</sub></td>
+  </tr>
+</table>
+
 ```
 python Scripts/editor_remote_exec.py --file Scripts/worldgen/build_assets.py   # palette, profile, presets, graphs from code
-python Scripts/editor_remote_exec.py --file Scripts/worldgen/build_levels.py   # Map_Gen_Downtown / Suburban / Park / Indoor / Office
+python Scripts/editor_remote_exec.py --file Scripts/worldgen/build_levels.py   # the Map_Gen_* example levels
 ```
 
 Then open a `/Game/Maps/Gen/Map_Gen_*` level, pick a seed on `WorldGenerator`,
@@ -786,14 +943,11 @@ See [doc/world_generation.md](doc/world_generation.md) and
 
 ## URDF Interoperability
 
-The project includes URDF (Unified Robot Description Format) files and
-bidirectional conversion tools for interoperability with ROS, MoveIt,
-PyBullet, MuJoCo, and other robotics tools:
-
-- `urdf/gen3_6dof.urdf` — Kinova Gen3 6-DOF arm
-- `urdf/mebot.urdf` — MeBot mobile base
-
-Export and import scripts run inside the UE Editor Python console. See the
+RammsCore ships bidirectional URDF (Unified Robot Description Format)
+conversion for interoperability with ROS, MoveIt, PyBullet, MuJoCo and other
+robotics tools: export a Physics Asset (e.g. the Kinova Gen3 arm or the MeBot
+base) to `<ProjectDir>/urdf/<asset>.urdf`, or import a URDF into a Physics
+Asset. The scripts run inside the UE Editor Python console. See the
 [RammsCore README](Plugins/RammsCore/README.md#urdf-export--import) for
 detailed usage.
 
@@ -820,14 +974,18 @@ pre-commit install
 
 ### Updating Plugin Submodules
 
+Check every plugin out at the commit this repository pins (after a pull):
+
+```bash
+git submodule update --init --recursive
+```
+
+Move one plugin to the tip of its tracked branch, then commit the new pointer
+here (one plugin bump per PR keeps the history readable):
+
 ```bash
 git submodule update --remote Plugins/RammsCore
-git submodule update --remote Plugins/CameraCapture
-git submodule update --remote Plugins/RammsStreaming
-git submodule update --remote Plugins/RammsAssets
-git submodule update --remote Plugins/RammsHumanPhysics
-git submodule update --remote Plugins/RammsNewtonPhysics
-git submodule update --remote Plugins/RammsMujocoPhysics
+git add Plugins/RammsCore
 ```
 
 ### Adding C++ Classes to Plugins
