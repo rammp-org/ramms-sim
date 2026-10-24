@@ -64,8 +64,9 @@
     <td width="50%" valign="top">
       <img src="doc/images/readme/crowd.webp" width="100%" alt="The chair driving across a plaza while pedestrians walk around it"><br>
       <b>People who notice the robot.</b> Mass Entity pedestrians walk lanes
-      around the chair, avoid it, and react to it by distance and closing
-      speed, in test plazas and on the generated sidewalks.
+      around the chair, avoid it, turn to look at it and flinch when it comes
+      too close, each with their own walk, idle and phone, cup or bag, in test
+      plazas and on the generated sidewalks.
     </td>
     <td width="50%" valign="top">
       <img src="doc/images/readme/ui_panels.jpg" width="100%" alt="The in-game control panels: drive joystick, caster and lift sliders, camera capture"><br>
@@ -115,7 +116,9 @@
   purpose. Every world exports a manifest of routes, clear widths and
   accessibility violations.
 - **RammsCrowd**: Mass Entity pedestrians on ZoneGraph lanes that avoid the
-  robot and react to it in aware, react and startle zones.
+  robot and react to it in aware, react and startle zones, animated with
+  body-type walk and idle variants, carried props, directional walks played at
+  the speed their feet need, head look-at and bump reactions.
 
 **Ways in**
 - **Control surface**: a robot describes its controls (`drive.forward`,
@@ -686,8 +689,16 @@ ZoneGraph lanes and NavMesh. They follow lanes, steer and avoid each other and
 the robot, and react to it through a stimulus registry: aware, react and
 startle zones with hysteresis and a closing-speed rule, tuned per kind in data
 assets. The robot pawn is mirrored into Mass so crowds see it without a
-character capsule. The generated worlds place crowds on their sidewalks. See
-`Plugins/RammsCrowd/README.md`.
+character capsule, and its footprint is a hard boundary they walk around.
+The generated worlds place crowds on their sidewalks.
+
+Each pedestrian is animated by `URammsCrowdAnimInstance` from
+`Content/NPCs/DA_CrowdAnimSet`: a walk and idle for their body type, sometimes
+a phone, cup, backpack, briefcase or purse in hand, and forward, brisk and
+directional walks blended by travel direction and played at the rate that keeps
+their feet planted. They turn their heads toward the chair's user once they
+notice it and flinch when startled or bumped. See
+`Plugins/RammsCrowd/README.md` and `Plugins/RammsCrowd/doc/CUSTOMIZATION.md`.
 
 ## Pixel Streaming (Remote Browser Access)
 
