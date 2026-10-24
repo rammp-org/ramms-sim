@@ -16,7 +16,7 @@
 </p>
 
 <p align="center">
-  <img src="doc/media/hero.webp" width="100%" alt="The MeBot wheelchair with its Kinova arm driving down a generated downtown sidewalk past pedestrians">
+  <img src="doc/images/readme/hero.webp" width="100%" alt="The MeBot wheelchair with its Kinova arm driving down a generated downtown sidewalk past pedestrians">
 </p>
 
 <p align="center">
@@ -33,13 +33,13 @@
 <table>
   <tr>
     <td width="50%" valign="top">
-      <img src="doc/media/worldgen_seeds.webp" width="100%" alt="One suburban preset regenerated with eight different seeds"><br>
+      <img src="doc/images/readme/worldgen_seeds.webp" width="100%" alt="One suburban preset regenerated with eight different seeds"><br>
       <b>Procedural, seed-driven worlds.</b> Streets, curb ramps, crosswalks,
       parks, homes, offices and stores built on PCG from a preset and a seed,
       each with a ground-truth accessibility manifest.
     </td>
     <td width="50%" valign="top">
-      <img src="doc/media/camera_views.webp" width="100%" alt="The seat, wrist, Orbbec Gemini and LUCI cameras, with depth, recorded together while the chair drives"><br>
+      <img src="doc/images/readme/camera_views.webp" width="100%" alt="The seat, wrist, Orbbec Gemini and LUCI cameras, with depth, recorded together while the chair drives"><br>
       <b>Every camera on the robot.</b> The seat view plus the wrist, Orbbec
       Gemini and LUCI cameras, each with its real intrinsics and mounting,
       rendering RGB, depth and motion vectors.
@@ -47,14 +47,14 @@
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <img src="doc/media/base_actuators.webp" width="100%" alt="The wheelchair base swinging its casters, lifting its seat and sliding its drive wheels"><br>
+      <img src="doc/images/readme/base_actuators.webp" width="100%" alt="The wheelchair base swinging its casters, lifting its seat and sliding its drive wheels"><br>
       <b>An articulated base, not a box on wheels.</b> Differential drive,
       front and rear caster swing arms, a lift that raises and tilts the seat
       base, and drive wheels that slide fore and aft, each a motor you can
       command, on a 46-body physics model that holds still on slopes.
     </td>
     <td width="50%" valign="top">
-      <img src="doc/media/arm_gripper.webp" width="100%" alt="The Kinova Gen3 arm reaching and the 2F-85 gripper closing"><br>
+      <img src="doc/images/readme/arm_gripper.webp" width="100%" alt="The Kinova Gen3 arm reaching and the 2F-85 gripper closing"><br>
       <b>A physics-driven arm and gripper.</b> Kinova Gen3 with DLS, FABRIK and
       CCD inverse kinematics, end-effector teleoperation and a Robotiq 2F-85,
       with link masses from the manufacturer's data.
@@ -62,13 +62,13 @@
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <img src="doc/media/crowd.webp" width="100%" alt="The chair driving across a plaza while pedestrians walk around it"><br>
+      <img src="doc/images/readme/crowd.webp" width="100%" alt="The chair driving across a plaza while pedestrians walk around it"><br>
       <b>People who notice the robot.</b> Mass Entity pedestrians walk lanes
       around the chair, avoid it, and react to it by distance and closing
       speed, in test plazas and on the generated sidewalks.
     </td>
     <td width="50%" valign="top">
-      <img src="doc/media/ui_panels.jpg" width="100%" alt="The in-game control panels: drive joystick, caster and lift sliders, camera capture"><br>
+      <img src="doc/images/readme/ui_panels.jpg" width="100%" alt="The in-game control panels: drive joystick, caster and lift sliders, camera capture"><br>
       <b>Drive it from anywhere.</b> In-game panels generated from the
       robot's own control surface, keyboard and gamepad, Python over Remote
       Control, a browser over Pixel Streaming, BCI and switch input, or an AI
@@ -534,7 +534,7 @@ ramms-sim/
 ├── Source/Ramms/              Main game module (robot pawns, player controller, game mode)
 ├── Scripts/                   Build, packaging, editor remote execution, worldgen and PIE test scripts
 ├── containers/                Apptainer definition for headless cluster runs
-├── doc/                       Design notes, plans, images and README media
+├── doc/                       Design notes, plans and images (README media in doc/images/readme/)
 └── Ramms.uproject             Project file
 ```
 
@@ -913,16 +913,16 @@ are generated broken on purpose.
 
 <table>
   <tr>
-    <td width="25%" valign="top"><img src="doc/media/world_downtown.jpg" alt="Generated downtown"><br><sub><b>Downtown</b>: street grid, crosswalks, curb ramps</sub></td>
-    <td width="25%" valign="top"><img src="doc/media/world_mainstreet.jpg" alt="Generated main street"><br><sub><b>Main street</b>: street parking, a green square</sub></td>
-    <td width="25%" valign="top"><img src="doc/media/world_suburban.jpg" alt="Generated suburb"><br><sub><b>Suburban</b>: lots, lawns, a pocket park</sub></td>
-    <td width="25%" valign="top"><img src="doc/media/world_park.jpg" alt="Generated park"><br><sub><b>Park</b>: paths, benches, a pond, hills</sub></td>
+    <td width="25%" valign="top"><img src="doc/images/readme/world_downtown.jpg" alt="Generated downtown"><br><sub><b>Downtown</b>: street grid, crosswalks, curb ramps</sub></td>
+    <td width="25%" valign="top"><img src="doc/images/readme/world_mainstreet.jpg" alt="Generated main street"><br><sub><b>Main street</b>: street parking, a green square</sub></td>
+    <td width="25%" valign="top"><img src="doc/images/readme/world_suburban.jpg" alt="Generated suburb"><br><sub><b>Suburban</b>: lots, lawns, a pocket park</sub></td>
+    <td width="25%" valign="top"><img src="doc/images/readme/world_park.jpg" alt="Generated park"><br><sub><b>Park</b>: paths, benches, a pond, hills</sub></td>
   </tr>
   <tr>
-    <td width="25%" valign="top"><img src="doc/media/world_home.jpg" alt="Generated home interior"><br><sub><b>Home</b>: rooms, doors, thresholds, furniture</sub></td>
-    <td width="25%" valign="top"><img src="doc/media/world_office.jpg" alt="Generated office interior"><br><sub><b>Office</b>: corridors, offices, desks</sub></td>
-    <td width="25%" valign="top"><img src="doc/media/world_store.jpg" alt="Generated store interior"><br><sub><b>Store</b>: aisles and shelving</sub></td>
-    <td width="25%" valign="top"><img src="doc/media/world_plan.jpg" alt="A generated suburb from above"><br><sub><b>From above</b>: a suburban block plan</sub></td>
+    <td width="25%" valign="top"><img src="doc/images/readme/world_home.jpg" alt="Generated home interior"><br><sub><b>Home</b>: rooms, doors, thresholds, furniture</sub></td>
+    <td width="25%" valign="top"><img src="doc/images/readme/world_office.jpg" alt="Generated office interior"><br><sub><b>Office</b>: corridors, offices, desks</sub></td>
+    <td width="25%" valign="top"><img src="doc/images/readme/world_store.jpg" alt="Generated store interior"><br><sub><b>Store</b>: aisles and shelving</sub></td>
+    <td width="25%" valign="top"><img src="doc/images/readme/world_plan.jpg" alt="A generated suburb from above"><br><sub><b>From above</b>: a suburban block plan</sub></td>
   </tr>
 </table>
 
