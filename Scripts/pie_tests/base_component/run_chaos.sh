@@ -29,7 +29,7 @@ f "$S/chaos_stop.py"; sleep 2; f "$S/chaos_sample.py"
 # hold the chair; a turn in place there grinds on the wall. Back off it first.
 cs set drive.forward -0.4; sleep 0.8; cs release drive.forward; sleep 1.5; f "$S/chaos_sample.py"
 echo "--- turn: X=+1 must turn right ---"
-op turn_op "$S/chaos_turn.py" start; sleep 2
+op turn_op "$S/chaos_turn.py" start; sleep 1
 op turn_op "$S/chaos_turn.py" check; sleep 2
 # Facing open ground after the turn, the later drive stream would carry the
 # chair off the edge of the map; start the rest from the spawn pose.
