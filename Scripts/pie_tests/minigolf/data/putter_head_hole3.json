@@ -1,0 +1,20 @@
+{
+ "rel_pos": [
+  -1.2296,
+  74.4064,
+  -25.8261
+ ],
+ "rel_quat": [
+  -0.430815,
+  -0.549646,
+  0.566965,
+  -0.436849
+ ],
+ "size": [
+  10.0,
+  2.5,
+  2.0
+ ],
+ "aim_yaw_deg": 2.6,
+ "note": "Putter head box relative to the Gen3's bracelet_link, measured with the arm at the stroke's frame-72 (address) pose; the address is at the ball (face 0.5 cm behind it). rel_pos is Unreal cm in the bracelet's frame, rel_quat is Unreal (x, y, z, w), size is the full box size in cm (toe, thickness, height). The face is yawed +2.6 degrees about world Z (aim_yaw_deg), a per-hole aim for hole 3: the long putt through the windmill tunnel drifted without it. Use it with `map --hole 3 --putter data/putter_head_hole3.json`. Probably about a degree too much now that the thick walls stopped the tunnel grazes."
+}
