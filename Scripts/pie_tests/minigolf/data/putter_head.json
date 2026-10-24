@@ -1,0 +1,20 @@
+{
+ "rel_pos": [
+  -1.1088,
+  74.5204,
+  -25.6643
+ ],
+ "rel_quat": [
+  -0.417396,
+  -0.562079,
+  0.573651,
+  -0.425177
+ ],
+ "size": [
+  10.0,
+  2.5,
+  2.0
+ ],
+ "aim_yaw_deg": 0.0,
+ "note": "Putter head box relative to the Gen3's bracelet_link, measured with the arm at the stroke's frame-72 (address) pose; the address is at the ball (face 0.5 cm behind it). rel_pos is Unreal cm in the bracelet's frame, rel_quat is Unreal (x, y, z, w), size is the full box size in cm (toe, thickness, height). The face is square to the lane (aim 0 degrees), which sends the struck ball straight on hole 1."
+}
