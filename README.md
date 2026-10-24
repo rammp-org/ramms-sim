@@ -556,7 +556,8 @@ Complete simulation of the MeBot powered wheelchair base:
 
 ### Kinova Gen 3 Manipulator
 
-Physics-based Kinova Gen3 (6-DOF, `gen3_6dof`) with a Robotiq 2F-85 gripper:
+Physics-based 7-DOF Kinova Gen3 with a Robotiq 2F-85 gripper (the skeletal mesh
+asset is named `gen3_6dof`, but the arm is the 7-DOF variant):
 - Skeletal mesh with per-joint physics constraints
 - Three IK solver algorithms: **DLS** (Damped Least Squares), **FABRIK**
   (per-joint scalar DLS), and **CCD** (Cyclic Coordinate Descent)
