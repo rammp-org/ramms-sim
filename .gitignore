@@ -90,3 +90,10 @@ Content/CitySampleVehicles/
 Content/UrbanVerse/
 __pycache__
 Packaged/
+
+# Crowd motion matching: only AnimsFK/ and DatabasesFK/ are used and committed.
+# (Anims/ and Databases/ are an older IK-retargeted build; Rigs/ is the build
+# script's retargeter, which needs the GASP mannequin content.)
+Content/CrowdMM/Anims/
+Content/CrowdMM/Databases/
+Content/CrowdMM/Rigs/
