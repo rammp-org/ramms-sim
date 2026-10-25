@@ -689,7 +689,10 @@ ZoneGraph lanes and NavMesh. They follow lanes, steer and avoid each other and
 the robot, and react to it through a stimulus registry: aware, react and
 startle zones with hysteresis and a closing-speed rule, tuned per kind in data
 assets. The robot pawn is mirrored into Mass so crowds see it without a
-character capsule, and its footprint is a hard boundary they walk around.
+character capsule, and its footprint is a hard boundary they walk around. They
+plan a pass a few metres out, keeping right when they meet the chair head-on,
+turn gently, leave a comfortable gap and slow down alongside it; a parked chair
+startles nobody, one driving at them does.
 The generated worlds place crowds on their sidewalks.
 
 Each pedestrian is animated by `URammsCrowdAnimInstance` from
