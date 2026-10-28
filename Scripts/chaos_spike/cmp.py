@@ -7,4 +7,4 @@ for j in joints:
     ct=np.array([r['t'] for r in C]); cq=np.array([r['q'][j] for r in C]); mq=np.interp(ct, mt, [r['q'][j] for r in M])
     e=cq-mq; i6=np.argmin(abs(ct-6.0))
     print("%-28s %8.4f %8.4f %8.4f %8.4f" % (j, np.sqrt(np.mean(e**2)), np.max(abs(e)), cq[i6], mq[i6]))
-print("loop gap max cm: chaos %.4f  mj %.4f" % (max(r['loop_gap_cm'] for r in C), max(r['loop_gap_cm'] for r in M)))
+print("loop gap max cm (Chaos): %.4f" % max(r.get('loop_gap_cm', 0.0) for r in C))

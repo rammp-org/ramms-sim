@@ -48,11 +48,15 @@ def _build(opts):
         # bodies: a joint (or free joint) makes a separate simulated body, otherwise weld to the parent
         jointed = {j["child"] for j in J["joints"]}
         actors = {}
+        slide_mid = {j["child"]: (j["axis"], 50.0 * (j["range"][0] + j["range"][1])) for j in J["joints"] if j["type"] == "slide" and j["range"]}
         for b in J["bodies"]:
             if b["name"] not in meshes: continue
             w, x, y, z = b["quat"]
             loc = unreal.Vector(b["pos"][0], b["pos"][1], b["pos"][2] + base_z)
             rot = unreal.Quat(x, y, z, w).rotator()
+            sl = slide_mid.get(b["name"])
+            if sl:   # a slide's limit is symmetric about where the body starts, so start it mid-range; PIE moves it back
+                loc = loc + unreal.Vector(*sl[0]) * sl[1]
             a = acs.spawn_actor_from_class(unreal.StaticMeshActor, loc, rot)
             a.set_actor_label("CR_" + b["name"]); a.set_folder_path("ChaosRobot"); a.tags = ["ChaosRobot", b["name"]]
             c = a.static_mesh_component
@@ -75,7 +79,8 @@ def _build(opts):
                 while p in root_of and root_of[p] != p: p = root_of[p]
                 root_of[n] = root_of.get(p, p)
         for n, a in actors.items():
-            sim = (n in jointed) and n != "base_link"
+            b_ = next(b for b in J["bodies"] if b["name"] == n)
+            sim = (n in jointed) or b_["free"]   # a body welded to the world stays put
             if root_of[n] != n:
                 a.attach_to_actor(actors[root_of[n]], "None", unreal.AttachmentRule.KEEP_WORLD, unreal.AttachmentRule.KEEP_WORLD, unreal.AttachmentRule.KEEP_WORLD, True)
                 a.static_mesh_component.set_simulate_physics(False)
@@ -95,6 +100,23 @@ def _build(opts):
             cc.set_editor_property("constraint_actor1", actors[root_of[parent]]); cc.set_editor_property("constraint_actor2", actors[root_of[child]])
             return ca, cc
         for j in J["joints"]:
+            if j["type"] == "slide":   # linear X along the axis, everything else locked; spring and damping as linear drives
+                loc = unreal.Vector(j["anchor"][0], j["anchor"][1], j["anchor"][2] + base_z) + unreal.Vector(*j["axis"]) * slide_mid.get(j["child"], (None, 0.0))[1]
+                ca, cc = constraint(j["name"], j["parent"], j["child"], loc, frame_rot(j["axis"]))
+                half = 50.0 * (j["range"][1] - j["range"][0]) if j["range"] else 0.0
+                # the three linear axes share one limit size, so lock Y and Z first and size the limit on X last
+                cc.set_linear_y_limit(unreal.LinearConstraintMotion.LCM_LOCKED, 0.0); cc.set_linear_z_limit(unreal.LinearConstraintMotion.LCM_LOCKED, 0.0)
+                cc.set_linear_x_limit(unreal.LinearConstraintMotion.LCM_LIMITED if j["range"] else unreal.LinearConstraintMotion.LCM_FREE, half)
+                for f in (cc.set_angular_twist_limit, cc.set_angular_swing1_limit, cc.set_angular_swing2_limit):
+                    f(unreal.AngularConstraintMotion.ACM_LOCKED, 0.0)
+                kp, kv = j.get("stiffness", 0.0), j["damping"]   # N/m and N.s/m are kg/s^2 and kg/s in either unit system
+                cc.set_linear_position_drive(kp > 0, False, False); cc.set_linear_velocity_drive(kv > 0, False, False)
+                cc.set_linear_drive_params(kp, kv, 0.0)
+                ci = cc.get_editor_property("constraint_instance"); prof = ci.get_editor_property("profile_instance")
+                ld = prof.get_editor_property("linear_drive"); ld.set_editor_property("acceleration_mode", False)
+                prof.set_editor_property("linear_drive", ld); ci.set_editor_property("profile_instance", prof); cc.set_editor_property("constraint_instance", ci)
+                L("slide %s parent=%s child=%s range=%s k=%g c=%g" % (j["name"], root_of[j["parent"]], root_of[j["child"]], j["range"], kp, kv))
+                continue
             if j["type"] != "hinge": L("skip %s %s" % (j["name"], j["type"])); continue
             loc = unreal.Vector(j["anchor"][0], j["anchor"][1], j["anchor"][2] + base_z)
             ca, cc = constraint(j["name"], j["parent"], j["child"], loc, frame_rot(j["axis"]))
@@ -114,6 +136,7 @@ def _build(opts):
                 ac, coef = acts[j["name"]]; csum = sum(c for _, c in ac["joints"])
                 kp, kv = coef * csum * ac["kp"], coef * csum * ac["kv"]
                 fmax = coef * ac["forcerange"][1] if ac["forcerange"] else 0.0
+            if kp == 0 and j.get("stiffness", 0.0) > 0: kp = j["stiffness"]
             kv += j["damping"]
             cc.set_angular_drive_mode(unreal.AngularDriveMode.TWIST_AND_SWING)
             cc.set_orientation_drive_twist_and_swing(kp > 0, False)

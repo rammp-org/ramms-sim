@@ -1,251 +1,268 @@
-# Chaos as a physics backend for MuJoCo-described robots and objects: feasibility
+# Chaos as a physics backend for MuJoCo-described robots and objects
 
-Status: **feasibility study with a working spike** (2026-10-28). The spike's scripts are in
-`Scripts/chaos_spike/` (see its README); nothing in the runtime changed.
+Status: **feasibility study with a working spike, decisions recorded** (2026-10-28). The spike is in
+`Scripts/chaos_spike/` (see its README). Nothing in the runtime has changed yet.
 
-The question: can the robots and articulated objects RAMMS describes in MJCF (through URLab) also run on
-Chaos, so a user picks the engine that fits their application and their content? Matching MuJoCo exactly
-is not the goal. The goal is one robot or object definition that runs on either engine, with RAMMS'
-controllers, sensors and UI unchanged, where the Chaos version interacts natively with the user's existing
-Chaos content.
+The question was whether the robots and articulated objects RAMMS describes in MJCF (through URLab) can
+also run on Chaos, so users choose the engine that fits their application and their content. Matching
+MuJoCo exactly is not the goal. The goal is one robot or object definition that runs on either engine:
+- RAMMS' controllers, sensors and UI work unchanged.
+- On Chaos, the robot or object interacts natively with the user's existing Chaos content.
+
+## Decisions (2026-10-28)
+
+1. **Priority on Chaos:**
+   1. base and seat motions (stance changes, lift, tilt, driving) and SimReady articulated objects
+   2. grasping
+   3. the arm
+2. **Grasping on Chaos uses a grasp assist.** Chaos grasping serves teleop and data collection, not
+   controller development or high-fidelity manipulation, so a clearly labelled assist is the right tool.
+3. **Two-way coupling between engines** (a MuJoCo robot with Chaos-only props) is a future item.
+4. **The hand-authored skeletal `BP_Mebot_Ramms` is deprecated** once the generated Chaos robot covers
+   it: first it stops being the default, then it is removed.
 
 ## Short answer
 
-**Feasible, with one hard part.** Generating a Chaos robot from the MJCF is mechanical. Free-space arm
-motion tracks MuJoCo closely enough for teleop, navigation and data collection. Contact-rich manipulation
-is the hard part: the spike's grasp, which MuJoCo holds with under 2 mm of slip, is dropped by Chaos on
-every run.
+**Feasible.** Every model below was built in Chaos from its compiled MJCF with no hand authoring. The
+results, compared with MuJoCo on the same commands:
 
-| | Result in the spike (Kinova Gen3 + Robotiq 2F-85, built from `mujoco/gen3_2f85/gen3_2f85.xml`) |
-|---|---|
-| Building it | 20 Chaos bodies, 15 hinges, 2 loop-closing joints, all from the compiled MJCF, with no hand authoring |
-| Arm tracking (2 s moves, MuJoCo's gains copied 1:1) | 0.02–0.08 rad RMS against MuJoCo, 0.01–0.09 rad steady-state offset, about 0.15 s lag on the return |
-| Gripper kinematics | opens and closes; the four-bar loops hold (under 0.04 mm of loop error) |
-| Gripper at rest | its passive second degree of freedom settles on the opposite stops from MuJoCo's (the pads tilt outward) |
-| Grasp and tip a 50 g box | MuJoCo: held, 1.6 mm slip. Chaos: dropped in 3 of 3 runs, one of them with a light coupler spring added |
+| model | what the spike ran | Chaos against MuJoCo |
+|---|---|---|
+| Lift-drive linkage base: 27 hinges, 6 closed loops, 114 kg | settle, then stances mid → full → tilt → mid, then drive on equal wheel torques | **Stances:** chassis height 7.8 / 21.3 cm against 9.7 / 22.4 cm, tilt 14.3° against 14.8°. Needs the drive-force calibration below. **Driving:** 3.8 m against 3.5 m in 2.5 s, 13.5° of yaw drift against 0.5° |
+| SimReady refrigerator: 2 hinged doors, 3 drawers | push every joint open for 0.5 s, then coast | Doors and drawers swing and slide within their ranges. Joint damping is not applied yet (gotcha 7), so drawers run to their stops |
+| SimReady microwave: door, turntable, roller ring, sprung button | same | Door stops at its limit; the turntable spins freely; the button's spring is not applied yet (gotcha 7) |
+| Kinova Gen3 + Robotiq 2F-85: 15 hinges, tendon gripper with 2 loops | joint-space moves, then a grasp-and-tip | **Arm:** 0.01–0.08 rad RMS, over two runs. **Gripper:** closes, loops hold to under 0.04 mm. **Grasp:** held in MuJoCo (1.6 mm slip), dropped by Chaos in 4 of 4 runs |
 
-So the recommendation is to build it in phases (below). Phases 1–3 make bases, arms, articulated
-furniture and free-space manipulation selectable per robot. Grasping on Chaos is its own work item, and
-until it lands it is labelled as lower fidelity rather than promised.
+**What works:** loop closure, servo stances, wheel driving, hinge and slide joints, and arm tracking.
+
+**What needs work:** a few rules the builder has to apply (the gotchas below); passive joint damping
+and springs; and grasping. Grasping now gets an assist rather than fidelity work.
 
 ## What exists today
 
-- **Two robots, two physics paths.** `BP_Mebot_Ramms` runs on Chaos: the chair, arm and gripper are
-  skeletal meshes with hand-authored physics assets, and the URDF importer
-  (`Plugins/RammsCore/Content/Python/urdf/`) writes limits, masses and inertia into them.
-  `BP_Mebot_Mujoco` runs on URLab's MuJoCo. Their link masses are kept equal by hand (`doc/robot_pawn.md`).
+- **Two robots, two physics paths.**
+  - `BP_Mebot_Ramms` runs on Chaos. The chair, arm and gripper are skeletal meshes with hand-authored
+    physics assets, and the URDF importer (`Plugins/RammsCore/Content/Python/urdf/`) writes limits,
+    masses and inertia into them.
+  - `BP_Mebot_Mujoco` and the lift-drive bases run on URLab's MuJoCo.
+  - The link masses of the two paths are kept equal by hand (`doc/robot_pawn.md`).
 - **The actuation seam already exists.** Controllers command motors by id through
   `IRammsActuationBackend` (`RammsActuationBackend.h`). `URammsRobotBaseComponent` picks the
-  Chaos-skeletal backend (RammsCore) or the MuJoCo backend (RammsMujocoSupport, through the registry).
-  The Chaos backend has three gaps:
+  Chaos-skeletal backend (RammsCore) or the MuJoCo one (RammsMujocoSupport, through the registry). The
+  Chaos backend has three gaps:
   - A torque motor is an acceleration change ×100, not N·m.
   - Velocity motors are ignored.
-  - It only knows skeletal physics-asset constraints, not `PhysicsConstraintComponent`s between parts.
+  - It only knows skeletal physics-asset constraints.
 - **URLab's model is a component tree.** Each MJCF element is a `UMjNodeComponent`. Compiling it
   produces `mjModel`, with every default resolved and every body's mass, inertia, convex mesh, joint
-  axis and actuator gain worked out.
-- **URLab already supports other solvers.**
-  - `UMjPhysicsEngine::CustomStepHandler` replaces `mj_step`. RammsNewtonPhysics uses it to step Newton
-    and write the state back into `mjData`.
-  - The `Puppet` step mode takes pushed state rather than stepping.
-  - After either one, `mj_forward` keeps URLab's sensors, render pump, recording and bridge consistent.
-- **The 2026-09-11 roadmap (`doc/mujoco_sim_roadmap.md`) set Chaos aside for MuJoCo.** This study
-  revisits that decision as a user-selectable option, not a replacement.
+  axis, actuator gain and keyframe worked out.
+- **URLab already supports other solvers.** `UMjPhysicsEngine::CustomStepHandler` replaces `mj_step`,
+  and RammsNewtonPhysics uses it. The `Puppet` step mode takes pushed state rather than stepping. After
+  either one, `mj_forward` keeps URLab's sensors, recording and bridge consistent.
+- **The 2026-09-11 roadmap (`doc/mujoco_sim_roadmap.md`) set Chaos aside for MuJoCo.** This plan brings
+  Chaos back as a user-selectable option, not a replacement.
 
-## What Chaos offers here (UE 5.8, from the engine headers)
+## What Chaos offers (UE 5.8, from the engine headers)
 
-- **Rigid bodies with maximal-coordinate joints.** The engine's Chaos has no Featherstone or
-  reduced-coordinate articulation solver.
-- **Joint settings that help long chains:**
+- **Rigid bodies with maximal-coordinate joints.** There is no reduced-coordinate articulation solver.
+- **Joint settings:**
   - per-axis limits, including soft limits
-  - linear and angular drives (position and velocity, with a max force), in force or acceleration mode
-  - projection, shock propagation and mass conditioning (`ParentInvMassScale`)
-  - a linear joint solver (all in `PBDJointConstraintTypes.h`)
+  - linear and angular position and velocity drives with a max force, in force or acceleration mode
+  - projection, shock propagation, mass conditioning and a linear joint solver
+    (`PBDJointConstraintTypes.h`)
 - **Project settings:** async physics at a fixed 10 ms step, 16 position and 8 velocity iterations,
   enhanced determinism.
 - **Plugins that might be useful later:**
-  - Physics Control (1.0, not experimental): targets for bodies and constraints.
-  - ImmediatePhysics: a private Chaos simulation you step yourself, as the RigidBody anim node does.
-  - Control Rig Physics (beta in 5.8) and Chaos Rigid Asset (experimental).
+  - Physics Control (1.0)
+  - ImmediatePhysics (a private Chaos simulation you step yourself)
+  - Control Rig Physics (beta)
+  - Chaos Rigid Asset (experimental)
 
 ## Options
 
-| | A. Chaos bodies in the world, built from the compiled model *(recommended)* | B. Chaos stepper behind URLab (like Newton) | C. Offline export to skeletal mesh + physics asset |
+| | A. Chaos bodies in the world, built from the compiled model *(chosen)* | B. Chaos stepper behind URLab (like Newton) | C. Offline export to skeletal mesh + physics asset |
 |---|---|---|---|
-| How | At BeginPlay, a component builds Chaos bodies and constraints from `mjModel` in the world's physics scene and moves URLab's visuals onto them | `CustomStepHandler` steps an ImmediatePhysics simulation at the MJCF timestep and writes `qpos`/`qvel` back | An editor tool writes a skinned mesh and physics asset from the MJCF (an extension of today's URDF importer) |
-| Interacts with the user's Chaos content | **Yes**: same scene as their props, ragdolls, vehicles, destruction and Mover characters | No: world objects would have to be mirrored in as kinematic bodies | Yes |
-| URLab sensors, bridge, recording | Through puppet-style state push (Phase 3) | For free, as with Newton | No |
-| Rate | Project physics rate (100 Hz) | MJCF timestep (500 Hz) | Project physics rate |
-| One source of truth | Yes | Yes | No: a generated copy that can drift |
-| Fits | "My scene is Chaos" | "MuJoCo semantics, different solver" | "I want an asset I can edit in the Physics Asset Editor" |
-
-**A** is the one that meets Chaos users where they are. **C** is worth keeping as a later export path.
-**B** mostly duplicates what Newton already gives URLab.
+| How | At BeginPlay, a component builds Chaos bodies and constraints from `mjModel` in the world's physics scene and moves URLab's visuals onto them | `CustomStepHandler` steps an ImmediatePhysics simulation at the MJCF timestep | An editor tool writes a skinned mesh and physics asset from the MJCF |
+| Interacts with the user's Chaos content | **Yes**: same scene | No | Yes |
+| URLab sensors, bridge, recording | Through a puppet-style state push (later phase) | Free | No |
+| One source of truth | Yes | Yes | No: a generated copy |
 
 ## Mapping MJCF to Chaos
 
 | MJCF (compiled) | Chaos | Notes |
 |---|---|---|
 | body with a joint, or free | simulated body | mass from `body_mass` |
-| body with no joint | welded to its parent | becomes part of the parent's body, as in MuJoCo |
-| `body_inertia` / `ipos` | Chaos inertia from shape × mass | an exact inertia tensor needs C++ (`FBodyInstance`); the spike skipped it |
+| body with no joint | welded to its parent | |
+| moving body with no collision geom | a small body at its centre of mass | the microwave's roller ring |
 | geom sphere / capsule / box | sphere / capsule / box element | exact |
-| geom mesh | convex element | **MuJoCo collides a mesh as its convex hull, so this matches** (the spike re-hulled with V-HACD at 32 vertices; the builder should pass MuJoCo's hull through) |
-| geom cylinder | convex (sided hull) | no Chaos cylinder; wheels become polygons, so prefer the chair's existing sphere wheels |
-| geom ellipsoid, hfield, sdf | convex / heightfield / unsupported | |
-| hinge / slide / ball | constraint: twist free or limited, the rest locked / one linear axis / swing free | the constraint X axis is the joint axis; signs as in URLab's axis conversion (Y flipped, axis = (−x, y, −z)) |
-| asymmetric `range` | limit of half the range plus `AngularRotationOffset` at mid-range | drive targets then subtract mid-range |
-| `damping` | angular velocity drive to 0 | |
+| geom mesh | convex element | MuJoCo collides meshes as their convex hull. Pass MuJoCo's hull through; the spike re-hulled with V-HACD at 32 vertices, which is looser |
+| geom cylinder | convex polygon | no Chaos cylinder. The lift-drive chassis sat 1.2 cm low on the spike's coarse 16-sided wheels; use more sides |
+| hinge | constraint: X axis = joint axis (pseudovector: (−x, y, −z) in Unreal's frame), twist free or limited, swing locked | asymmetric `range`: `AngularRotationOffset` at mid-range, with targets less mid-range |
+| slide | linear X along the axis (a true vector: (x, −y, z)), the rest locked | asymmetric `range`: build the body at mid-range, then move it back once the constraint has initialised (gotcha 6) |
+| `damping`, `stiffness`/`springref`, `frictionloss` | physics-rate forces in the backend | constraint drives did not apply them (gotcha 7) |
 | `armature` | none | add to the child's inertia if needed |
-| `frictionloss` | velocity drive to 0 with a max force | approximate |
-| `<position>` / `<general>` servo (kp, kv, forcerange) | twist position + velocity drive, force mode | stiffness = kp·10⁴, damping = kv·10⁴, max = force·10⁴ (N·m to kg·cm²/s²) |
-| `<velocity>` | velocity drive | |
-| `<motor>` | equal and opposite torques on child and parent at the physics rate | also fixes today's ×100 acceleration hack |
-| fixed tendon actuator | per-joint drives with coefficient-scaled gains | the spike does this for the 2F-85 |
-| spatial tendons, `joint` equality, `polycoef` | none | compute in the backend each physics step, or drop |
-| `connect` equality | point constraint (angular free) | closes loops; held under 0.04 mm in the spike |
-| `weld` equality | locked constraint, or a kinematic target for mocap welds | |
-| contype / conaffinity / exclude / parent filter | self-collision rules | **required**, see Gotchas |
-| friction (sliding) | physical material | MuJoCo takes the max of the pair's frictions (or the geom with higher priority); Chaos averages by default |
-| torsional / rolling friction, solref / solimp, margin | none | Chaos contacts are rigid |
-| sites, cameras | scene components | |
-| sensors | URLab's, from mirrored `qpos`/`qvel` (Phase 3); touch and force from Chaos contacts and constraint forces | |
+| `<position>` / `<general>` servo | position + velocity drive, force mode | stiffness = kp·10⁴, damping = kv·10⁴; max force needs calibrating (gotcha 5) |
+| `<motor>` | equal and opposite torques on child and parent, at the physics rate | the spike applied them on the game thread |
+| fixed tendon | per-joint drives with coefficient-scaled gains | |
+| spatial tendon, `joint` equality, `polycoef` | backend-computed, or dropped | |
+| `connect` | point constraint (angular free) | held to 0.03 mm on the base and 0.04 mm on the gripper |
+| `weld` | locked constraint, or a kinematic target for mocap welds | |
+| contype / conaffinity / exclude / parent filter | self-collision rules | required (gotcha 1) |
+| friction | physical material | MuJoCo takes the max of the pair (or the geom with priority); Chaos averages by default |
+| torsional / rolling friction, `solref`/`solimp` | none | Chaos limits and contacts are hard: doors stop at their limit, while MuJoCo's soft limits bounce them back |
+| keyframes | stance presets | the base's low / mid / full / tilt |
 
 ## The spike
 
-`Scripts/chaos_spike/` builds the Gen3 + 2F-85 in Chaos from the MJCF and runs it against MuJoCo on the
-same targets:
+`Scripts/chaos_spike/`:
+- `mjcf_chaos_export.py` compiles an MJCF with MuJoCo and writes, in Unreal's frame:
+  - bodies with their collision hulls
+  - joints
+  - actuators (servos, motors, tendon couplings)
+  - connects
+  - keyframes
+- `build_chaos_proto.py` builds that in a scratch level: a hull mesh and actor per body, a constraint
+  per joint and connect, and drives.
+- `chaos_pie.py` runs one of `traj.py`'s schedules in PIE (`arm`, `grasp`, `base` or `object`) and
+  measures every joint from body poses.
+- `mj_run.py` runs the same schedule in MuJoCo.
 
-1. **`mjcf_chaos_export.py`** (host Python with `mujoco`): compiles the MJCF and writes, in Unreal's frame,
-   each body's pose at `qpos0`, its mass, and the convex hull of its collision geoms, plus the joints,
-   servo gains, tendon couplings and connect equalities.
-2. **`build_chaos_proto.py`** (editor): makes a hull static mesh per body, a `StaticMeshActor` per body
-   (welded bodies attached), and a `PhysicsConstraintActor` per joint and per connect, with limits and
-   force-mode drives, in `/Game/ChaosProto/Map_ChaosProto`.
-3. **`chaos_pie.py`** (editor, PIE): drives the joints through `traj.py`'s schedule and measures each
-   joint's angle from the body poses, the same way for both engines.
-4. **`mj_ref.py`, `mj_grasp.py`**: the MuJoCo runs. **`cmp.py`, `plot_track.py`**: the comparison.
+### Base (lift-drive linkage)
+
+Stances are reached by ramping the servo ctrls between the MJCF's keyframes over 2 s each. Drive-force
+limit ×10 (gotcha 5).
+
+| time | phase | Chaos chassis: height (cm), roll (°) | MuJoCo |
+|---|---|---|---|
+| 0.9 s | settled at `qpos0` | −1.2, 0.0 | 0.0, 0.0 |
+| 2.9 s | mid | 7.8, 0.0 | 9.7, 0.1 |
+| 4.9 s | full | 21.3, 0.0 | 22.4, 0.0 |
+| 6.9 s | tilt | 12.3, 14.3 | 14.0, 14.8 |
+| 8.9 s | back to mid | 9.0, 1.4 | 10.1, 0.9 |
+| 9.5–12 s | 8 N·m on every wheel | 3.84 m travelled, yaw −13.5° | 3.51 m, yaw +0.5° |
+
+The constant ~1.2 cm offset is the coarse wheel polygon. MuJoCo also yaws about 7° while changing
+stance (wheel scrub); Chaos barely does.
+
+### Arm (Gen3 + 2F-85)
 
 ![Chaos and MuJoCo following the same joint targets](images/chaos_backend/chaos_vs_mujoco_tracking.png)
 
-Arm, 9 s run (out at 1–3 s, hold, back at 7–8.5 s; the gripper closes at 4 s):
-
-| joint | RMS vs MuJoCo | max | at 6 s, Chaos | at 6 s, MuJoCo |
-|---|---|---|---|---|
-| joint_1 | 0.025 | 0.065 | 0.589 | 0.600 |
-| joint_2 | 0.069 | 0.160 | 0.901 | 0.911 |
-| joint_3 | 0.022 | 0.054 | 0.018 | 0.000 |
-| joint_4 | 0.058 | 0.118 | 1.550 | 1.603 |
-| joint_5 | 0.020 | 0.039 | 0.009 | 0.000 |
-| joint_6 | 0.084 | 0.168 | 0.515 | 0.600 |
-| joint_7 | 0.030 | 0.074 | 0.847 | 0.800 |
+| joint | RMS vs MuJoCo, run 1 / run 2 | at 6 s, Chaos (run 1) | at 6 s, MuJoCo |
+|---|---|---|---|
+| joint_1 | 0.025 / 0.011 | 0.589 | 0.600 |
+| joint_2 | 0.069 / 0.014 | 0.901 | 0.911 |
+| joint_4 | 0.058 / 0.044 | 1.550 | 1.603 |
+| joint_6 | 0.084 / 0.064 | 0.515 | 0.600 |
+| joint_7 | 0.030 / 0.023 | 0.847 | 0.800 |
 
 (radians)
 
-**Not tuned.** The gains are MuJoCo's, copied 1:1, and Chaos runs at 100 Hz against MuJoCo's 500 Hz.
-Angles are read on the game thread, which sees async physics one step late; that probably accounts for
-part of the lag. The steady-state offsets (0.05–0.09 rad on joints 4 and 6) are not explained yet.
-Likely candidates are joint-solver convergence on a 7-link chain and swing-limit leakage. They are the
-first tuning item (drive mode, iterations, substep rate, projection).
+The gains are MuJoCo's, copied 1:1, and Chaos runs at 100 Hz against MuJoCo's 500 Hz. Runs vary
+because the spike sets targets and reads angles on the game thread against async physics. The
+remaining 0.05–0.09 rad steady-state offsets on joints 4 and 6 are the first tuning item.
 
-**Grasp.** A 3×3×5 cm, 50 g box stands on the gripper base. The gripper closes at 1 s, then joints 2, 4
-and 6 tip it over, so gravity pulls the box across the pads.
-- MuJoCo holds it (1.6 mm of slip).
-- Chaos drops it about 1 s into the tip, on all three runs (one with a light spring added on the coupler).
+**Gripper.** It closes, and its loops hold. Its passive second degree of freedom lands on either branch
+from run to run: in run 2 the left finger matched MuJoCo's closed pose and the right one did not.
 
-The likely cause is the 2F-85's underactuated second degree of freedom. In MuJoCo, joint armature,
-damping and the soft equality keep it still; in Chaos it sits on the opposite stops. So the pads meet the
-box tilted and on their edges.
+**Grasp.** MuJoCo holds the box. Chaos dropped it in 4 of 4 runs. Per decision 2, Chaos grasping gets an
+assist rather than this fidelity work.
 
-### Gotchas the spike hit (each one is a rule for the real builder)
+### Objects (SimReady refrigerator and microwave)
+
+Each joint is pushed open for 0.5 s with a generalized force scaled to its moving body's mass:
+
+- **Fridge doors:** reach their 2.09 rad stop in both engines. MuJoCo's soft limit bounces them back
+  to 1.57 rad.
+- **Freezer drawer:** 0.37 m at 1 s against MuJoCo's 0.40 m.
+- **Crisper drawers:** run to their 0.30 m stop in Chaos, against 0.17 m (damped) in MuJoCo.
+- **Microwave turntable and roller ring:** spin faster in Chaos.
+- **Microwave release button:** does not spring back in Chaos.
+
+The last three all come from the same missing passive damping and stiffness (gotcha 7).
+
+### Gotchas: each one is a rule for the builder
 
 1. **Self-collision has to follow MuJoCo's rules.** With every part colliding, the arm came apart before
-   the run started; the spike's hulls (V-HACD, at most 32 vertices) are looser than MuJoCo's, so
-   non-adjacent links most likely overlapped at `qpos0`. MuJoCo filters
-   parent/child pairs and `<exclude>`s and uses contype/conaffinity. The spike makes every part ignore the
-   rest (as `bApplySelfCollisionChannel` does for robot pawns). The builder should apply the real MuJoCo
-   rules.
-2. **A drive target does not wake a sleeping body.** Bodies at rest ignored new targets until they were
-   woken each tick. The real backend has to wake bodies on every command, or keep robot bodies out of
-   sleep.
-3. **Use force mode for physical gains.** Drives default to acceleration mode (`bAccelerationMode`). With
-   it off, kp/kv/forcerange carry over as N·m ×10⁴.
-4. **Asymmetric limits need the rotation offset, and then targets need correcting.** A limit is
-   symmetric about the constraint frame, so the frame is offset to mid-range and every target has mid-range
-   subtracted. Without the correction, the gripper's drivers sat at 0.4 rad at "open" and the linkage
-   folded into its other branch.
-5. **Use a neutral game mode for test levels.** The project's default game mode spawned the MeBot on top
-   of the test robot.
+   the run started; the spike's looser hulls most likely overlapped at `qpos0`. Apply MuJoCo's
+   parent/child filter, `<exclude>`s and contype/conaffinity. The spike makes the parts ignore one
+   another, as `bApplySelfCollisionChannel` does.
+2. **A drive target does not wake a sleeping body.** Wake on every command, or keep robot bodies awake.
+3. **Use force mode (`bAccelerationMode` off)** so gains carry over physically (N·m ×10⁴; N/m and N·s/m
+   are already kg/s² and kg/s).
+4. **Asymmetric hinge limits need `AngularRotationOffset`,** and every target then has mid-range
+   subtracted. Without that, the gripper's drivers rested at 0.4 rad and its linkage folded into the
+   other branch.
+5. **Drive max force does not carry over 1:1.** With the MJCF's 207 N·m limit converted (2.07 × 10⁶), the
+   base's stance servos did not move at all, although MuJoCo holds the stances with 10–30 N·m. ×10 was
+   enough, and so was unlimited. Calibrate this (or apply the limit in the backend) rather than copying
+   it.
+6. **Slides:**
+   - The three linear axes share one limit size, so lock Y and Z before sizing X; otherwise the slide is
+     locked.
+   - A slide's axis is a true vector, unlike a hinge's.
+   - Linear limits are symmetric and the frames can't be moved after init. Build the body at mid-range
+     and move it back to `q = 0` once the constraint has initialised.
+7. **Passive joint damping and springs did not take effect as constraint drives.** The drives were set
+   up as intended (velocity drive and/or position drive, force mode, read back in the editor), and an
+   unlimited max force didn't change it. Apply `damping`, `stiffness` and `frictionloss` as forces in the
+   backend's physics-rate callback, which motors need anyway.
+8. **The game mode:** test levels need a neutral game mode, or the project default spawns the MeBot.
 
-## Gaps and risks, most serious first
+## Gaps and risks
 
-1. **Grasping and contact-rich manipulation.** Rigid contacts, no torsional friction, friction averaged
-   rather than maxed, and small fast parts. Options:
-   - author the gripper's passive compliance explicitly
-   - offer a fully-actuated (parallel-jaw) gripper variant for Chaos
-   - tune contact (margins, iterations, CCD on pads)
-   - a clearly-labelled grasp assist (a weld once contact is stable)
-   This needs your call; see the questions.
-2. **Mass ratios and closed loops.** The pads are 3.5 g, on a 60 kg chair. Maximal-coordinate solvers
-   struggle with that. The 2F-85's loops held here, but the arm was on a fixed base, not the moving
-   chair. Mass conditioning, projection, and floors on mass and inertia are the levers.
+1. **Grasp fidelity.** Decided: an assist, not fidelity work.
+2. **Mass ratios.**
+   - The base's 63 kg chassis on 0.4–1.5 kg links was fine.
+   - The rollers variant of the holonomic base has 17 g rollers (138 hinges) and is the stress case.
+     Levers: mass conditioning, projection, mass and inertia floors, or collapsing rollers into a
+     friction-anisotropic wheel.
 3. **MJCF features with no Chaos equivalent:**
    - joint equalities, `polycoef`, spatial tendons
    - `armature`, `frictionloss`
-   - soft contacts (`solref`/`solimp`), `condim` 4/6
-   Most can be approximated in the backend's physics-rate callback. Each one is a documented divergence.
-4. **Rate and latency.** Chaos runs at the project's 10 ms async step. Raising it costs every simulated
-   object in the level. Readings on the game thread lag one step.
-5. **URLab features tied to `mjData`** (its sensors, recording/replay, the ZMQ bridge and the gym env)
-   work on Chaos only through the state mirror (Phase 3). Contact-derived sensors need Chaos hit events.
-6. **Wheels.** MJCF cylinders become convex polygons. The base needs the Chaos chair's existing wheel
-   treatment, not a literal conversion.
+   - soft contacts and soft limits
+   - `condim` 4/6
+   Each is approximated in the backend or documented as a divergence.
+4. **Rate and latency.** Chaos runs at the project's 10 ms step, and commands from the game thread land
+   up to one step late. Motors and passive forces belong in an async physics callback.
+5. **Wheels.** Use enough cylinder sides, or the chair's existing wheel treatment. Driving yaw drift
+   differs: 13.5° against 0.5° over 3.8 m.
+6. **URLab features tied to `mjData`** (sensors, recording, bridge, gym env) need the state mirror.
 
-## Plan
+## Plan, in the decided order
 
-**Phase 1: a Chaos build of a URLab articulation** (C++, in RammsMujocoSupport, since it needs URLab):
-- `URammsChaosArticulationComponent` on an `AMjArticulation`, plus a backend choice (MuJoCo / Chaos) on
-  the articulation or the robot base.
-- On Chaos it compiles the spec (MuJoCo is used only as the compiler) and does not register with
-  `AAMjManager`.
-- It builds runtime body setups with exact primitives and convex elements from `mjModel`, welds jointless
-  bodies, makes an `FConstraintInstance` per joint, and applies MuJoCo's collision filtering.
-- It reparents URLab's geom visuals onto the Chaos bodies.
-- Acceptance: the spike's tracking numbers or better, from C++, and the arm holds a pose while mounted
-  on the moving chair.
+**Phase 1: a Chaos build of a URLab articulation** (C++, RammsMujocoSupport):
+- `URammsChaosArticulationComponent` builds Chaos bodies and constraints from the compiled `mjModel`
+  and reparents URLab's visuals.
+- A backend choice (MuJoCo / Chaos) on the articulation.
+- Gotchas 1–6 are applied as rules.
+- First targets: **the SimReady articulated objects** (fridge, microwave, the rest of the imported set)
+  and **the lift-drive bases'** chassis, linkages and wheels.
+- Acceptance: the spike's object and stance numbers or better, from C++, plus the objects placed by
+  worldgen opening and closing in PIE.
 
 **Phase 2: `FRammsChaosArticulationBackend`** (`IRammsActuationBackend`):
-- Motor ids resolve to MJCF actuators.
-- Servos become drives; `<motor>` becomes physical torque pairs, and velocity PI loops run in an async
-  physics callback. This also gives the skeletal Chaos backend a way off its ×100 hack.
-- Tendon and coupled actuators are computed per step.
-- The same `DT_*Motors` tables drive either engine.
+- Motor ids resolve to MJCF actuators; servos become drives (with calibrated limits).
+- Motors, passive damping, springs and friction loss are applied in an async physics callback, along
+  with the velocity PI loop (`SetVelocityDrive`). This also fixes the ×100 torque hack.
+- The base's `DT_*Motors`, the 5-bar linkage controller and the drive controllers work unchanged on
+  Chaos.
+- Acceptance: stance changes and driving through the control surface on a generated Chaos lift-drive
+  base, against MuJoCo.
 
-**Phase 3: mirror into URLab:**
-- Push `qpos`/`qvel` measured from Chaos into `mjData` each physics step, puppet-style, then run
-  kinematics and sensors.
-- URLab sensors, recording and the bridge then report the Chaos robot. Touch and force sensors come from
-  Chaos contacts and constraint forces.
+**Phase 3: grasp assist, then the arm:**
+- A Chaos grasp assist: once both pads have had stable contact with one body for N physics steps while
+  closing, weld the body to the gripper. Release on open. Labelled in the UI and in recorded data.
+- Arm tuning (the steady-state offsets).
+- Acceptance: teleop pick-and-place of worldgen props on the Chaos MeBot.
 
-**Phase 4: articulated objects and a mixed acceptance suite:**
-- SimReady furniture (`sr_fc_microwave_oven`, `sr_fc_refrigerator`) on Chaos.
-- A `Ramms.Chaos.*` automation suite that turns the spike's comparisons into tests: tracking error,
-  loop closure, door swing against MuJoCo.
+**Phase 4: deprecate `BP_Mebot_Ramms`:**
+- A generated Chaos MeBot covers it once `Scripts/pie_tests/base_component/run_chaos.sh` passes on the
+  generated robot.
+- `BP_MebotGameMode` then defaults to it and `BP_Mebot_Ramms` is marked deprecated. It is removed (with
+  the skeletal Chaos backend paths only it uses) in a later release.
 
-**Phase 5: manipulation fidelity on Chaos** (gripper compliance, contact tuning, and the grasp policy
-decided below).
+**Phase 5: mirror into URLab:** push Chaos `qpos`/`qvel` into `mjData` each step (puppet-style), so URLab
+sensors, recording and the bridge report the Chaos robot.
 
-**Later:** export path C (MJCF to skeletal mesh + physics asset) for users who want editable Chaos
-assets. It may also be how `BP_Mebot_Ramms`' hand-authored assets get generated rather than maintained.
-
-## Questions for you
-
-1. **What goes first on Chaos?** The arm on the chair (both MeBots), the SimReady articulated objects, or
-   both?
-2. **Grasping on Chaos:** acceptable to ship a labelled "grasp assist", or physics only, with lower
-   fidelity documented?
-3. **Mixed scenes:** is "everything on one engine" enough? Or do you want a MuJoCo robot with Chaos-only
-   props? That second case already works one way through quick-convert, but two-way coupling between
-   engines is a different project.
-4. **Should the generated Chaos robot replace the hand-authored `BP_Mebot_Ramms` once it matches,** or
-   should both stay?
+**Future:** two-way coupling between engines (decision 3), and export path C.
