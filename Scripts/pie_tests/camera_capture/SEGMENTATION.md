@@ -4,8 +4,9 @@ Class masks from the camera capture subsystem on a generated world: CameraCaptur
 pass (custom-depth stencil, see its README, "Segmentation") with RammsWorldGen's labels (its README,
 "Segmentation labels") and this project's class table (`Config/DefaultGame.ini`,
 `[/Script/CameraCapture.CameraCaptureSegmentationSettings]`: 149 fine classes rolling up to 29 coarse
-ones, pedestrians as `Person` (actors and the Mass visualizer's distant instances) and the robot as `Robot`,
-stencil 200 left to the camera projector).
+ones, pedestrians as `Person` (actors and the Mass visualizer's distant instances) and the robot as `Robot`).
+The pass needs `r.CustomDepth=3` (custom depth with stencil); the project leaves it at 1 and the capture
+raises it while segmentation is on.
 
 ```
 segmentation_capture.py   the PIE run: a camera at the PlayerStart, colour + depth + class masks
@@ -19,7 +20,8 @@ In the editor's Python console, with a generated map open:
 
 ```python
 import unreal; D = unreal.Paths.project_dir() + "Scripts/pie_tests/camera_capture/"
-SEG_SECONDS = 8.0   # optional: SEG_OUT, SEG_EVERY, SEG_W, SEG_H, SEG_F, SEG_Z, SEG_PITCH, SEG_YAW
+SEG_SECONDS = 8.0   # optional: SEG_OUT, SEG_EVERY, SEG_W, SEG_H, SEG_F, SEG_Z, SEG_PITCH, SEG_YAW,
+                    #           SEG_SPEED (walk the camera forward, cm/s), SEG_DEPTH, SEG_PNG
 exec(open(D + "segmentation_capture.py").read())
 ```
 
@@ -32,6 +34,17 @@ python Scripts/pie_tests/camera_capture/segmentation_preview.py Saved/SegCapture
 ```
 
 The first frame's mask is dropped while `M_SegStencil` compiles (the log says so).
+
+The README videos are this run with `SEG_SPEED = 110.0; SEG_EVERY = 2; SEG_DEPTH = False; SEG_PNG = True`,
+composed colour | fine | coarse at 15 fps into an animated WebP.
+
+## In the UI
+
+The camera capture panel (RammsUI) has a **Classes: on/off** button beside the rate stepper. On, the
+subsystem captures class masks and the channel button cycles Colour, Depth, Motion, **Classes** and
+**Coarse**: the mask drawn with one colour per fine or coarse class (`M_SegmentationColormap`, a lookup
+texture built from the class table). Below the feed, the number of classes in view, or, with the pointer
+over the feed, the class under it with its coarse class and value.
 
 ## Results (2026-10-28)
 

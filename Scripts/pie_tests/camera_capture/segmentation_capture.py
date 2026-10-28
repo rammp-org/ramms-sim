@@ -10,6 +10,8 @@ SEG_EVERY frames for SEG_SECONDS, then stops capture and ends PIE. Optional sett
     SEG_W, SEG_H image size (640 x 480)       SEG_F      focal length, px (380)
     SEG_Z        camera height above the PlayerStart, cm (120)
     SEG_PITCH    camera pitch, deg (-8)       SEG_YAW    yaw added to the PlayerStart's, deg (0)
+    SEG_SPEED    move the camera straight ahead at this speed, cm/s of game time (0: stand still)
+    SEG_DEPTH    capture depth too (True)     SEG_PNG    write colour as PNG rather than EXR (False)
 
 Progress goes to <project>/Saved/SegCapture/segmentation_capture.log.
 """
@@ -18,7 +20,7 @@ import time
 
 import unreal
 
-_SEG_OPTS = {k: globals().pop(k) for k in ("SEG_OUT", "SEG_SECONDS", "SEG_EVERY", "SEG_W", "SEG_H", "SEG_F", "SEG_Z", "SEG_PITCH", "SEG_YAW")
+_SEG_OPTS = {k: globals().pop(k) for k in ("SEG_OUT", "SEG_SECONDS", "SEG_EVERY", "SEG_W", "SEG_H", "SEG_F", "SEG_Z", "SEG_PITCH", "SEG_YAW", "SEG_SPEED", "SEG_DEPTH", "SEG_PNG")
              if k in globals()}
 
 
@@ -82,21 +84,30 @@ def _segmentation_capture(opts):
                     return
                 sub.set_output_directory(out)
                 sub.set_capture_rate(opts.get("SEG_EVERY", 20))
-                sub.set_capture_channels(True, True, False)
+                sub.set_capture_channels(True, bool(opts.get("SEG_DEPTH", True)), False)
+                if opts.get("SEG_PNG", False):
+                    sub.set_color_format(unreal.RammsCaptureColorFormat.SEPARATE_PNG_AND_EXR)
                 sub.set_capture_segmentation(True)
-                sub.spawn_camera("SegCam", xf, intr, True)
+                cam = sub.spawn_camera("SegCam", xf, intr, True)
                 sub.set_serialization_enabled(True)
                 sub.start_capture()
-                st.update(sub=sub, phase="run", until=now + opts.get("SEG_SECONDS", 8.0))
+                st.update(sub=sub, phase="run", until=now + opts.get("SEG_SECONDS", 8.0), cam=cam.get_owner(), origin=xf.translation,
+                          ahead=unreal.MathLibrary.get_forward_vector(xf.rotation.rotator()), g0=unreal.GameplayStatics.get_time_seconds(gw))
                 log("capturing %d camera(s) to %s" % (sub.get_registered_camera_count(), out))
                 return
             if st["phase"] == "run":
+                speed = opts.get("SEG_SPEED", 0.0)
+                if speed and gw is not None:
+                    # Game time, not wall time, so the path is the same however fast the editor runs.
+                    t = unreal.GameplayStatics.get_time_seconds(gw) - st["g0"]
+                    st["cam"].set_actor_location(st["origin"] + st["ahead"] * (speed * t), False, False)
                 if now < st["until"]:
                     return
                 stats = st["sub"].get_statistics()
                 log("frames=%d" % stats.total_frames_captured)
                 st["sub"].stop_capture()
                 st.pop("sub")
+                st.pop("cam", None)
                 st.update(phase="flush", until=now + 3.0)  # let the last readbacks and writes land
                 return
             if st["phase"] == "flush" and now >= st["until"]:
