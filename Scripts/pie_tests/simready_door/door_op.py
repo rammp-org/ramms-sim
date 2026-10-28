@@ -6,12 +6,19 @@ is done. Runs from a slate tick, so it returns at once.
 
 Globals: DO_PLAN (the plan .json), DO_JOINT (the appliance joint), DO_SHOTS (plan seconds), DO_OUT (the result
 .json: rows of [sim_s, joint, planned joint, grip 0..255, commanded yaw deg], with the offline log beside them).
+Optional: DO_SPEED (the physics engine's sim_speed_percent for the run), DO_MOVIE (a HighResShot every 1/DO_FPS
+sim seconds, default 15, at DO_RES, default 960x540, pausing the simulation until each is on disk, so the frames
+are evenly spaced in sim time; `result["frames"]` lists their sim times).
 """
 import json, math, os, time, traceback
 import unreal
 ues = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem)
 les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
+# Optional settings are consumed here, so one run's DO_MOVIE or DO_SPEED does not carry over to the next
+# (the editor's Python globals persist between console entries).
+OPT = {k: globals().pop(k) for k in ("DO_MOVIE", "DO_SPEED", "DO_FPS", "DO_RES") if k in globals()}
 plan = json.load(open(DO_PLAN))
+SHOTDIR = os.path.abspath(unreal.Paths.screen_shot_dir())
 LOG = plan["log"]; DT = plan["result"]["scene"]["log_dt"]; BASE_Z = plan["result"]["scene"]["base_z"]
 T = LOG["t"]; TGT = LOG["target"]; GRIP = LOG["grip"]; QD = LOG["q_des"]; QS = LOG["q"]
 for k in [k for k in list(globals()) if k == "DOP"]:
@@ -43,7 +50,14 @@ def zyx(q):
 
 def finish(msg):
     DOP["done"] = msg
-    out = {"msg": msg, "rows": DOP["rows"], "plan_t": T, "plan_q": QS, "plan_q_des": QD, "err": DOP["err"]}
+    try:
+        if "speed0" in DOP:
+            DOP["mgr"].get_editor_property("physics_engine").set_editor_property("sim_speed_percent", DOP["speed0"])
+        if DOP.get("mgr") is not None:
+            DOP["mgr"].set_paused(False)
+    except Exception:
+        pass
+    out = {"msg": msg, "frames": DOP.get("frames"), "rows": DOP["rows"], "plan_t": T, "plan_q": QS, "plan_q_des": QD, "err": DOP["err"]}
     os.makedirs(os.path.dirname(os.path.abspath(DO_OUT)), exist_ok=True)
     json.dump(out, open(DO_OUT, "w"))
     unreal.log("simready_door: %s, %d rows -> %s" % (msg, len(DOP["rows"]), DO_OUT))
@@ -102,8 +116,22 @@ def tick(dt):
                 return
             if not DOP["ctl"].is_target_initialized():
                 return
-            DOP["t0"] = DOP["mgr"].get_sim_time(); DOP["phase"] = "run"; return
+            DOP["t0"] = DOP["mgr"].get_sim_time(); DOP["phase"] = "run"
+            if OPT.get("DO_MOVIE") or OPT.get("DO_SPEED"):
+                eng = DOP["mgr"].get_editor_property("physics_engine")
+                DOP["speed0"] = eng.get_editor_property("sim_speed_percent")
+                if OPT.get("DO_SPEED"):
+                    eng.set_editor_property("sim_speed_percent", float(OPT["DO_SPEED"]))
+            DOP["next_frame"] = 0.0; DOP["frames"] = []
+            return
         if ph == "run":
+            if DOP.get("waiting"):
+                # Paused for a movie frame: resume once the shot is on disk.
+                n = len([f for f in os.listdir(SHOTDIR) if f.startswith("HighresScreenshot")])
+                if n > DOP["shot_count"] or now - DOP["wait_t"] > 10:
+                    DOP["waiting"] = False
+                    DOP["mgr"].set_paused(False)
+                return
             ts = DOP["mgr"].get_sim_time() - DOP["t0"]
             p, q, g, qd, i = interp(ts)
             # RammsMjEndEffectorController (bTrackBaseFrame) takes targets in the arm's base frame;
@@ -125,6 +153,15 @@ def tick(dt):
             DOP["ctl"].set_grip(g / 255.0)
             qa = DOP["app"].get_joint_angle(DO_JOINT)
             DOP["rows"].append([round(ts, 4), round(qa, 5), round(qd, 5), round(g, 1), round(DOP["yaw_cmd"], 2)])
+            if OPT.get("DO_MOVIE") and ts >= DOP["next_frame"]:
+                DOP["mgr"].set_paused(True)
+                os.makedirs(SHOTDIR, exist_ok=True)
+                DOP["shot_count"] = len([f for f in os.listdir(SHOTDIR) if f.startswith("HighresScreenshot")])
+                unreal.SystemLibrary.execute_console_command(gw, "HighResShot %s" % OPT.get("DO_RES", "960x540"))
+                DOP["frames"].append(round(ts, 4))
+                DOP["next_frame"] += 1.0 / OPT.get("DO_FPS", 15)
+                DOP["waiting"] = True; DOP["wait_t"] = now
+                return
             if DOP["shots"] and ts >= DOP["shots"][0]:
                 DOP["shots"].pop(0)
                 unreal.SystemLibrary.execute_console_command(gw, "HighResShot 1920x1080")
