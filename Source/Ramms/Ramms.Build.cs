@@ -29,7 +29,7 @@ public class Ramms : ModuleRules
 			"Ramms/Variant_TimeTrial/UI"
 		});
 
-		PrivateDependencyModuleNames.AddRange(new string[] { });
+		PrivateDependencyModuleNames.AddRange(new string[] { "RammsUI" });
 
 		// Pixel Streaming: RAMMS swaps the default streamer's video producer to
 		// the viewport MediaCapture path (see doc/PIXEL_STREAMING_PLAN.md).
