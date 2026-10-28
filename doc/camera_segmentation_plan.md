@@ -1,6 +1,20 @@
-# Semantic class channel for CameraCapture — plan, not yet built
+# Semantic class channel for CameraCapture — plan (built 2026-10-28)
 
-Recorded 2026-10-07. Nothing here is implemented. Depth and motion are already
+> **Status: built**, with the differences below; see
+> `Scripts/pie_tests/camera_capture/SEGMENTATION.md`, CameraCapture's README ("Segmentation") and
+> RammsWorldGen's README ("Segmentation labels").
+>
+> - The class mask is its own capture (lighting off, `M_SegStencil` reading the stencil into a float
+>   target), not the motion pass's spare channel, so `M_DmvCapture` was left alone and the mask is on the
+>   colour grid.
+> - `r.CustomDepth` stays at 1 in the project; the capture raises it to 3 while segmentation is on.
+> - Labels are `seg:<Class>` tags (RammsWorldGen writes them on generated worlds) plus actor-class rules;
+>   the class table is `Config/DefaultGame.ini`; masks are 8-bit PNGs with the table beside them; the
+>   camera capture panel shows fine and coarse class views (`M_SegmentationColormap`).
+> - Not done yet: the RMSS wire channel, and instance ids (planned from the class mask plus depth matched
+>   against instance bounds, not from a material pass).
+
+Recorded 2026-10-07. The plan as written then: Depth and motion are already
 decoupled (CameraCapture `feat/decouple-depth-and-motion`); this is the third
 plane.
 
