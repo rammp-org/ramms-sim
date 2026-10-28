@@ -9,8 +9,9 @@ distance, azimuth, elevation), DM_GEN3 (default /Game/Robots/URL/gen3_2f85_fixed
 """
 import json, math, os, traceback
 import unreal
-OUT = globals().get("DM_OUT") or os.path.join(unreal.Paths.project_saved_dir(), "SimReadyDoor", "map.txt")
-GEN3 = globals().get("DM_GEN3", "/Game/Robots/URL/gen3_2f85_fixed")
+OPT = {k: globals().pop(k) for k in ("DM_CAM", "DM_GEN3", "DM_OUT") if k in globals()}   # consumed: no carry-over
+OUT = OPT.get("DM_OUT") or os.path.join(unreal.Paths.project_saved_dir(), "SimReadyDoor", "map.txt")
+GEN3 = OPT.get("DM_GEN3", "/Game/Robots/URL/gen3_2f85_fixed")
 L = []
 try:
     les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
@@ -71,7 +72,7 @@ try:
     sky = eas.spawn_actor_from_class(unreal.SkyLight, unreal.Vector(0, 0, 300))
     sky.light_component.set_mobility(unreal.ComponentMobility.MOVABLE); sky.light_component.set_editor_property("real_time_capture", True)
     # The offline video's view (MuJoCo lookat xyz, distance, azimuth, elevation), mirrored into Unreal.
-    lx, ly, lz, dist, azm, el = globals().get("DM_CAM", (0.5, 0.05, 0.95, 2.4, 50, -24))
+    lx, ly, lz, dist, azm, el = OPT.get("DM_CAM", (0.5, 0.05, 0.95, 2.4, 50, -24))
     dx = math.cos(math.radians(el)) * math.cos(math.radians(azm))
     dy = math.cos(math.radians(el)) * math.sin(math.radians(azm))
     dz = math.sin(math.radians(el))

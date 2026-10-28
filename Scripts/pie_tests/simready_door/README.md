@@ -32,11 +32,22 @@ door_op.py    the PIE run: follows the plan's hand targets and grip on the sim c
    exec(open(D + "door_op.py").read())
    ```
    `DM_CAM` (MuJoCo lookat x y z, distance, azimuth, elevation, as `articulation_test.py --cam`) sets the
-   view. `door_op.py` runs from a slate tick, so the console returns at once; PIE ends by itself when the
+   view. The optional settings (`DM_CAM`, `DM_GEN3`, `DM_OUT`, `DO_SPEED`, `DO_MOVIE`, `DO_FPS`, `DO_RES`) are
+   consumed when read, since the editor's Python globals outlive a console entry. `door_op.py` runs from a slate tick, so the console returns at once; PIE ends by itself when the
    plan does, and `DO_OUT` holds `rows` of `[sim_s, joint (rad or m), planned joint, grip 0..255, yaw]`
    with the offline log beside them. Screenshots go to `Saved/Screenshots`.
+4. To record a video, add `DO_MOVIE = True` (and `DO_SPEED = 15`): a 960x540 HighResShot every 1/15 sim
+   second, the simulation paused until each is written, then for example
+   `ffmpeg -framerate 15 -i Saved/Screenshots/WindowsEditor/HighresScreenshot%05d.png -vf fps=30 -pix_fmt yuv420p door.mp4`.
+   The unfocused editor renders a few frames a second and its screenshot requests lag, so neither
+   `r.DumpingMovie` nor shots taken without pausing line up with the simulation.
 
 ## How the plan maps into Unreal
+
+`articulation_test.py` runs `RammsMjEndEffectorController`'s own IK law by default (`--controller ue`: damping
+0.08, gain 0.5, no per-step clamp, targets held between 50 Hz editor ticks), so the plan is checked against
+the controller that will run it. Replayed offline with that law, a plan reproduces the PIE result to the
+degree; with `ik_test.py`'s stiffer law (`--controller offline`) it can pass offline and fail in PIE.
 
 - URLab mirrors Y between MuJoCo and Unreal (MuJoCo `(x, y, z)` m is Unreal `(100x, -100y, 100z)` cm, a
   MuJoCo yaw `a` an Unreal yaw `-a`), so the builder places the Gen3 at `(0, 0, 100 base_z)` and the
@@ -58,23 +69,32 @@ ForgeCAD `refrigerator`, left door, grasped by its bar handle (plan: open to 80 
 
 | | opened to | final |
 | --- | --- | --- |
-| MuJoCo 3.17, offline | 77.1 deg | 0.06 deg |
+| MuJoCo 3.17, `--controller ue` | 77.4 deg | 0.74 deg |
 | Unreal PIE (URLab) | 78.4 deg | 0.74 deg |
 
 The two traces follow the commanded angle within a few degrees all the way.
 
-ForgeCAD `microwave_oven` on a 0.85 m counter, door ajar at 25 degrees, its free edge pinched (plan: open to
-85, bring back to 12 holding it, let go, push it shut):
+ForgeCAD `refrigerator`, freezer drawer, grasped by its handle (plan: pull out 0.22 m, push back in):
+
+| | pulled to | final |
+| --- | --- | --- |
+| MuJoCo 3.17, `--controller ue` | 0.217 m | 0.0000 m |
+| Unreal PIE (URLab) | 0.217 m | 0.0003 m |
+
+ForgeCAD `microwave_oven` on a 0.85 m counter, door ajar at 25 degrees, its free edge straddled by the
+half-closed fingers (`--grip 135`; plan: open to 85, bring back to 12, let go, push it shut):
 
 | | opened to | brought back to | final |
 | --- | --- | --- | --- |
-| MuJoCo 3.17, offline | 85.1 deg | 0.2 deg | 0.6 deg |
-| Unreal PIE (URLab) | 90.4 deg | 24.7 deg | 68.6 deg |
+| MuJoCo 3.17, `--controller ue` | 89.3 deg | 20.1 deg | 1.3 deg |
+| Unreal PIE (URLab) | 89.3 deg | about 20 deg | 1.25 deg |
 
-In Unreal the door opens, but the pinch on its 28 mm edge does not hold the way it does offline: the door
-lags the hand, then overshoots it, and slips out of the grip at about 25 degrees on the way back, so the
-replayed push meets the door from the wrong side. Not yet diagnosed (contact parameters of the imported
-models and the gripper's force are the next things to compare).
+The door runs a few degrees past the open target and stops about 20 degrees short on the way back (the
+inner finger meets the cabinet's front at that angle); the push closes the rest. A pinch of the 28 mm edge
+(full grip) passes with `--controller offline` but not under the controller's softer tracking: the edge
+twists out of the 2F-85's pads, in PIE and in the offline replay alike (opened to 90, back to 25, final
+about 66 degrees). On its way to the push point the hand first moves straight out from the door's outer
+face, so it does not clip the free edge.
 
 ## Limits
 

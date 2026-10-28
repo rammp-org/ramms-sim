@@ -8,8 +8,11 @@ RammsWorldGen's Tools/simready_mjcf.py, then runs
   the grasp frame moving with the door or drawer) -> close (swept back, still
   holding) -> release -> retreat -> [push: close the rest with the closed gripper]
 
-The arm runs damped-least-squares IK on the 2f85_pinch site, the control law of
-ik_test.py and of RammsMjEndEffectorController. Writes <out>.json (the result and
+The arm runs damped-least-squares IK on the 2f85_pinch site. By default it is
+RammsMjEndEffectorController's exactly (--controller ue: its damping and gain, no
+step clamp, the target held between 50 Hz editor ticks as door_op.py feeds it in
+PIE), so a plan that passes here passes in Unreal; --controller offline is
+ik_test.py's stiffer law. Writes <out>.json (the result and
 a 50 Hz log, including the pinch targets that Scripts/pie_tests/simready_door
 replays in Unreal), <out>.mp4 (needs an offscreen GL: MUJOCO_GL=egl or osmesa
 on Linux) and <out>_plot.png.
@@ -30,14 +33,22 @@ at the origin facing +x), on a counter with --table.
       --open 80 --app-pos 1.168 0.053 0 --out fridge_door
 
   # ForgeCAD microwave on a 0.85 m counter: door ajar at 25 degrees (as after the release
-  # button), pinch its free edge, open to 85, bring it back, let go, push it shut.
+  # button). The half-closed fingers straddle its free edge like a fork (--grip 135), open it
+  # to 85, bring it back to 12, let go, and push it shut.
   python mujoco/articulation_test.py --model D:/simready/mjcf/sr_fc_microwave_oven/sr_fc_microwave_oven.xml \
-      --joint door --start 25 --open 85 --close-to 12 --grasp-local 0.345 -0.004 0.12 \
+      --joint door --start 25 --open 85 --close-to 12 --grasp-local 0.335 -0.004 0.12 --grip 135 \
       --approach-local -1 0 0 --close-local 0 1 0 --yaw-follow 0.8 --push 0.27 -0.02 0.12 0 1 0 \
       --app-pos 1.022 0.068 0 --table 0.3 0.25 0.85 --cam 0.75 0.1 1.0 1.8 25 -28 --out microwave_door
 
+  # ForgeCAD refrigerator, freezer drawer (a slide): pull its handle out 0.22 m and push it back.
+  python mujoco/articulation_test.py --model D:/simready/mjcf/sr_fc_refrigerator/sr_fc_refrigerator.xml \
+      --joint freezer --handle col_handle_002_3 --depth -0.01 --open 0.22 --app-pos 1.168 0.053 0 --out drawer
+
 --yaw-follow is the fraction of the door's rotation the hand turns with (a bar
 turns in the grip); below 1 it keeps the wrist (joint 6) inside its limits.
+--grip below 255 holds the fingers part-closed: around a flat door edge they work as
+a fork, pushing on its faces, where a pinch relies on friction the 2F-85 does not
+have under RammsMjEndEffectorController's softer tracking.
 AT_TRACE=1 prints the joint, the tracking error, contact and arm joints at limits.
 """
 import argparse
@@ -51,8 +62,14 @@ import mujoco as mj
 HERE = os.path.dirname(os.path.abspath(__file__))
 ARM = 7
 ARM_HOME = [0.0, 0.26179939, 3.14159265, -2.26892803, 0.0, 0.95993109, 1.57079633]
-DAMP = 0.05
-GAIN = 0.6
+# The end-effector IK. "ue" is RammsMjEndEffectorController as Unreal runs it (its DampingLambda and
+# StepGain defaults, no step clamp, the target clamped to the joint ranges and held between 50 Hz editor
+# ticks, which is how Scripts/pie_tests/simready_door/door_op.py feeds it): a plan that passes with it
+# passes in PIE. "offline" is ik_test.py's law (stiffer, per-step clamp).
+CONTROLLERS = {
+    "ue": {"damping": 0.08, "gain": 0.5, "clip": 0.0, "tick": 0.02},
+    "offline": {"damping": 0.05, "gain": 0.6, "clip": 0.05, "tick": 0.0},
+}
 
 
 def compose(robot_xml, app_xml, app_pos, app_yaw, base_z, table=None, prefix="app_"):
@@ -137,6 +154,12 @@ def main():
     ap.add_argument("--depth", type=float, default=0.0, help="pinch point past the grasp point along the approach")
     ap.add_argument("--yaw-follow", type=float, default=1.0,
                     help="fraction of a hinge's rotation the hand follows (a bar turns in the grip)")
+    ap.add_argument("--grip", type=float, default=255.0,
+                    help="gripper command while holding (0 open .. 255 closed); below 255 the fingers straddle a door "
+                         "edge like a fork instead of pinching it")
+    ap.add_argument("--controller", choices=sorted(CONTROLLERS), default="ue",
+                    help="IK law: ue (RammsMjEndEffectorController, as in PIE; default) or offline (ik_test.py)")
+    ap.add_argument("--ik-tick", type=float, default=None, help="override the controller's target update period (s)")
     ap.add_argument("--move-time", type=float, default=6.0)
     ap.add_argument("--out", required=True)
     ap.add_argument("--video", type=int, default=1)
@@ -237,15 +260,30 @@ def main():
                 return True
         return False
 
+    ctl = dict(CONTROLLERS[a.controller])
+    if a.ik_tick is not None:
+        ctl["tick"] = a.ik_tick
+    lo_hi = [m.jnt_range[k] if m.jnt_limited[k] else None for k in range(ARM)]
+
     def step_to(p_t, q_t, grip_ctrl, phase, q_des):
+        # In "ue" mode the target is held between editor ticks, as door_op.py feeds it in Unreal.
+        if ctl["tick"] <= 0 or state.get("held") is None or d.time >= state["next_tick"]:
+            state["held"] = (np.array(p_t, float), np.array(q_t, float), grip_ctrl)
+            state["next_tick"] = d.time + ctl["tick"]
+        p_h, q_h, g_h = state["held"]
         mj.mj_jacSite(m, d, jacp, jacr, sid)
         J = np.vstack([jacp[:, :ARM], jacr[:, :ARM]])
         cur = np.zeros(4); mj.mju_mat2Quat(cur, d.site_xmat[sid])
-        err = np.concatenate([p_t - d.site_xpos[sid], quat_err(q_t, cur)])
-        dq = J.T @ np.linalg.solve(J @ J.T + DAMP ** 2 * np.eye(6), err)
-        dq = np.clip(dq, -0.05, 0.05)
-        d.ctrl[:ARM] = d.qpos[:ARM] + GAIN * dq
-        d.ctrl[grip] = grip_ctrl
+        err = np.concatenate([p_h - d.site_xpos[sid], quat_err(q_h, cur)])
+        dq = J.T @ np.linalg.solve(J @ J.T + ctl["damping"] ** 2 * np.eye(6), err)
+        if ctl["clip"] > 0:
+            dq = np.clip(dq, -ctl["clip"], ctl["clip"])
+        tgt = d.qpos[:ARM] + ctl["gain"] * dq
+        for k in range(ARM):
+            if lo_hi[k] is not None:
+                tgt[k] = min(max(tgt[k], lo_hi[k][0]), lo_hi[k][1])
+        d.ctrl[:ARM] = tgt
+        d.ctrl[grip] = g_h
         mj.mj_step(m, d)
         state["step"] += 1
         if state["step"] % 10 == 0:
@@ -296,12 +334,12 @@ def main():
     move(pre, p_g, q_g, 0, 1.5, "reach", q_start)
     hold(p_g, q_g, 0, 0.3, "reach", q_start)
     reach_err = float(np.linalg.norm(d.site_xpos[sid] - p_g))
-    hold(p_g, q_g, 255, 1.0, "grasp", q_start)
+    hold(p_g, q_g, a.grip, 1.0, "grasp", q_start)
     grasped = in_contact()
 
-    opened = sweep(grasp_target, q_start, target_open, a.move_time, 255, "open")
+    opened = sweep(grasp_target, q_start, target_open, a.move_time, a.grip, "open")
     held_open = in_contact()
-    back = sweep(grasp_target, target_open, q_back, a.move_time, 255, "close")
+    back = sweep(grasp_target, target_open, q_back, a.move_time, a.grip, "close")
     p_c, q_c = grasp_target(q_back)
     hold(p_c, q_c, 0, 0.8, "release", q_back)
     away = p_c - unit(np.array(q_to_mat(q_c))[:, 2]) * 0.12
@@ -329,7 +367,11 @@ def main():
 
         p0, qp = push_target(cur_v)
         q_now = np.zeros(4); mj.mju_mat2Quat(q_now, d.site_xmat[sid].copy())
-        move(d.site_xpos[sid].copy(), p0 - Rp[:, 2] * 0.06, qp, 255, 2.0, "push", cur_v, q_from=q_now)
+        # Clear the door first: straight out from its outer face, then across to the push point, so the
+        # hand never sweeps through the free edge on its way round.
+        w1 = d.site_xpos[sid].copy() - pd_world * 0.10
+        move(d.site_xpos[sid].copy(), w1, qp, 255, 1.2, "push", cur_v, q_from=q_now)
+        move(w1, p0 - Rp[:, 2] * 0.06, qp, 255, 1.5, "push", cur_v)
         move(p0 - Rp[:, 2] * 0.06, p0, qp, 255, 0.8, "push", cur_v)
         sweep(push_target, cur_v, q_closed - (0.02 if hinge else 0.005) * np.sign(target_open - q_closed),
               2.5, 255, "push")
@@ -351,7 +393,7 @@ def main():
         "closed_fraction": 1 - (final - q_closed) / span if span else None,
         "sim_seconds": round(d.time, 2),
         "scene": {"base_z": a.base_z, "app_pos": a.app_pos, "app_yaw": a.app_yaw, "table": a.table,
-                  "start": a.start, "gravcomp": True, "timestep": m.opt.timestep, "log_dt": 10 * m.opt.timestep},
+                  "start": a.start, "gravcomp": True, "controller": a.controller, "timestep": m.opt.timestep, "log_dt": 10 * m.opt.timestep},
     }
     res["verdict"] = "PASS" if (res["open_fraction"] or 0) > 0.9 and (res["closed_fraction"] or 0) > 0.97 else "FAIL"
     print(json.dumps(res, indent=1))
