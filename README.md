@@ -39,10 +39,11 @@
       each with a ground-truth accessibility manifest.
     </td>
     <td width="50%" valign="top">
-      <img src="doc/images/readme/camera_views.webp" width="100%" alt="The seat, wrist, Orbbec Gemini and LUCI cameras, with depth, recorded together while the chair drives"><br>
-      <b>Every camera on the robot.</b> The seat view plus the wrist, Orbbec
-      Gemini and LUCI cameras, each with its real intrinsics and mounting,
-      rendering RGB, depth and motion vectors.
+      <img src="doc/images/readme/camera_views.webp" width="100%" alt="The seat, wrist and Orbbec Gemini cameras, with depth, class segmentation and motion vectors, recorded together while the chair drives"><br>
+      <b>Every camera on the robot.</b> The seat view plus the wrist and Orbbec
+      Gemini cameras (the LUCI cameras sit alongside), each with its real
+      intrinsics and mounting, rendering RGB, depth, class segmentation and
+      motion vectors.
     </td>
   </tr>
   <tr>
