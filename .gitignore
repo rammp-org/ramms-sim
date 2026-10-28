@@ -88,6 +88,9 @@ Content/CitySampleVehicles/
 # UrbanVerse-100K assets: downloaded and imported locally (gated dataset, per-asset licenses);
 # see Plugins/RammsWorldGen/README.md "UrbanVerse assets".
 Content/UrbanVerse/
+# NVIDIA SimReady Central assets: downloaded and imported locally (per-asset licenses);
+# see Plugins/RammsWorldGen/README.md "SimReady assets".
+Content/SimReady/
 __pycache__
 Packaged/
 
