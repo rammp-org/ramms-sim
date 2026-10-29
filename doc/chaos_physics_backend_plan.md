@@ -249,8 +249,9 @@ stepped), then builds from `mjModel`:
 
 URLab's body components (and the visuals under them) follow the Chaos bodies.
 
-**Spike gotchas.** Gotchas 1–4, 6 and 7 are now rules in the builder. Gotcha 5 is
-`ServoForceLimitScale` (default 10×). The game mode (gotcha 8) is up to the level.
+**Spike gotchas.** Gotchas 1–4, 6 and 7 are now rules in the builder. Gotcha 5 was
+`ServoForceLimitScale` (default 10×) until Phase 2 found its cause (see below). The game mode
+(gotcha 8) is up to the level.
 
 ![SimReady refrigerator and microwave pushed open on Chaos, the Gen3 behind](images/chaos_backend/chaos_articulation_objects.jpg)
 
@@ -262,15 +263,78 @@ URLab's body components (and the visuals under them) follow the Chaos bodies.
 | SimReady fridge and microwave | doors, drawers, turntable and the sprung release button agree with MuJoCo to within ~10 % in travel. Damping and springs now work, through the callback. Doors stop at their limit rather than bouncing |
 | Lift-drive base, stances | settled −0.7 cm (MuJoCo 0); mid stance 8.1 cm (9.7); full 21.6 cm (22.4); tilt 14.6° (14.8°) |
 | Lift-drive base, driving in the mid stance | **heading drift: −0.1° against MuJoCo's +0.5°.** The spike drifted −13.5°. The fix was the per-body MJCF friction (combined by max) with no restitution, the MJCF inertia and the physics-rate wheel damping. It still travels 4.3 m against 3.5 m. The wheels roll without slipping in both engines, so the gap is in acceleration against damping, not traction |
-| Lift-drive base, driving in the `fwd` stance | 7.0 m and −121° of yaw, against 3.4 m and −10°. With all six wheels down, Chaos loads the center wheels more and unevenly. **Open**, for Phase 2 |
+| Lift-drive base, driving in the `fwd` stance | 7.0 m and −121° of yaw, against 3.4 m and −10°. With all six wheels down, Chaos loads the center wheels more and unevenly. Fixed in Phase 2 (3.5 m, +1°) |
 | Gen3 arm | joint tracking as in the spike (0.01–0.09 rad RMS). Large keyframe moves overshoot (3.33 against 3.14 rad) |
 
 **Not yet:**
 - slide and velocity-servo drives are untested (no model in hand uses them)
 - ball joints and welds between moving bodies are untested
 - the ~330 collision-only constraints the lift-drive base needs for MuJoCo's filtering could become
-  Chaos ignore-collision pairs
+  Chaos ignore-collision pairs (done in Phase 2 for models where no two parts can collide)
 - packaged builds need runtime convex cooking
+
+## Phase 2 status (2026-10-28)
+
+**Robots drive on Chaos through their own controllers.** RammsMujocoSupport's registered actuation
+backend now drives a URLab articulation on whichever engine simulates it: while the articulation
+carries an active `URammsChaosArticulationComponent` (in its Blueprint, or added by `SwitchToChaos` at
+runtime), the robot base component's motors go to `FRammsChaosArticulationBackend`. The 5-bar linkage
+controllers, the drive controllers, the control surface and the input maps work unchanged. RammsCore's
+API is untouched.
+
+| `IRammsActuationBackend` | on Chaos |
+|---|---|
+| motor ids | MJCF actuator names, as on MuJoCo |
+| `GetValue` / `GetVelocity` | the actuator's joint from the latest physics step, not the interpolated game-thread transforms |
+| `SetVelocityDrive` | the joint constraint's velocity drive is the P term (solved implicitly); the integral moves its target once a frame; the drive's force limit clamps the sum |
+| `SetMotorBrake` | the joint constraint holds a torque motor's joint, up to its torque |
+| `SimulatesMotorJoint` | false for torque motors, so the drive controllers park with the brake. Their own torque hold on the wheel angle, closed once a game frame, rang against Chaos and drifted the robot |
+| `ReleaseMotor`, `GetMotorTransform` | a servo's drives off until its next command; the joint's body |
+
+**Gotcha 5 was the solver, not the limit.** A drive is only as stiff as Chaos' iterations let it
+converge along a chain. Measured on the Gen3 (shoulder sag under gravity at `home`; a joint_1 step of
+1.5 rad, saturated at the MJCF's 105 N·m):
+
+| Chaos settings | shoulder sag | step: peak / settled / time to 90 % |
+|---|---|---|
+| MuJoCo | 0.007 rad | 1.50 / 1.50 rad / 0.15 s |
+| project default (8 / 1 iterations), mass conditioning on | 0.072 | 1.80 / 1.45 / 0.32 |
+| same, kp ×10 | 0.067 | 1.80 / 1.42 / 0.28 |
+| 32 / 4 | 0.035 | 1.72 / 1.47 / 0.22 |
+| 8 / 1, mass conditioning off | 0.039 | 1.74 / 1.48 / 0.22 |
+| 32 / 4, off | 0.018 | 1.65 / 1.51 / 0.20 |
+| **64 / 8, off (the new default)** | **0.010** | **1.58 / 1.50 / 0.16** |
+
+The force limit is now the MJCF's force range as is (`ServoForceLimitScale` 1). With these defaults
+the arm reaches its keyframes without the Phase 1 overshoot, the fridge doors open within 5 % of
+MuJoCo's travel, and the `fwd`-stance six-wheel drive goes 3.5 m with +1° of yaw against MuJoCo's
+3.4 m and −10° (it was 7.0 m and −121°). Per-run tables are in
+`Scripts/pie_tests/chaos_articulation/README.md`.
+
+**Also fixed on the way:**
+- Self-collision: when MuJoCo's rules leave no pair of parts that can collide (the usual robot MJCF:
+  contype 1, conaffinity 0), the parts ignore each other on the RobotSelf channel instead of getting a
+  collision-only constraint per pair. The lift-drive base had 330 of them; with stiff drives they
+  spun it in place.
+- URLab's components get no collision on Chaos. Moving their query shapes every frame cost ~40 ms
+  on the lift-drive base (19 → 100 fps).
+
+**The lift-drive linkage pawn through its control surface** (`robot_run.py`), against MuJoCo: the
+linkage heights match to within 0.5 cm except at the top, where MuJoCo stops at 13.7 cm and Chaos goes to
+16 cm; the chassis heights to within 1 cm; the robot holds still between commands on both. Driving
+straight, Chaos is 15 % slower (1.20 against 1.42 m/s) with the same heading drift (+12° against
++9°); turning in place it is 1.6× faster (308 against 188°/s). On a stop Chaos parks on the brake in
+0.3 s while MuJoCo coasts. The holonomic pawn runs on Chaos too, but its MuJoCo reference turns 190°
+while driving "straight", so there is no comparison yet.
+
+**Open:**
+- turning and straight-line speed (contact and scrub: the rear wheels skid in both engines)
+- the velocity-loop path is checked with a direct test only; no controller on these robots uses
+  `SetMotorVelocityCommand`
+- the 5-bar's top-of-range stop (MuJoCo's soft limit or a contact; Chaos' is hard)
+- a robot Blueprint variant with the component, so a user picks the engine without `SwitchToChaos`.
+  The base component's `Backend = Chaos` still means the skeletal backend; making it select this one
+  needs a RammsCore registry entry (a public API change)
 
 ## Plan, in the decided order
 
@@ -284,7 +348,7 @@ URLab's body components (and the visuals under them) follow the Chaos bodies.
 - Acceptance: the spike's object and stance numbers or better, from C++, plus the objects placed by
   worldgen opening and closing in PIE.
 
-**Phase 2: `FRammsChaosArticulationBackend`** (`IRammsActuationBackend`):
+**Phase 2: `FRammsChaosArticulationBackend`** (`IRammsActuationBackend`), done (see Phase 2 status):
 - Motor ids resolve to MJCF actuators; servos become drives (with calibrated limits).
 - Motors, passive damping, springs and friction loss are applied in an async physics callback, along
   with the velocity PI loop (`SetVelocityDrive`). This also fixes the ×100 torque hack.
