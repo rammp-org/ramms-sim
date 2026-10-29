@@ -21,6 +21,9 @@ MuJoCo exactly is not the goal. The goal is one robot or object definition that 
 3. **Two-way coupling between engines** (a MuJoCo robot with Chaos-only props) is a future item.
 4. **The hand-authored skeletal `BP_Mebot_Ramms` is deprecated** once the generated Chaos robot covers
    it: first it stops being the default, then it is removed.
+5. **One robot authoring pipeline: USD / MJCF** (2026-10-28, after Phase 2). Every robot is a URLab
+   articulation, and `Backend = Chaos` on its base component runs that articulation on Chaos. The MeBot
+   gets an MJCF and is renamed RAMMP Gen 1 (follow-up work); the skeletal backend stays only until then.
 
 ## Short answer
 
@@ -332,9 +335,9 @@ while driving "straight", so there is no comparison yet.
 - the velocity-loop path is checked with a direct test only; no controller on these robots uses
   `SetMotorVelocityCommand`
 - the 5-bar's top-of-range stop (MuJoCo's soft limit or a contact; Chaos' is hard)
-- a robot Blueprint variant with the component, so a user picks the engine without `SwitchToChaos`.
-  The base component's `Backend = Chaos` still means the skeletal backend; making it select this one
-  needs a RammsCore registry entry (a public API change)
+- picking the engine without `SwitchToChaos`: done after Phase 2 (decision 5). `Backend = Chaos` on the
+  robot base component now switches a URLab robot's articulation to Chaos (ramms-core #40,
+  ramms-mujoco-support #11); a robot with no articulation still falls back to the skeletal backend
 
 ## Plan, in the decided order
 
@@ -363,11 +366,13 @@ while driving "straight", so there is no comparison yet.
 - Arm tuning (the steady-state offsets).
 - Acceptance: teleop pick-and-place of worldgen props on the Chaos MeBot.
 
-**Phase 4: deprecate `BP_Mebot_Ramms`:**
-- A generated Chaos MeBot covers it once `Scripts/pie_tests/base_component/run_chaos.sh` passes on the
-  generated robot.
-- `BP_MebotGameMode` then defaults to it and `BP_Mebot_Ramms` is marked deprecated. It is removed (with
-  the skeletal Chaos backend paths only it uses) in a later release.
+**Phase 4: the MeBot as RAMMP Gen 1, from MJCF** (decision 5):
+- An MJCF (or USD) for the MeBot, renamed RAMMP Gen 1, imported as a URLab articulation with its motor
+  table, and `Backend = Chaos` on its base component.
+- It covers `BP_Mebot_Ramms` once `Scripts/pie_tests/base_component/run_chaos.sh` passes on it.
+- `BP_MebotGameMode` then defaults to it and `BP_Mebot_Ramms` is marked deprecated. It is removed, with
+  the skeletal Chaos backend (`FRammsChaosActuationBackend` and the fallback in
+  `URammsRobotBaseComponent::EnsureBackend`), in a later release.
 
 **Phase 5: mirror into URLab:** push Chaos `qpos`/`qvel` into `mjData` each step (puppet-style), so URLab
 sensors, recording and the bridge report the Chaos robot.
