@@ -26,8 +26,9 @@ CA_OUT = "run"; exec(open(D + "chaos_run.py").read())   # CA_FRAMES = True also 
 
 **A robot through its controllers.** `robot_run.py` drives the pawn in the open level through
 `URammsRobotControlSurfaceComponent`, as a panel or input map would. The robot base component's motors
-go to Chaos when the articulation carries a `URammsChaosArticulationComponent`, and to MuJoCo
-otherwise, so the same script measures both:
+go to Chaos when its `Backend` is Chaos (or the articulation carries a
+`URammsChaosArticulationComponent`), and to MuJoCo otherwise, so the same script measures both. With
+`Backend = Chaos` set on the placed pawn, leave `CR_SWITCH` out:
 
 ```python
 # Chaos: a level with the pawn and no MuJoCo manager; CR_SWITCH adds the component at runtime
