@@ -39,10 +39,11 @@
       each with a ground-truth accessibility manifest.
     </td>
     <td width="50%" valign="top">
-      <img src="doc/images/readme/camera_views.webp" width="100%" alt="The seat, wrist, Orbbec Gemini and LUCI cameras, with depth, recorded together while the chair drives"><br>
-      <b>Every camera on the robot.</b> The seat view plus the wrist, Orbbec
-      Gemini and LUCI cameras, each with its real intrinsics and mounting,
-      rendering RGB, depth and motion vectors.
+      <img src="doc/images/readme/camera_views.webp" width="100%" alt="The seat, wrist and Orbbec Gemini cameras, with depth, class segmentation and motion vectors, recorded together while the chair drives"><br>
+      <b>Every camera on the robot.</b> The seat view plus the wrist and Orbbec
+      Gemini cameras (the LUCI cameras sit alongside), each with its real
+      intrinsics and mounting, rendering RGB, depth, class segmentation and
+      motion vectors.
     </td>
   </tr>
   <tr>
@@ -642,11 +643,38 @@ Production-grade multi-camera capture for simulation and research:
   `DA_RealSense_D435`)
 - **Multi-modal output** — RGB, depth (in alpha channel), and motion vectors
   as 32-bit float EXR files with per-frame JSON metadata
+- **Semantic segmentation** — a class mask per camera from the custom-depth
+  stencil: 8-bit fine and coarse class PNGs per frame, with the class table
+  (`segmentation_classes.csv` / `.json`) beside them. Generated worlds come
+  labelled (palette slots, surfaces, procedural pieces); pedestrians are
+  `Person` and the robot `Robot`. 149 fine classes roll up to 29 coarse ones
+  (`Config/DefaultGame.ini`). The camera capture panel's **Classes** button
+  turns it on and adds fine and coarse class views, with the class under the
+  pointer named below the feed. See
+  [Scripts/pie_tests/camera_capture/SEGMENTATION.md](Scripts/pie_tests/camera_capture/SEGMENTATION.md).
 - **Frustum visualization** — Editor viewport shape with filled translucent
   planes
 
 **Components:** `UIntrinsicSceneCaptureComponent2D`, `UCaptureComponent`,
 `ACameraCaptureManager`
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="doc/images/readme/segmentation_downtown.webp" width="100%" alt="Walking a generated downtown sidewalk: colour, fine classes and coarse classes"><br>
+      <sub>Downtown: colour, fine classes, coarse classes.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="doc/images/readme/segmentation_mainstreet.webp" width="100%" alt="Walking a park path on the generated main street: colour, fine classes and coarse classes"><br>
+      <sub>Main street square: foliage is cut out leaf by leaf, pedestrians come out whole.</sub>
+    </td>
+  </tr>
+</table>
+
+<p align="center">
+  <img src="doc/images/readme/camera_capture_classes.jpg" width="90%" alt="The camera capture panel showing the fine class view, the coarse class view and colour"><br>
+  <sub>The camera capture panel: <b>Classes</b>, <b>Coarse</b> and <b>Colour</b> views of the same camera.</sub>
+</p>
 
 ### Real-Time Streaming
 
@@ -670,8 +698,8 @@ input source drives that description through one sink with source
 arbitration, so nothing hard-codes a key map or a motor name:
 
 - **In-game panels** (`RammsUI`): floating drive joystick, caster and lift
-  sliders, arm pad, camera-capture and status panels, generated from the
-  surface.
+  sliders, arm pad, camera-capture (colour, depth, motion and class views) and
+  status panels, generated from the surface.
 - **Keyboard, gamepad and Enhanced Input** maps bound to control ids.
 - **RammsAccess**: BCI (OpenBCI Galea), pointer / HID devices (head mice, eye
   gaze) and assistive switches, sent as a versioned intent stream over UDP with
