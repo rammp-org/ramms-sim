@@ -56,7 +56,7 @@ def main(path, out):
             hull = {"verts": np.round(P[idx], 4).tolist(), "faces": faces}
         bodies.append({"name": name, "parent": mujoco.mj_id2name(m, mujoco.mjtObj.mjOBJ_BODY, m.body_parentid[b]),
                        "pos": ue_pos(p), "quat": ue_quat(d.xquat[b]), "mass": float(m.body_mass[b]),
-                       "inertia": m.body_inertia[b].tolist(), "hull": hull,
+                       "inertia": m.body_inertia[b].tolist(), "ipos": ue_pos(m.body_ipos[b]), "hull": hull,
                        "free": any(m.jnt_type[j] == 0 for j in range(m.njnt) if m.jnt_bodyid[j] == b)})
     joints = []
     for j in range(m.njnt):

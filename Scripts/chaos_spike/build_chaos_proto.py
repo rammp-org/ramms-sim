@@ -42,7 +42,10 @@ def _build(opts):
                 desc.create_triangle(pg, vis)
             sm.build_from_static_mesh_descriptions([desc], False)
             sme.remove_collisions(sm)
-            ok = sme.set_convex_decomposition_collisions(sm, 1, 32, 100000)
+            hv = 32
+            for pat, n_ in (opts.get("CP_HULL_VERTS") or {}).items():
+                if pat in b["name"]: hv = n_
+            ok = sme.set_convex_decomposition_collisions(sm, 1, hv, 100000)
             meshes[b["name"]] = sm
             L("mesh %s verts=%d faces=%d convex=%s" % (b["name"], len(V), len(b["hull"]["faces"]), ok))
         # bodies: a joint (or free joint) makes a separate simulated body, otherwise weld to the parent
@@ -67,6 +70,14 @@ def _build(opts):
                 c.set_collision_object_type(unreal.CollisionChannel.ECC_VEHICLE)
                 c.set_collision_response_to_channel(unreal.CollisionChannel.ECC_VEHICLE, unreal.CollisionResponseType.ECR_IGNORE)
             c.set_mass_override_in_kg("None", max(b["mass"], 1e-4), True)
+            for pat, pm in (opts.get("CP_MATERIALS") or {}).items():   # {name substring: (friction, restitution)}
+                if pat in b["name"]:
+                    mp = "%s/PM_%s" % (PKG, pat)
+                    m_ = unreal.load_asset(mp) if eas.does_asset_exist(mp) else unreal.AssetToolsHelpers.get_asset_tools().create_asset("PM_" + pat, PKG, unreal.PhysicalMaterial, unreal.PhysicalMaterialFactoryNew())
+                    m_.set_editor_property("friction", pm[0]); m_.set_editor_property("static_friction", pm[0]); m_.set_editor_property("restitution", pm[1])
+                    m_.set_editor_property("override_friction_combine_mode", True); m_.set_editor_property("friction_combine_mode", unreal.FrictionCombineMode.MAX)
+                    m_.set_editor_property("override_restitution_combine_mode", True); m_.set_editor_property("restitution_combine_mode", unreal.FrictionCombineMode.MIN)
+                    c.set_phys_material_override(m_)
             actors[b["name"]] = a
         root_of = {}
         for b in J["bodies"]:
