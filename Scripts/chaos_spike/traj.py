@@ -51,3 +51,18 @@ def obj(t, J):
                          for j in J["joints"] if j["type"] in ("hinge", "slide")}}
 obj.end = 4.0
 SCHEDULES["object"] = obj
+
+# Driving only: ramp to the mid stance, then the same equal wheel torques (isolates heading drift).
+def _base_drive(t, J):
+    names = [a["name"] for a in J["actuators"]]; mid = J["keys"]["mid"]; s = min(max(t / 2.0, 0.0), 1.0)
+    c = {}
+    for a, v in zip(J["actuators"], mid):
+        c[a["name"]] = s * v if a["kind"] == "servo" else (BASE_DRIVE[2] if 3.0 <= t < 5.5 else 0.0)
+    return c
+_base_drive.end = 6.0
+SCHEDULES["base_drive"] = _base_drive
+def _base_drive_rev(t, J):
+    c = _base_drive(t, J)
+    return {k: (-v if J and any(a["name"] == k and a["kind"] == "motor" for a in J["actuators"]) else v) for k, v in c.items()}
+_base_drive_rev.end = 6.0
+SCHEDULES["base_drive_rev"] = _base_drive_rev

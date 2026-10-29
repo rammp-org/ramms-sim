@@ -1,7 +1,8 @@
 # Chaos as a physics backend for MuJoCo-described robots and objects
 
-Status: **feasibility study with a working spike, decisions recorded** (2026-10-28). The spike is in
-`Scripts/chaos_spike/` (see its README). Nothing in the runtime has changed yet.
+Status: **Phase 1 built** (2026-10-28): ramms-mujoco-support's `URammsChaosArticulationComponent` (see
+"Phase 1 status" below and `Scripts/pie_tests/chaos_articulation/`). The spike that preceded it is in
+`Scripts/chaos_spike/`.
 
 The question was whether the robots and articulated objects RAMMS describes in MJCF (through URLab) can
 also run on Chaos, so users choose the engine that fits their application and their content. Matching
@@ -228,6 +229,48 @@ The last three all come from the same missing passive damping and stiffness (got
 5. **Wheels.** Use enough cylinder sides, or the chair's existing wheel treatment. Driving yaw drift
    differs: 13.5° against 0.5° over 3.8 m.
 6. **URLab features tied to `mjData`** (sensors, recording, bridge, gym env) need the state mirror.
+
+## Phase 1 status (2026-10-28)
+
+`URammsChaosArticulationComponent` (ramms-mujoco-support) is the builder. Add it to an `AMjArticulation`,
+or call `SwitchToChaos(Actor, Keyframe)` at runtime.
+
+**How it builds.** It compiles the articulation's own spec with MuJoCo (a model compiler only, never
+stepped), then builds from `mjModel`:
+- runtime bodies with exact primitives and cooked convex hulls
+- MJCF mass, centre of mass and inertia, with welded bodies combined and hinge armature added
+- a max-combined, non-bouncing physical material per body
+- constraints whose child frames centre asymmetric ranges (no build-at-mid-range trick)
+- connect and weld loop closures
+- MuJoCo's self-collision filtering
+- force-mode servo drives
+- an `ISimCallbackObject` that applies motors, joint damping, stiffness and friction loss at the
+  physics rate
+
+URLab's body components (and the visuals under them) follow the Chaos bodies.
+
+**Spike gotchas.** Gotchas 1–4, 6 and 7 are now rules in the builder. Gotcha 5 is
+`ServoForceLimitScale` (default 10×). The game mode (gotcha 8) is up to the level.
+
+![SimReady refrigerator and microwave pushed open on Chaos, the Gen3 behind](images/chaos_backend/chaos_articulation_objects.jpg)
+
+**Results, against MuJoCo on the same commands.** The tables are in
+`Scripts/pie_tests/chaos_articulation/README.md`.
+
+| | Result |
+|---|---|
+| SimReady fridge and microwave | doors, drawers, turntable and the sprung release button agree with MuJoCo to within ~10 % in travel. Damping and springs now work, through the callback. Doors stop at their limit rather than bouncing |
+| Lift-drive base, stances | settled −0.7 cm (MuJoCo 0); mid stance 8.1 cm (9.7); full 21.6 cm (22.4); tilt 14.6° (14.8°) |
+| Lift-drive base, driving in the mid stance | **heading drift: −0.1° against MuJoCo's +0.5°.** The spike drifted −13.5°. The fix was the per-body MJCF friction (combined by max) with no restitution, the MJCF inertia and the physics-rate wheel damping. It still travels 4.3 m against 3.5 m. The wheels roll without slipping in both engines, so the gap is in acceleration against damping, not traction |
+| Lift-drive base, driving in the `fwd` stance | 7.0 m and −121° of yaw, against 3.4 m and −10°. With all six wheels down, Chaos loads the center wheels more and unevenly. **Open**, for Phase 2 |
+| Gen3 arm | joint tracking as in the spike (0.01–0.09 rad RMS). Large keyframe moves overshoot (3.33 against 3.14 rad) |
+
+**Not yet:**
+- slide and velocity-servo drives are untested (no model in hand uses them)
+- ball joints and welds between moving bodies are untested
+- the ~330 collision-only constraints the lift-drive base needs for MuJoCo's filtering could become
+  Chaos ignore-collision pairs
+- packaged builds need runtime convex cooking
 
 ## Plan, in the decided order
 

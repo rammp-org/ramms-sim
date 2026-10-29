@@ -66,6 +66,15 @@ def _cp(opts):
                         ax_w = unreal.Vector(*j["axis"])
                         ach.set_actor_location(ach.get_actor_location() - ax_w * mid, False, True)   # built mid-range (see the builder): back to q = 0
                         cc.set_linear_position_target(unreal.Vector(100.0 * j.get("springref", 0.0) - mid, 0.0, 0.0))   # the spring rests at springref
+                if opts.get("CP_SET_COM"):   # Chaos puts the centre of mass at the hull's centroid; move it to the MJCF's
+                    com_log = []
+                    for n, a in acts.items():
+                        c = a.static_mesh_component
+                        if not c.is_simulating_physics() or "ipos" not in B.get(n, {}): continue
+                        tf = a.get_actor_transform(); want = tf.transform_location(unreal.Vector(*B[n]["ipos"]))
+                        off = tf.rotation.unrotate_vector(want - c.get_center_of_mass("None"))
+                        c.set_center_of_mass(off, "None"); com_log.append("%s %.2f" % (n, off.length()))
+                    open(CH + "/" + outn + ".com.txt", "w").write("\n".join(com_log))
                 ov = opts.get("CP_DRIVE_OVERRIDE")
                 if ov:
                     for n, cc in cons.items(): ov(n, cc)
