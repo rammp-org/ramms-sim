@@ -17,7 +17,8 @@ public class Ramms : ModuleRules
 			"ChaosVehicles",
 			"PhysicsCore",
 			"UMG",
-			"Slate"
+			"Slate",
+			"Json"
 		});
 
 		PublicIncludePaths.AddRange(new string[] {
