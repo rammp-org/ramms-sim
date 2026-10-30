@@ -7,7 +7,10 @@
 		{
 			"Name": "Ramms",
 			"Type": "Runtime",
-			"LoadingPhase": "Default"
+			"LoadingPhase": "Default",
+			"AdditionalDependencies": [
+				"Engine"
+			]
 		}
 	],
 	"Plugins": [
@@ -16,7 +19,7 @@
 			"Enabled": true
 		},
 		{
-			"Name": "MovieRenderPipeline",
+			"Name": "ChaosVehiclesPlugin",
 			"Enabled": true
 		},
 		{
@@ -128,31 +131,23 @@
 			"Enabled": true
 		},
 		{
-			"Name": "RammsWorldGen",
+			"Name": "JsonBlueprintUtilities",
 			"Enabled": true
 		},
 		{
-			"Name": "MovieRenderPipeline",
+			"Name": "RammsUI",
 			"Enabled": true
 		},
 		{
-			"Name": "MoviePipelineMaskRenderPass",
+			"Name": "RammsCore",
 			"Enabled": true
 		},
 		{
-			"Name": "AccumulationDOF",
+			"Name": "MediaIOFramework",
 			"Enabled": true
 		},
 		{
-			"Name": "CineCameraSceneCapture",
-			"Enabled": true
-		},
-		{
-			"Name": "USDCore",
-			"Enabled": true
-		},
-		{
-			"Name": "USDImporter",
+			"Name": "EnhancedInput",
 			"Enabled": true
 		}
 	]

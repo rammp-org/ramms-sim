@@ -16,14 +16,15 @@ public class Ramms : ModuleRules
 			"EnhancedInput",
 			"PhysicsCore",
 			"UMG",
-			"Slate"
+			"Slate",
+			"Json"
 		});
 
 		PublicIncludePaths.AddRange(new string[] {
 			"Ramms"
 		});
 
-		PrivateDependencyModuleNames.AddRange(new string[] { });
+		PrivateDependencyModuleNames.AddRange(new string[] { "RammsUI" });
 
 		// Pixel Streaming: RAMMS swaps the default streamer's video producer to
 		// the viewport MediaCapture path (see doc/PIXEL_STREAMING_PLAN.md).
