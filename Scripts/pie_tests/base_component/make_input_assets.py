@@ -22,6 +22,9 @@ Gamepad (Xbox names; PlayStation in brackets):
                     mode's pairing (RammsControlInputMode.STICK)
   right stick X     turns a holonomic drive (a 3-axis stick's twist); nothing
                     on a differential one yet
+  right stick Y     motor group A (the MeBot's drive-wheel elevators)
+  RT / LT [R2/L2]   motor group B +/- (the MeBot's drive-wheel translators)
+  RB / LB [R1/L1]   motor group C +/- (the MeBot's caster arms)
   A [Cross]         cross the curb ahead
   B [Circle] held   stop the curb crossing (held 0.5 s)
   X [Square] held   seat to rest (held 0.5 s)
@@ -151,6 +154,9 @@ def input_map(name, imc, bindings, priority=1):
 # and at STICK_FULL it reads full, so a worn pad still reaches full speed.
 STICK_DEAD = 0.15
 STICK_FULL = 0.95
+# A trigger rests at 0 and has no drift to speak of; this keeps a resting
+# finger from creeping a motor.
+TRIGGER_DEAD = 0.1
 # How long the buttons that stop a curb crossing or move the seat to rest must
 # be held (s): neither is to happen from a thumb brushing the pad.
 HOLD_S = 0.5
@@ -218,10 +224,15 @@ maps = [
     mapping(imc, IA["LinkageHeight"], "Q", negate=True),
     mapping(imc, IA["MotorGroupA"], "Y"),
     mapping(imc, IA["MotorGroupA"], "H", negate=True),
+    mapping(imc, IA["MotorGroupA"], "Gamepad_RightY", dead_zone=(DZ.AXIAL, STICK_DEAD)),
     mapping(imc, IA["MotorGroupB"], "T"),
     mapping(imc, IA["MotorGroupB"], "B", negate=True),
+    mapping(imc, IA["MotorGroupB"], "Gamepad_RightTriggerAxis", dead_zone=(DZ.AXIAL, TRIGGER_DEAD)),
+    mapping(imc, IA["MotorGroupB"], "Gamepad_LeftTriggerAxis", negate=True, dead_zone=(DZ.AXIAL, TRIGGER_DEAD)),
     mapping(imc, IA["MotorGroupC"], "Z"),
     mapping(imc, IA["MotorGroupC"], "X", negate=True),
+    mapping(imc, IA["MotorGroupC"], "Gamepad_RightShoulder"),
+    mapping(imc, IA["MotorGroupC"], "Gamepad_LeftShoulder", negate=True),
     mapping(imc, IA["MotorGroupD"], "C"),
     mapping(imc, IA["MotorGroupD"], "V", negate=True),
     mapping(imc, IA["CameraNext"], "N"),

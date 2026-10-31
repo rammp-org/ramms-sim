@@ -62,6 +62,17 @@ ci inject IA_Ramms_GripperClose 1 0 0 0.2; sleep 0.5; ci expect gripper.closed 0
 op arm_op "$S/chaos_arm.py" mark
 ci inject IA_Ramms_ArmMove 0 0 1 6.0; ci expect arm.up 0.99 1.01; sleep 6; ci expect arm.up -0.01 0.01
 op arm_op "$S/chaos_arm.py" check_z
+echo "--- gamepad at its keys -> surface (dead zones, device, lift groups) ---"
+# The context's stick dead zone (0.15, full at 0.95): a stick at 0.6 reads 0.5625, at 0.5 0.4375.
+ci pad_axis Gamepad_LeftY 0.6; sleep 0.5; ci expect drive.forward 0.54 0.58; ci owner drive.forward gamepad
+ci pad_axis Gamepad_LeftY 0 Gamepad_LeftX 0.5; sleep 0.5; ci expect drive.turn 0.42 0.46; ci expect drive.forward -0.01 0.01
+# The drive stick's twist turns only where its X does not: nothing on this differential drive.
+ci pad_axis Gamepad_LeftX 0 Gamepad_RightX 0.8; sleep 0.5; ci expect drive.turn -0.01 0.01; ci pad_axis Gamepad_RightX 0
+ci pad_axis Gamepad_RightY 1.0; sleep 1.0; ci pad_axis Gamepad_RightY 0; sleep 1.5; ci expect lift.motor_swing_arm_l 15 45
+ci pad_axis Gamepad_RightTriggerAxis 1.0; sleep 1.0; ci pad_axis Gamepad_RightTriggerAxis 0; sleep 1.5; ci expect lift.dw_main_plate_l 4 16
+ci pad_key Gamepad_RightShoulder down; sleep 1.0; ci pad_key Gamepad_RightShoulder up; sleep 1.5; ci expect lift.front_caster_swing_arm 15 45
+ci pad_release
+f "$S/chaos_reset_pose.py"; sleep 2
 echo "--- control HUD (ramms-ui panel + joystick, auto-spawned) ---"
 hud(){ op hud_op "$S/hud_check.py" "$@"; }
 hud status

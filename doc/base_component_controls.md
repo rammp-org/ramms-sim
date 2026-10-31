@@ -309,7 +309,7 @@ keyboard key) as source `Gamepad`, otherwise `Keyboard`.
 | d-pad | `IA_Ramms_SeatJog` (2-D) | `seat.jog_fore_aft` / `seat.jog_up` |
 | X held (0.5 s) | `IA_Ramms_SeatReset` | `seat.reset` |
 | E / Q | `IA_Ramms_LinkageHeight` | `linkage.*.height` (6 cm/s) |
-| Y / H, T / B, Z / X, C / V | `IA_Ramms_MotorGroupA..D` | per family: cranks / hips (0.6 rad/s), chair elevators / translators / caster arms |
+| Y / H, T / B, Z / X, C / V; right stick Y (A), RT / LT (B), RB / LB (C) | `IA_Ramms_MotorGroupA..D` | per family: cranks / hips (0.6 rad/s), chair elevators / translators / caster arms |
 | N / Y, Home / right stick click | `IA_Ramms_CameraNext` / `CameraReset` | `camera.next` / `camera.reset` |
 | I / K, J / L, U / O | `IA_Ramms_ArmMove` (3-D) | `arm.forward` / `arm.strafe` / `arm.up` |
 | ← →, ↑ ↓, M / . | `IA_Ramms_ArmRotate` (3-D) | `arm.yaw` / `arm.pitch` / `arm.roll` |
