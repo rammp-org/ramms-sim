@@ -174,6 +174,10 @@ class Crossing:
     def x(self, body):
         return self.d.body(body).xpos[0]
 
+    def rear_x(self):
+        """The rear omni wheel further back: both are past the edge once it is."""
+        return min(self.x("rear_omni_l"), self.x("rear_omni_r"))
+
     def pitch_roll(self):
         w, x, y, z = self.d.body("chassis").xquat
         return (math.degrees(math.asin(max(-1, min(1, 2 * (w * y - z * x))))),
@@ -378,7 +382,7 @@ class Crossing:
         self.levelling(False)
         ph("Rear omni wheels up", lambda: self.move(self.goals_for({"rear_lift": lift})))
         on = ("drive", "front") if self.powered else ("drive",)
-        ph("Drive until the rear omni wheels are over the curb", lambda: self.drive_until(lambda: self.x("rear_omni_l") - self.r_ro >= FACE + 0.03, on=on))
+        ph("Drive until the rear omni wheels are over the curb", lambda: self.drive_until(lambda: self.rear_x() - self.r_ro >= FACE + 0.03, on=on))
         ph("Rear omni wheels down on the curb", lambda: self.touch_down("rear_lift", "curb"))
         self.levelling(True)
         self.finish()
@@ -406,7 +410,7 @@ class Crossing:
         self.levelling(False)
         ph("Rear omni wheels up", lambda: self.move(self.goals_for({"rear_lift": lift})))
         on = ("drive", "front") if self.powered else ("drive",)
-        past = lambda: self.x("rear_omni_l") - self.r_ro >= FACE + 0.03
+        past = lambda: self.rear_x() - self.r_ro >= FACE + 0.03
         ph("Drive until the rear omni wheels are past the edge", lambda: self.drive_until(past, on=on))
         # Everything under the frame is over the road now: lower the chassis on the drive and front wheels, so the
         # sprung rear, which reaches least, has less to reach.

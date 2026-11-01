@@ -19,6 +19,8 @@
   expect_motor <id> <lo> <hi>      a motor's value (rad or cm) is in lo..hi
   expect_level <deg>         |pitch| and |roll| are under deg
   expect_control <id> <lo> <hi>    a control-surface value (e.g. gripper.closed) is in lo..hi
+  expect_refused <id> <value>      the control surface refuses that command (source Remote): something holds it
+  expect_joint <joint> <lo> <hi>   an MJCF joint's position (rad, or m for a slide) is in lo..hi
   mark_body <body>           remember where an MJCF body is (for expect_body_moved)
   expect_body_moved <body> <lo> <hi>  the body moved lo..hi cm (any direction) since mark_body
 """
@@ -173,6 +175,21 @@ else:
             raise RuntimeError("pitch %.1f / roll %.1f over %g deg" % (rot.pitch, rot.roll, lim))
     elif op[0] == "expect_control":
         v = cs.get_control_value(op[1])
+        lo, hi = float(op[2]), float(op[3])
+        log("%s = %+.3f (expect %g..%g) -> %s" % (op[1], v, lo, hi, "ok" if lo <= v <= hi else "FAIL"))
+        if not lo <= v <= hi:
+            raise RuntimeError("%s = %.3f, outside %g..%g" % (op[1], v, lo, hi))
+    elif op[0] == "expect_refused":
+        ok = cs.set_control(op[1], float(op[2]), SRC)
+        log("set %s %s -> %s (expect refused) -> %s" % (op[1], op[2], "accepted" if ok else "refused", "FAIL" if ok else "ok"))
+        if ok:
+            cs.release_control(op[1], SRC)
+            raise RuntimeError("%s %s was accepted, expected refused" % (op[1], op[2]))
+    elif op[0] == "expect_joint":
+        joint = next((c for c in pawn.get_components_by_class(unreal.ActorComponent) if c.get_name() == op[1]), None)
+        if joint is None:
+            raise RuntimeError("%s has no joint %s" % (pawn.get_name(), op[1]))
+        v = unreal.MjJointRuntime.get_position(joint)
         lo, hi = float(op[2]), float(op[3])
         log("%s = %+.3f (expect %g..%g) -> %s" % (op[1], v, lo, hi, "ok" if lo <= v <= hi else "FAIL"))
         if not lo <= v <= hi:
