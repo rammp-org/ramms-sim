@@ -10,6 +10,9 @@ articulation gets the RAMMS wiring the chair pawn (BP_Mebot_Ramms) has, driving 
                      the chair's input map and gamepad layout drive it unchanged
   ControlSurface, ControlInput (DA_RammsInput_Mebot), SimControl (the MJCF's `home` key at spawn,
   which also stands the robot on the ground), cameras on the chassis body, AutoPossessPlayer 0
+  CurbController     URammsMebotCurbController: the curb crossing (curb.negotiate / curb.abort / curb.phase),
+                     configured from mujoco/mebot/curb_config_powered_front.json (export_curb_config.py)
+  DriveModeSelector  the differential drive and the curb crossing as drive modes, differential first
 
 The powered front omni wheels are left to the control surface as raw motors (motor.front_omni_*):
 nothing drives them in normal driving, so they freewheel. Everything geometric (ranges, the wheel
@@ -27,6 +30,7 @@ import re
 import unreal
 
 MJCF_REL = "mujoco/mebot/mebot_powered_front.xml"
+CURB_CONFIG_REL = "mujoco/mebot/curb_config_powered_front.json"
 ARTICULATION = "/Game/Robots/MeBot/URL/mebot_powered_front"
 PAWN_DIR, PAWN_NAME = "/Game/Robots/MeBot", "BP_MebotPoweredFront_Ramms"
 DATA_DIR, TABLE_NAME = "/Game/Robots/Data", "DT_MebotPoweredFront_Motors"
@@ -204,6 +208,21 @@ setp(top, target_arm_length=550.0, relative_rotation=unreal.Rotator(roll=0.0, pi
      use_pawn_control_rotation=False, inherit_pitch=False, inherit_roll=False, inherit_yaw=False)
 setp(add_component(bp, unreal.CameraComponent, "TopCamera", parent_var="TopArm"), auto_activate=False)
 
+# The curb crossing, configured from the model (export_curb_config.py), and the drive modes it switches between.
+with open(os.path.join(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_dir()), CURB_CONFIG_REL), encoding="utf-8") as fh:
+    curb_fields = json.load(fh)["config"]
+curb_cfg = unreal.RammsMebotCurbConfig()
+for key, value in curb_fields.items():
+    if key.endswith("_table"):
+        t = unreal.RammsMebotSupportTable()
+        t.set_editor_property("angle_rad", value["angle_rad"])
+        t.set_editor_property("height_cm", value["height_cm"])
+        value = t
+    curb_cfg.set_editor_property(key, value)
+curb = add_component(bp, unreal.RammsMebotCurbController, "CurbController")
+setp(curb, config=curb_cfg, return_mode_id="differential")
+setp(add_component(bp, unreal.RammsDriveModeSelector, "DriveModeSelector"), initial_mode_id="differential")
+
 add_component(bp, unreal.RammsRobotControlSurfaceComponent, "ControlSurface")
 setp(add_component(bp, unreal.RammsMjSimControlComponent, "SimControl"), initial_keyframe="home")
 setp(add_component(bp, unreal.RammsRobotCameraComponent, "CameraControl"), orbit_sensitivity=0.25, zoom_sensitivity=1.0,
@@ -216,5 +235,8 @@ cdo.set_editor_property("auto_possess_player", unreal.AutoReceiveInput.PLAYER0)
 unreal.BlueprintEditorLibrary.compile_blueprint(bp)
 if not EAL.save_loaded_asset(bp, False):
     raise RuntimeError("could not save %s" % pawn_path)
+log("curb controller: %d / %d / %d table points, rear lift up to %.1f cm" % tuple(
+    [len(curb_cfg.get_editor_property(k).get_editor_property("angle_rad")) for k in ("drive_table", "front_table", "rear_table")]
+    + [max(curb_fields["rear_table"]["height_cm"])]))
 log("saved %s: wheel radius %.1f cm, lifts %s" % (pawn_path, numeric["drive_wheel_radius"] * 100.0,
     ", ".join("%s->%s %g" % (c, m, numeric[s]) for c, m, s in ANGULAR + LINEAR)))

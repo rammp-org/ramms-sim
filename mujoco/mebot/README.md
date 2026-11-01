@@ -13,6 +13,7 @@ MuJoCo models of the MeBot base, built from its Unreal assets (the public ramms-
 | `meshes/omni_*_roller.stl` | The omni wheels' rollers (generated) |
 | `check_mebot.py` | Headless checks of both models: each stands on all six wheels, every motor moves the way the model says, and the linkages stay closed |
 | `curb_sequence.py` | The curb crossing, up or down, for either model: a scripted stop-and-step sequence, optionally rendered to a clip |
+| `export_curb_config.py` | Writes `curb_config_<variant>.json` for the Unreal curb controller: each support's height table (as `curb_sequence.py` builds it), the wheel radii, the frame's clearance, the lift speeds, and the mass model for the rear-lift rule |
 
 ```bash
 python Scripts/editor_remote_exec.py --file mujoco/mebot/extract_ue_mebot.py          # only when the Unreal asset changes
@@ -20,6 +21,7 @@ python Scripts/editor_remote_exec.py --file mujoco/mebot/extract_ue_mebot_meshes
 python mujoco/mebot/build_mebot_mjcf.py [--rider-kg 75]
 python mujoco/mebot/check_mebot.py
 python mujoco/mebot/curb_sequence.py --variant powered_front --dir up [--height 0.15] [--clip climb.mp4]
+python mujoco/mebot/export_curb_config.py [--variant powered_front]   # after the model changes; then Scripts/mebot_mujoco/make_mebot_pawn.py
 python -m mujoco.viewer --mjcf=mujoco/mebot/mebot_scene.xml
 ```
 
