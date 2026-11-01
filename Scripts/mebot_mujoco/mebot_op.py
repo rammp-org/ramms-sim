@@ -6,8 +6,11 @@
   end                        stop PIE
   state                      the chassis's position and attitude, every motor, the lift controls
   set <control id> <value>   a control-surface command (source Remote)
+  trigger <control id>       a control-surface action (curb.negotiate, curb.abort)
+  curb                       the curb crossing: phase, status, step and crossing height, the chassis
   release <control id>       release it
   pad <key> <value> [...]    gamepad keys at values (URammsInputTestLibrary: through Enhanced Input)
+  pad_key <key> <down|up>    a gamepad button (or any key) pressed or let go
   pad_release                every injected key back to rest
   drive_to <x cm> <stick>    one poll: drive forward at the stick until the chassis passes x, then release
   mark                       remember the chassis's pose (for the expect_* ops)
@@ -82,9 +85,35 @@ else:
         if not cs.set_control(op[1], float(op[2]), SRC):
             raise RuntimeError("set_control(%s, %s) refused" % (op[1], op[2]))
         log("set %s %s" % (op[1], op[2]))
+    elif op[0] == "trigger":
+        ok = cs.trigger_control(op[1], SRC)
+        log("trigger %s -> %s" % (op[1], ok))
+        if not ok:
+            curb = pawn.get_component_by_class(unreal.RammsMebotCurbController)
+            raise RuntimeError("%s refused%s" % (op[1], (": " + curb.get_status()) if curb else ""))
+    elif op[0] == "curb":
+        curb = pawn.get_component_by_class(unreal.RammsMebotCurbController)
+        loc, rot = pose(chassis)
+        step, height = curb.get_crossing()
+        log("curb %s | %s | step %+.1f cm, crossing height %.1f cm | chassis (%.1f, %.1f, %.1f) pitch %+.1f" % (
+            curb.get_phase().name, curb.get_status(), step, height, loc.x, loc.y, loc.z, rot.pitch))
     elif op[0] == "release":
         cs.release_control(op[1], SRC)
         log("released %s" % op[1])
+    elif op[0] == "pad_key":
+        if op[2] not in ("down", "up"):
+            raise RuntimeError("pad_key %s: down or up, not %s" % (op[1], op[2]))
+        pc = unreal.GameplayStatics.get_player_controller(w, 0)
+        if pc is None:
+            raise RuntimeError("no player controller")
+        # The name checked first: SetKeyDown's result is whether the controller consumed the key, false for a
+        # key Enhanced Input took, so it cannot tell a misspelled name from a delivered press.
+        key = unreal.Key()
+        key.import_text(op[1])
+        if not unreal.InputLibrary.key_is_valid(key):
+            raise RuntimeError("pad_key: %s is not a key's name" % op[1])
+        unreal.RammsInputTestLibrary.set_key_down(pc, unreal.Name(op[1]), op[2] == "down")
+        log("pad_key %s %s" % (op[1], op[2]))
     elif op[0] in ("pad", "pad_release"):
         pc = unreal.GameplayStatics.get_player_controller(w, 0)
         if op[0] == "pad_release":
