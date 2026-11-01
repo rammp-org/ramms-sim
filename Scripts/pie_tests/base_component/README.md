@@ -40,7 +40,14 @@ doesn't. `move_private_assets.py` is the one-shot migration that put them there.
   `arm.forward` / `gripper.closed` / `arm.resync` (`chaos_arm.py`), the
   RammsUISubsystem registry is checked, Enhanced Input actions are injected
   through `ControlInput` (lift motor group, gripper open / close, arm up —
-  `control_input_check.py`), and the MebotController API is exercised.
+  `control_input_check.py`), a gamepad is driven at its keys
+  (`control_input_check.py pad_axis / pad_key / pad_hold`, `URammsInputTestLibrary`): the
+  left stick through its dead zone, reported as `Gamepad`, the twist doing
+  nothing on the differential drive, W and the stick combining on the drive
+  axes, the right stick Y (down, then up) / triggers / bumpers each held for a fixed stretch of game time
+  (released by the editor) and moving the elevators / translators / caster
+  arms by their rate's worth since a mark — and the MebotController API is
+  exercised.
 - `make_ramp_map.py` — builds `/Game/Maps/Map_RampTest` from the engine's
   default template: a 1:12 (4.8°, the ADA maximum) and a 1:8 (7.1°) ramp with
   landings, rising along +X, and a PlayerStart on the first one's approach.

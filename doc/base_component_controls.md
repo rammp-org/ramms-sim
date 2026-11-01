@@ -284,25 +284,56 @@ names the mapping context to add and binds each `UInputAction` to control
 Ids; `make_input_assets.py` authors all of it and is the place to change a
 key. Binding modes: **Axis** (value × Scale sets the axis, Completed
 releases it — 2-D / 3-D actions feed `ControlId` / `ControlIdY` /
-`ControlIdZ`), **Action** (Started fires it), **Increment at rate** (a held
-key moves a Position target at RatePerSecond, clamped to the axis range; the
-motor holds where you let go). Ids may be wildcards (`linkage.*.height`,
-`motor.*_front_crank`), so one map serves a robot family.
+`ControlIdZ`), **Stick** (as Axis, but X feeds whatever the surface pairs
+with `ControlIdY`'s control — `drive.turn` on a differential drive or a curb
+crossing, `drive.strafe` on a holonomic one — and Z only what X and Y do not:
+a twist turns a holonomic base and does nothing on a differential one; an
+axis held off centre while a mode switch changes what it drives sends
+nothing until it is back to centre), **Action** (fires once per press, when
+the action first triggers, so a Hold trigger on the mapping makes a button
+need holding; an Enum control such as `drive.mode` steps to its next choice),
+**Increment at rate** (a held key moves a Position target at RatePerSecond,
+clamped to the axis range; the motor holds where you let go). Ids may be
+wildcards (`linkage.*.height`, `motor.*_front_crank`), so one map serves a
+robot family. The component reports an action a gamepad key drives (and no
+keyboard key) as source `Gamepad`, otherwise `Keyboard`.
 
 `IMC_RammsRobot` (shared by every map):
 
 | Keys | Action | Binds to |
 |---|---|---|
-| W / S, A / D, left stick | `IA_Ramms_Drive` (2-D) | `drive.forward` / `drive.turn` |
+| W / S, A / D | `IA_Ramms_Drive` (2-D) | `drive.forward` / `drive.turn` |
+| left stick, right stick X | `IA_Ramms_DriveStick` (3-D, Stick) | `drive.forward`; X the mode's pair (turn / strafe); Z (twist) `drive.turn` where X does not turn |
+| Tab, View | `IA_Ramms_DriveMode` | `drive.mode` (next mode in the selector's `CycleModeIds`) |
+| Enter, A | `IA_Ramms_CurbCross` | `curb.negotiate` |
+| End held, B held (0.5 s) | `IA_Ramms_CurbStop` | `curb.abort` |
+| d-pad | `IA_Ramms_SeatJog` (2-D) | `seat.jog_fore_aft` / `seat.jog_up` |
+| X held (0.5 s) | `IA_Ramms_SeatReset` | `seat.reset` |
 | E / Q | `IA_Ramms_LinkageHeight` | `linkage.*.height` (6 cm/s) |
-| Y / H, T / B, Z / X, C / V | `IA_Ramms_MotorGroupA..D` | per family: cranks / hips (0.6 rad/s), chair elevators / translators / caster arms |
-| N, Home | `IA_Ramms_CameraNext` / `CameraReset` | `camera.next` / `camera.reset` |
+| Y / H, T / B, Z / X, C / V; right stick Y (A), RT / LT (B), RB / LB (C) | `IA_Ramms_MotorGroupA..D` | per family: cranks / hips (0.6 rad/s), chair elevators / translators / caster arms |
+| N / Y, Home / right stick click | `IA_Ramms_CameraNext` / `CameraReset` | `camera.next` / `camera.reset` |
 | I / K, J / L, U / O | `IA_Ramms_ArmMove` (3-D) | `arm.forward` / `arm.strafe` / `arm.up` |
 | ← →, ↑ ↓, M / . | `IA_Ramms_ArmRotate` (3-D) | `arm.yaw` / `arm.pitch` / `arm.roll` |
 | R | `IA_Ramms_ArmResync` | `arm.resync` |
 | [ , ] , G | `IA_Ramms_Gripper*` | `gripper.open` / `close` / `toggle` |
-| P, Backspace, / | `IA_Ramms_SimPause` / `SimReset` / `SimStep` | `sim.pause` / `sim.reset` / `sim.step` |
+| P / Menu, Backspace, / | `IA_Ramms_SimPause` / `SimReset` / `SimStep` | `sim.pause` / `sim.reset` / `sim.step` |
 | 1 – 7 | `IA_Ramms_SimDebug1..7` | `sim.debug.*` |
+
+Gamepad buttons use their Xbox names (PlayStation: A Cross, B Circle, X
+Square, Y Triangle, View Create, Menu Options). The sticks carry their own dead
+zones in the context (radial 0.15 on the left stick, axial on the right X,
+full at 0.95), because Enhanced Input ignores `DefaultInput.ini`'s legacy
+`AxisConfig` dead zones. The drive stick is one 3-D action so that a 3-axis
+joystick or a space mouse maps onto the same action. `DA_RammsInput_Rider`
+binds the drive, its modes, the curb crossing, the seat, the cameras and the
+simulation, with no motor groups; give a pawn's `DriveModeSelector` a
+`CycleModeIds` list (e.g. `differential`, `holonomic`) so that the mode button
+never selects, or leaves, a mode outside it, such as a curb crossing, which
+selecting another mode aborts wherever its wheels are.
+
+Since UE 5.7 a mapping context keeps its keys in `DefaultKeyMappings`; one
+saved since then with keys only in the deprecated `Mappings` array has none.
+`make_input_assets.py` writes the former.
 
 The chair's pawn class (`ARammsSkeletalRobotPawn`, see `doc/robot_pawn.md`)
 binds no input of its own, so these keys reach the chair only through the surface.
@@ -315,6 +346,9 @@ sim functions come back as the `sim.*` controls above. Pixel Streaming
 keyboard events reach Enhanced Input like local ones (spike in
 `ui_input_refactor_plan.md`). Touch panels and tests use the same path:
 `ControlInput.InjectActionByName("IA_Ramms_Drive", (0, 1, 0), hold_s)`.
+Tests that need the keys themselves (dead zones, held buttons, the reported
+device) press them with `URammsInputTestLibrary.SetKeyDown` and move stick
+axes with `SetAxisKey` (`Gamepad_LeftX`, ...; an axis stays where it was put).
 
 ### 2b. Player-controlled pawns for the MuJoCo bases
 
