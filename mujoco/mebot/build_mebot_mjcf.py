@@ -42,7 +42,8 @@ are (the rear wheels' treads are 2.5 cm outboard of the physics asset's hulls).
 Kinematics -- pivots, wheel centres and sizes, collision boxes -- come from the Unreal asset. Everything in
 PARAMS is a PLACEHOLDER until measured on the robot: the Unreal asset has no masses (Unreal derived them from
 the boxes' volumes) and its drives are not the robot's. The joint ranges are the Unreal physics asset's limits
-(45 deg on the elevators and arms, 40 cm on the translators), kept until the robot's are known.
+(45 deg on the elevators and arms, 40 cm on the translators), read from its constraints and kept until
+the robot's are known: a range set in PARAMS overrides.
 The speeds in PARAMS are for whatever commands these position actuators (the Unreal motor table's
 MaxVelocity; check_mebot.py's ramps): MuJoCo's position actuators have none.
 
@@ -65,10 +66,10 @@ PARAMS = {
              "omni_hub": 0.5, "omni_roller": 0.01, "linkage": 0.3},
     "rider_kg": 75.0,                      # --rider-kg; 0 leaves the seat empty
     "rider_above_seat_cm": 25.0,           # the rider's centre of mass above the seat socket
-    # Joint ranges.
-    "elevator_deg": (-45.0, 45.0),         # the Unreal physics asset's limits
-    "caster_arm_deg": (-45.0, 45.0),
-    "translator_cm": (-40.0, 40.0),
+    # Joint ranges: None takes the Unreal physics asset's limits (ASSET_RANGES, from source/mebot_ue.json).
+    "elevator_deg": None,
+    "caster_arm_deg": None,                # the front arm's, and the rear arm's stop
+    "translator_cm": None,
     # Actuators: position gain, velocity gain, force/torque limit; speeds for the commands.
     "elevator": {"kp": 3000.0, "kv": 200.0, "force": 600.0, "speed_deg_s": 6.0},      # N*m/rad, N*m*s/rad, N*m
     "caster_arm": {"kp": 2000.0, "kv": 100.0, "force": 400.0, "speed_deg_s": 6.0},
@@ -113,6 +114,10 @@ LINKAGES = [
     ("rear_damper", "rear_pivot", "rear_caster_dampener", "hinge"), ("rear_spring", "rear_damper", "rear_caster_dampener_rod", "slide"),
 ]
 LINKAGE_PARENT = {lk[0]: lk[1] for lk in LINKAGES}
+# PARAMS ranges taken from the physics asset when left None: the constraints of these bones, which must agree.
+ASSET_RANGES = {"elevator_deg": ("motor_swing_arm_l", "motor_swing_arm_r"),
+                "caster_arm_deg": ("front_caster_swing_arm", "rear_caster_swing_arm"),
+                "translator_cm": ("dw_main_plate_l", "dw_main_plate_r")}
 REAR_LIFT_AXIS = "0 -1 0"  # positive turns the suspension arm the way that pushes the rear wheels down
 
 
@@ -305,6 +310,17 @@ class Model:
         h = self.hulls(bone)[0]
         ext = [h["max"][i] - h["min"][i] for i in range(3)]
         return (ext[0] + ext[2]) / 4 * UE_TO_M, ext[1] * UE_TO_M  # radius, width
+
+    def asset_range(self, bone):
+        """A joint's range from its physics-asset constraint, (-limit, limit): cm for its limited linear axis, else
+        degrees for its limited swing or twist."""
+        c = next(c for c in self.constraints if c["child"] == bone and c["parent"] == self.parent[bone])
+        if any(c["linear"][k] == "Limited" for k in "xyz"):
+            return (-c["linear"]["limit_cm"], c["linear"]["limit_cm"])
+        for k in ("swing1", "swing2", "twist"):
+            if c[k]["motion"] == "Limited":
+                return (-c[k]["limit_deg"], c[k]["limit_deg"])
+        raise ValueError("%s's constraint has no limited motion" % bone)
 
     def slide_axis(self, bone):
         c = next(c for c in self.constraints if c["child"] == bone and c["parent"] == self.parent[bone])
@@ -554,6 +570,12 @@ def main():
     with open(os.path.join(HERE, "source", "mebot_meshes.json"), encoding="utf-8") as fh:
         meshes = json.load(fh)
     m = Model(ue, meshes)
+    for key, bones in ASSET_RANGES.items():
+        if P[key] is None:
+            ranges = {m.asset_range(b) for b in bones}
+            if len(ranges) != 1:
+                raise ValueError("%s: the physics asset's limits differ across %s: %s" % (key, bones, sorted(ranges)))
+            P[key] = ranges.pop()
     for kind in ("front", "rear"):
         a, b = m.omni[kind + "_omni_l"], m.omni[kind + "_omni_r"]
         if a["n"] != b["n"] or any(abs(a[k] - b[k]) > 5e-4 for k in ("axis_radius", "radius", "half_length")):
@@ -570,6 +592,8 @@ def main():
     for name, o in m.omni.items():
         print("  %s: 2 rows x %d rollers, radius %.4f, roller axis at %.4f, rollers %.1f mm long, tread %+.1f mm from the bone" % (
             name, o["n"], o["radius"], o["axis_radius"], o["half_length"] * 2000, o["y_centre"] * 1000))
+    print("  ranges: elevators %s deg, caster arms %s deg, translators %s cm, rear lift %s deg" % (
+        P["elevator_deg"], P["caster_arm_deg"], P["translator_cm"], P["rear_lift_deg"]))
     print("  %d visual meshes, %d loop closures" % (sum(1 for p in m.parts if p["material"] != OMNI_RUBBER), len(m.closures())))
 
 

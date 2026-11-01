@@ -51,7 +51,7 @@ The lift joints are driven directly by position actuators; the rear one sits at 
 - **Keyframe `home`:** the reference pose, with every lift at 0. The Unreal pawn is put in it at spawn, which also stands the robot on the ground.
 - **Rider:** its marker is transparent, because URLab draws any alpha above 0 opaque. MuJoCo clips tint it back in.
 
-**Placeholders:** masses, actuator gains, forces and speeds, and the rear spring's rate, preload, damping and travel in `PARAMS` stand in until they are measured on the robot. The joint ranges are the Unreal physics asset's limits.
+**Placeholders:** masses, actuator gains, forces and speeds, and the rear spring's rate, preload, damping and travel in `PARAMS` stand in until they are measured on the robot. The joint ranges are read from the Unreal physics asset's constraints; a range set in `PARAMS` overrides them.
 
 ## The curb crossing
 
