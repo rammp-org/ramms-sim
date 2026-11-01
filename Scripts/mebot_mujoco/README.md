@@ -51,14 +51,14 @@ Drive to within 1.5 m of a curb, square to it, then start a crossing:
 - **Keyboard:** Enter starts it; hold End to stop.
 - **Remote:** `curb.negotiate` and `curb.abort` through the control surface.
 
-The controller finds the edge and its height with line traces ahead of the front omni wheels. It picks the crossing height from each support's height table, then runs `curb_sequence.py`'s phases:
+The controller finds the edge and its height with line traces ahead of the front omni wheels. An edge is ground that rises or falls steeply (a ramp is not a step), and the far side must stay level for 10 cm past it. A narrow strip, a second step or missing ground refuses the start. It picks the crossing height from each support's height table, then runs `curb_sequence.py`'s phases:
 1. Raise or lower the chassis, level, to the crossing height.
 2. Front omni wheels over the edge and down.
 3. Drive wheels over and down. With the powered front omni wheels, those pull the robot forward while the translators bring the drive wheels aft.
-4. The rule: the rear omni wheels are not lifted until both drive wheels are down on the far level, translated aft, with the centre of mass (from the exported mass model) ahead of their axle. If it fails, the crossing aborts.
+4. The rule: the rear omni wheels are not lifted until each drive wheel is past the edge and down on the far level, both translated aft, with the centre of mass (from the exported mass model) ahead of their axle. If it fails, the crossing aborts.
 5. Rear omni wheels over and down.
 6. Translators back to centre while the drive wheels roll, then the driving pose.
 
-A touchdown lowers the wheels by their measured height above the level, to contact and 1 cm past it. The sprung rear's lift is trimmed against the chassis's pitch while its wheels are down. A finished or stopped crossing brakes, then hands back to the differential drive. Steps of 3–17 cm are crossed; others are refused with the reason.
+A touchdown lowers the wheels by their measured height above the level, to contact and 1 cm past it. The sprung rear's lift is trimmed against the chassis's pitch while its wheels are down. A finished or stopped crossing brakes, then hands back to the differential drive. If it stops with the drive wheels up, the differential drive would hold nothing on the ground. So it holds the front omni hubs at rest instead, and leaves the lifts to the operator. Once the elevators have the drive wheels down, it hands back. While a crossing runs, `MebotController` leaves the lifts alone, then takes them back where they stand. Steps of 3–17 cm are crossed; others are refused with the reason.
 
 The level's URLab manager runs MuJoCo at the MJCF's 2 ms step, with elliptic friction cones and impratio 10 (the omni rollers creep when braked on pyramidal cones).

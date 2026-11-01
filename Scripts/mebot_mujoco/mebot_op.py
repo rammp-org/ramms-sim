@@ -101,7 +101,17 @@ else:
         cs.release_control(op[1], SRC)
         log("released %s" % op[1])
     elif op[0] == "pad_key":
+        if op[2] not in ("down", "up"):
+            raise RuntimeError("pad_key %s: down or up, not %s" % (op[1], op[2]))
         pc = unreal.GameplayStatics.get_player_controller(w, 0)
+        if pc is None:
+            raise RuntimeError("no player controller")
+        # The name checked first: SetKeyDown's result is whether the controller consumed the key, false for a
+        # key Enhanced Input took, so it cannot tell a misspelled name from a delivered press.
+        key = unreal.Key()
+        key.import_text(op[1])
+        if not unreal.InputLibrary.key_is_valid(key):
+            raise RuntimeError("pad_key: %s is not a key's name" % op[1])
         unreal.RammsInputTestLibrary.set_key_down(pc, unreal.Name(op[1]), op[2] == "down")
         log("pad_key %s %s" % (op[1], op[2]))
     elif op[0] in ("pad", "pad_release"):

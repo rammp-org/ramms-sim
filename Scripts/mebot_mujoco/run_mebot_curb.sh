@@ -12,13 +12,17 @@ op(){ if ! "$PY" Scripts/editor_remote_exec.py --code "unreal._ramms_mebot_op='$
 cleanup(){ op end; sleep 3; }
 trap cleanup EXIT   # early exits; the normal end runs cleanup itself, so its result counts
 
+# A poll captured in $(...) runs op in a subshell, where its FAIL=1 is lost: poll() latches FAIL here and prints
+# what the failed poll said.
+poll(){ if ! R=$(op "$@"); then echo "$R"; echo "!! the poll '$*' failed"; FAIL=1; return 1; fi; }
 # Drive forward until the chassis passes x (cm): one poll per call, so the simulation runs between them.
-drive_to(){ for i in $(seq 1 200); do r=$(op drive_to "$1" 0.4); case "$r" in *arrived*) echo "$r"; return 0;; esac; sleep 0.15; done
+drive_to(){ for i in $(seq 1 200); do poll drive_to "$1" 0.4 || { op release drive.forward; return 1; }
+                case "$R" in *arrived*) echo "$R"; return 0;; esac; sleep 0.15; done
             op release drive.forward; echo "!! did not reach x $1"; FAIL=1; return 1; }
 # Start a crossing and wait for it to end; it must end Done with the expected outcome.
 cross(){ op trigger curb.negotiate || return 1
-         for i in $(seq 1 60); do sleep 5; r=$(op curb)
-             case "$r" in *DONE*|*ABORTED*|*IDLE*) echo "$r"; case "$r" in *DONE*"$1"*) return 0;; esac; echo "!! the crossing did not finish: $1"; FAIL=1; return 1;; esac
+         for i in $(seq 1 60); do sleep 5; poll curb || return 1
+             case "$R" in *DONE*|*ABORTED*|*IDLE*) echo "$R"; case "$R" in *DONE*"$1"*) return 0;; esac; echo "!! the crossing did not finish: $1"; FAIL=1; return 1;; esac
          done; echo "!! the crossing timed out"; FAIL=1; return 1; }
 
 op begin || exit 1
