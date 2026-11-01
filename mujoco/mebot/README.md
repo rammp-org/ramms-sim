@@ -45,7 +45,11 @@ The lift joints are driven directly by position actuators; the rear one sits at 
 **The rear's reach:** it puts its wheels 14–15 cm down but lifts them only about 4.7 cm, because the rear arm turns roughly 0.5–0.9° per degree of suspension arm. The lift is also stopped short of where the rear actuator passes dead centre, near −40° of suspension arm. On the robot, the actuator's real stroke and mounts set this limit.
 
 - **Geom groups:** 2 visual meshes; 3 collision geoms (boxes, the drive wheels' cylinders, the rollers).
-- **Custom numerics:** `drive_wheel_radius`, `front_omni_radius` and `rear_omni_radius`.
+- **Custom numerics:**
+  - the wheel radii: `drive_wheel_radius`, `front_omni_radius`, `rear_omni_radius`;
+  - the lift speeds for whatever commands the position actuators: `elevator_speed_deg_s`, `caster_arm_speed_deg_s`, `rear_lift_speed_deg_s`, `translator_speed_cm_s`.
+- **Keyframe `home`:** the reference pose, with every lift at 0. The Unreal pawn is put in it at spawn, which also stands the robot on the ground.
+- **Rider:** its marker is transparent, because URLab draws any alpha above 0 opaque. MuJoCo clips tint it back in.
 
 **Placeholders:** masses, actuator gains, forces and speeds, and the rear spring's rate, preload, damping and travel in `PARAMS` stand in until they are measured on the robot. The joint ranges are the Unreal physics asset's limits.
 

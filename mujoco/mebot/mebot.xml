@@ -14,6 +14,10 @@
     <numeric name="drive_wheel_radius" data="0.184059"/>
     <numeric name="front_omni_radius" data="0.0765865"/>
     <numeric name="rear_omni_radius" data="0.101073"/>
+    <numeric name="elevator_speed_deg_s" data="6"/>
+    <numeric name="caster_arm_speed_deg_s" data="6"/>
+    <numeric name="rear_lift_speed_deg_s" data="8"/>
+    <numeric name="translator_speed_cm_s" data="2"/>
   </custom>
   <asset>
     <mesh name="drive_motor_l__motor_body" file="meshes/drive_motor_l__motor_body.stl"/>
@@ -88,7 +92,7 @@
       <geom class="visual" mesh="rear_caster_arm_mount__chassis_metal" pos="0.538656 -0.002557 -0.028235" rgba="0.3728 0.3728 0.3728 1"/>
       <site name="seat" pos="0.345 0 0.256381" size="0.02"/>
       <body name="rider" pos="0.345 0 0.506381">
-        <geom name="rider" class="visual" type="box" size="0.2 0.2 0.3" rgba="0.6 0.45 0.35 0.3"/>
+        <geom name="rider" class="visual" type="box" size="0.2 0.2 0.3" rgba="0.6 0.45 0.35 0"/>
         <inertial pos="0 0 0" mass="75" diaginertia="3.25 3.25 2"/>
       </body>
       <body name="translator_l" pos="0.16682 0.160111 0.11342">
@@ -890,4 +894,5 @@
     <framequat name="chassis_quat" objtype="body" objname="chassis"/>
     <framepos name="chassis_pos" objtype="body" objname="chassis"/>
   </sensor>
+  <keyframe><key name="home"/></keyframe>
 </mujoco>

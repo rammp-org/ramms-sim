@@ -457,6 +457,7 @@ def clip_writer(path, speedup, cx):
     W, H = 1280, 720
     m = cx.m
     m.vis.global_.offwidth, m.vis.global_.offheight = W, H
+    m.geom_rgba[m.geom("rider").id][3] = 0.3   # the rider's mass, shown
     rnd = mujoco.Renderer(m, H, W)
     opt = mujoco.MjvOption()
     opt.geomgroup[:] = [1, 0, 1, 0, 0, 0]

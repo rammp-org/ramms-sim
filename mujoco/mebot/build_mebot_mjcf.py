@@ -389,6 +389,10 @@ def build(m, P, powered_front):
     L.append('    <numeric name="drive_wheel_radius" data="%s"/>' % f(r_dw))
     for kind in ("front", "rear"):
         L.append('    <numeric name="%s_omni_radius" data="%s"/>' % (kind, f(m.omni[kind + "_omni_l"]["radius"])))
+    # The lift actuators' speeds (PARAMS), for whatever commands them: the curb sequence, the Unreal pawn.
+    for name, v in (("elevator_speed_deg_s", P["elevator"]["speed_deg_s"]), ("caster_arm_speed_deg_s", P["caster_arm"]["speed_deg_s"]),
+                    ("rear_lift_speed_deg_s", P["rear_lift"]["speed_deg_s"]), ("translator_speed_cm_s", P["translator"]["speed_cm_s"])):
+        L.append('    <numeric name="%s" data="%s"/>' % (name, f(v)))
     L += ['  </custom>', '  <asset>']
     for p in m.parts:
         if p["material"] != OMNI_RUBBER or p["bone"] not in [w for _, w in OMNI_WHEELS.values()]:
@@ -411,7 +415,9 @@ def build(m, P, powered_front):
         rider = [seat_c[i] - o[i] for i in range(3)]
         rider[2] += P["rider_above_seat_cm"] * UE_TO_M
         L.append('      <body name="rider" pos="%s">' % fv(rider))
-        L.append('        <geom name="rider" class="visual" type="box" size="0.2 0.2 0.3" rgba="0.6 0.45 0.35 0.3"/>')
+        # Transparent: the rider is its mass. (URLab draws any alpha above 0 opaque, which would hide the
+        # robot; MuJoCo clips can tint it in.)
+        L.append('        <geom name="rider" class="visual" type="box" size="0.2 0.2 0.3" rgba="0.6 0.45 0.35 0"/>')
         L.append('        <inertial pos="0 0 0" mass="%s" diaginertia="%s %s %s"/>' % (
             f(P["rider_kg"]), f(P["rider_kg"] * 0.13 / 12 * 4), f(P["rider_kg"] * 0.13 / 12 * 4), f(P["rider_kg"] * 0.08 / 12 * 4)))
         L.append('      </body>')
@@ -509,6 +515,8 @@ def build(m, P, powered_front):
     L.append('    <framequat name="chassis_quat" objtype="body" objname="chassis"/>')
     L.append('    <framepos name="chassis_pos" objtype="body" objname="chassis"/>')
     L.append('  </sensor>')
+    # The reference pose, every lift at 0: what the Unreal pawn is put in (and stood on the ground) at spawn.
+    L.append('  <keyframe><key name="home"/></keyframe>')
     L.append('</mujoco>')
     return "\n".join(L) + "\n"
 
