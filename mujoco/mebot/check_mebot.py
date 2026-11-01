@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""Headless checks of the MeBot MJCF: it stands on its six wheels and every motor moves the way the model says.
+"""Headless checks of the MeBot MJCFs: each stands on its six wheels, every motor moves the way the model says,
+and the passive linkages stay closed.
 
-    python mujoco/mebot/check_mebot.py [--scene mujoco/mebot/mebot_scene.xml]
+    python mujoco/mebot/check_mebot.py [--scene mujoco/mebot/mebot_scene.xml ...]
 
-Needs the mujoco Python package. Each lift command is ramped at its PARAMS speed (as the Unreal motor table's
-MaxVelocity would), each drive wheel speed is held by a small PI loop, and every check prints PASS or FAIL;
-the exit code is the number of failures.
+Checks mebot_scene.xml and mebot_powered_front_scene.xml unless scenes are given. Needs the mujoco Python
+package. Each lift command is ramped at its PARAMS speed (as the Unreal motor table's MaxVelocity would), each
+wheel speed is held by a small PI loop, and every check prints PASS or FAIL; the exit code is the number of
+failures.
 """
 import argparse
 import math
@@ -34,6 +36,8 @@ class Sim:
         self.goal = dict(self.cmd)
         self.wheel_goal = {"l": 0.0, "r": 0.0}
         self.integ = {"l": 0.0, "r": 0.0}
+        self.front_goal = None                  # the powered front omni wheels freewheel unless given a speed
+        self.front_integ = {"l": 0.0, "r": 0.0}
         self.floor = mujoco.mj_name2id(self.m, mujoco.mjtObj.mjOBJ_GEOM, "floor")
         # Each wheel's geoms: its own and its rollers'.
         self.wheel_geoms = {}
@@ -82,14 +86,35 @@ class Sim:
             self.integ[s] = max(-3.0, min(3.0, self.integ[s] + e * dt))
             tq = P["drive"]["torque"]
             self.d.ctrl[self.act["drive_" + s]] = max(-tq, min(tq, 20.0 * e + 40.0 * self.integ[s]))
+        if "front_omni_l" in self.act:         # the powered-front variant's hub motors
+            for s in ("l", "r"):
+                if self.front_goal is None:
+                    self.front_integ[s] = self.d.ctrl[self.act["front_omni_" + s]] = 0.0
+                    continue
+                e = self.front_goal[s] - self.d.joint("front_omni_" + s).qvel[0]
+                self.front_integ[s] = max(-1.0, min(1.0, self.front_integ[s] + e * dt))
+                tq = P["front_omni_drive"]["torque"]
+                self.d.ctrl[self.act["front_omni_" + s]] = max(-tq, min(tq, 3.0 * e + 10.0 * self.front_integ[s]))
         mujoco.mj_step(self.m, self.d)
 
-    def run(self, seconds=None, goals=None, wheels=None, settle=1.0):
-        """Command goals (ramped) and/or wheel speeds; run until the ramps finish, then settle seconds more
-        (or exactly seconds, if given)."""
+    def closure_mm(self):
+        """The largest gap across the linkages' loop closures, mm."""
+        worst = 0.0
+        for i in range(self.m.neq):
+            b1, b2 = self.m.eq_obj1id[i], self.m.eq_obj2id[i]
+            p1 = self.d.xpos[b1] + self.d.xmat[b1].reshape(3, 3) @ self.m.eq_data[i][0:3]
+            p2 = self.d.xpos[b2] + self.d.xmat[b2].reshape(3, 3) @ self.m.eq_data[i][3:6]
+            worst = max(worst, float(((p1 - p2) ** 2).sum() ** 0.5))
+        return worst * 1000
+
+    def run(self, seconds=None, goals=None, wheels=None, front=None, settle=1.0):
+        """Command goals (ramped) and/or wheel speeds (drive, powered front omni); run until the ramps finish,
+        then settle seconds more (or exactly seconds, if given)."""
         self.goal.update(goals or {})
         if wheels is not None:
             self.wheel_goal["l"], self.wheel_goal["r"] = wheels
+        if front is not None:
+            self.front_goal = None if front == "free" else {"l": front[0], "r": front[1]}
         t0, held = self.d.time, 0.0
         while True:
             self.step()
@@ -103,17 +128,17 @@ class Sim:
                     return
 
 
-def main():
-    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--scene", default=os.path.join(HERE, "mebot_scene.xml"))
-    args = ap.parse_args()
-    s = Sim(args.scene)
+def check_scene(scene):
+    print("== %s" % os.path.basename(scene))
+    s = Sim(scene)
     fails = []
+    gap = [0.0]
 
     def check(name, ok, detail):
         print("%s  %-46s %s" % ("PASS" if ok else "FAIL", name, detail))
         if not ok:
             fails.append(name)
+        gap[0] = max(gap[0], s.closure_mm())
 
     deg = math.radians
     s.run(seconds=2.0)
@@ -164,6 +189,27 @@ def main():
     dyaw = (yaw2 - yaw + 180) % 360 - 180
     check("left -, right + turns left in place", dyaw > 30, "yaw %+.0f deg" % dyaw)
 
+    if "front_omni_l" in s.act:
+        s.run(goals={"elevator_l": deg(-15), "elevator_r": deg(-15)})
+        on = s.touching()
+        p0, heading = s.body("chassis"), s.d.body("chassis").xmat.reshape(3, 3)[:, 0].copy()
+        s.run(seconds=2.0, front=(6.0, 6.0))
+        s.run(seconds=1.0, front=(0.0, 0.0))
+        dx = float((s.body("chassis") - p0) @ heading)
+        s.run(seconds=0.1, front="free")
+        check("powered front omni wheels drive it on its omnis", dx > 0.5 and not on & {"drive_wheel_l", "drive_wheel_r"},
+              "%+.2f m forward with the drive wheels up" % dx)
+        s.run(goals={"elevator_l": 0.0, "elevator_r": 0.0})
+
+    check("linkages stay closed", gap[0] < 1.0, "largest loop-closure gap %.2f mm" % gap[0])
+    return fails
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument("--scene", nargs="*", default=[os.path.join(HERE, n) for n in ("mebot_scene.xml", "mebot_powered_front_scene.xml")])
+    args = ap.parse_args()
+    fails = sum((check_scene(sc) for sc in args.scene), [])
     print("%d check(s) failed" % len(fails) if fails else "all checks passed")
     return len(fails)
 
