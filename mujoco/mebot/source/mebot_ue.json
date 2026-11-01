@@ -1,0 +1,4495 @@
+{
+ "source": {
+  "skeletal_mesh": "/RammsAssets/Robots/RAMMP/Base/SkeletalMeshes/mebot",
+  "physics_asset": "/RammsAssets/Robots/RAMMP/Base/SkeletalMeshes/mebot_PhysicsAsset"
+ },
+ "units": "cm, Unreal axes (X forward, Y right, Z up)",
+ "bones": [
+  {
+   "name": "mebot",
+   "parent": "None",
+   "component": {
+    "loc": [
+     -53.8656,
+     -0.2557,
+     2.8235
+    ],
+    "rpy": [
+     -0.0,
+     -0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     -0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   }
+  },
+  {
+   "name": "dw_main_plate_l",
+   "parent": "mebot",
+   "component": {
+    "loc": [
+     -37.1836,
+     -16.2668,
+     14.1655
+    ],
+    "rpy": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     -0.0,
+     -1.0
+    ]
+   }
+  },
+  {
+   "name": "elevator_dampener_l",
+   "parent": "dw_main_plate_l",
+   "component": {
+    "loc": [
+     -29.5636,
+     -21.3966,
+     19.8805
+    ],
+    "rpy": [
+     -0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   }
+  },
+  {
+   "name": "elevator_dampener_rod_l",
+   "parent": "elevator_dampener_l",
+   "component": {
+    "loc": [
+     -18.0412,
+     -21.4509,
+     23.8478
+    ],
+    "rpy": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     -0.0,
+     -1.0
+    ]
+   }
+  },
+  {
+   "name": "elevator_dampener_link_l",
+   "parent": "dw_main_plate_l",
+   "component": {
+    "loc": [
+     -11.0578,
+     -22.4754,
+     21.8069
+    ],
+    "rpy": [
+     -0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   }
+  },
+  {
+   "name": "elevator_dampener_aux_link_l",
+   "parent": "elevator_dampener_link_l",
+   "component": {
+    "loc": [
+     -9.2769,
+     -21.6833,
+     20.777
+    ],
+    "rpy": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     -0.0,
+     -1.0
+    ]
+   }
+  },
+  {
+   "name": "motor_elevator_pivot_l",
+   "parent": "dw_main_plate_l",
+   "component": {
+    "loc": [
+     -7.2986,
+     -20.9833,
+     25.1343
+    ],
+    "rpy": [
+     -0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   }
+  },
+  {
+   "name": "motor_elevator_rod_link_l",
+   "parent": "motor_elevator_pivot_l",
+   "component": {
+    "loc": [
+     -7.2986,
+     -19.7133,
+     30.2143
+    ],
+    "rpy": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     -0.0,
+     -1.0
+    ]
+   }
+  },
+  {
+   "name": "motor_swing_arm_l",
+   "parent": "dw_main_plate_l",
+   "component": {
+    "loc": [
+     -37.1836,
+     -18.456,
+     14.1655
+    ],
+    "rpy": [
+     -0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   }
+  },
+  {
+   "name": "drive_motor_l",
+   "parent": "motor_swing_arm_l",
+   "component": {
+    "loc": [
+     -5.3066,
+     -24.4085,
+     12.7855
+    ],
+    "rpy": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     -0.0,
+     -1.0
+    ]
+   }
+  },
+  {
+   "name": "drive_wheel_l",
+   "parent": "drive_motor_l",
+   "component": {
+    "loc": [
+     -5.3066,
+     -30.4105,
+     12.7855
+    ],
+    "rpy": [
+     -0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   }
+  },
+  {
+   "name": "motor_elevator_l",
+   "parent": "motor_swing_arm_l",
+   "component": {
+    "loc": [
+     -47.5556,
+     -20.9833,
+     26.8331
+    ],
+    "rpy": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     -0.0,
+     -1.0
+    ]
+   }
+  },
+  {
+   "name": "motor_elevator_rod_l",
+   "parent": "motor_elevator_l",
+   "component": {
+    "loc": [
+     -9.6905,
+     -20.9833,
+     30.0134
+    ],
+    "rpy": [
+     -0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   }
+  },
+  {
+   "name": "dw_main_plate_r",
+   "parent": "mebot",
+   "component": {
+    "loc": [
+     -37.1836,
+     16.2668,
+     14.1655
+    ],
+    "rpy": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     -0.0,
+     -1.0
+    ]
+   }
+  },
+  {
+   "name": "elevator_dampener_link_r",
+   "parent": "dw_main_plate_r",
+   "component": {
+    "loc": [
+     -11.0578,
+     22.4754,
+     21.8069
+    ],
+    "rpy": [
+     -0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   }
+  },
+  {
+   "name": "elevator_dampener_aux_link_r",
+   "parent": "elevator_dampener_link_r",
+   "component": {
+    "loc": [
+     -9.2769,
+     21.6833,
+     20.777
+    ],
+    "rpy": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     -0.0,
+     -1.0
+    ]
+   }
+  },
+  {
+   "name": "elevator_dampener_r",
+   "parent": "dw_main_plate_r",
+   "component": {
+    "loc": [
+     -29.5636,
+     20.9012,
+     19.8805
+    ],
+    "rpy": [
+     -0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   }
+  },
+  {
+   "name": "elevator_dampener_rod_r",
+   "parent": "elevator_dampener_r",
+   "component": {
+    "loc": [
+     -18.0413,
+     20.8352,
+     23.8478
+    ],
+    "rpy": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     -0.0,
+     -1.0
+    ]
+   }
+  },
+  {
+   "name": "motor_elevator_pivot_r",
+   "parent": "dw_main_plate_r",
+   "component": {
+    "loc": [
+     -7.2986,
+     20.9833,
+     25.1343
+    ],
+    "rpy": [
+     -0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   }
+  },
+  {
+   "name": "motor_elevator_rod_link_r",
+   "parent": "motor_elevator_pivot_r",
+   "component": {
+    "loc": [
+     -7.2986,
+     19.7133,
+     30.2143
+    ],
+    "rpy": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     -0.0,
+     -1.0
+    ]
+   }
+  },
+  {
+   "name": "motor_swing_arm_r",
+   "parent": "dw_main_plate_r",
+   "component": {
+    "loc": [
+     -37.1836,
+     18.456,
+     14.1655
+    ],
+    "rpy": [
+     -0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   }
+  },
+  {
+   "name": "drive_motor_r",
+   "parent": "motor_swing_arm_r",
+   "component": {
+    "loc": [
+     -5.3066,
+     24.4085,
+     12.7855
+    ],
+    "rpy": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     -0.0,
+     -1.0
+    ]
+   }
+  },
+  {
+   "name": "drive_wheel_r",
+   "parent": "drive_motor_r",
+   "component": {
+    "loc": [
+     -5.3066,
+     30.4105,
+     12.7855
+    ],
+    "rpy": [
+     -0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   }
+  },
+  {
+   "name": "motor_elevator_r",
+   "parent": "motor_swing_arm_r",
+   "component": {
+    "loc": [
+     -47.5556,
+     20.9833,
+     26.8331
+    ],
+    "rpy": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     -0.0,
+     -1.0
+    ]
+   }
+  },
+  {
+   "name": "motor_elevator_rod_r",
+   "parent": "motor_elevator_r",
+   "component": {
+    "loc": [
+     -9.6905,
+     20.9833,
+     30.0134
+    ],
+    "rpy": [
+     -0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   }
+  },
+  {
+   "name": "front_caster_arm_mount",
+   "parent": "mebot",
+   "component": {
+    "loc": [
+     0.7444,
+     9.9043,
+     13.8725
+    ],
+    "rpy": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     -0.0,
+     -1.0
+    ]
+   }
+  },
+  {
+   "name": "front_caster_linkage",
+   "parent": "front_caster_arm_mount",
+   "component": {
+    "loc": [
+     1.3794,
+     2.9987,
+     31.0175
+    ],
+    "rpy": [
+     -0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   }
+  },
+  {
+   "name": "front_caster_linkage_arm",
+   "parent": "front_caster_linkage",
+   "component": {
+    "loc": [
+     5.2273,
+     0.0242,
+     33.473
+    ],
+    "rpy": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     -0.0,
+     -1.0
+    ]
+   }
+  },
+  {
+   "name": "front_caster_linkage_aux",
+   "parent": "front_caster_arm_mount",
+   "component": {
+    "loc": [
+     3.9194,
+     -0.2557,
+     21.1725
+    ],
+    "rpy": [
+     -0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   }
+  },
+  {
+   "name": "front_caster_linkage_aux_arm",
+   "parent": "front_caster_linkage_aux",
+   "component": {
+    "loc": [
+     11.0314,
+     -0.4151,
+     21.1725
+    ],
+    "rpy": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     -0.0,
+     -1.0
+    ]
+   }
+  },
+  {
+   "name": "front_caster_motor",
+   "parent": "front_caster_arm_mount",
+   "component": {
+    "loc": [
+     -13.1882,
+     6.253,
+     6.2624
+    ],
+    "rpy": [
+     -0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   }
+  },
+  {
+   "name": "front_caster_motor_rod",
+   "parent": "front_caster_motor",
+   "component": {
+    "loc": [
+     -4.6365,
+     6.253,
+     28.0367
+    ],
+    "rpy": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     -0.0,
+     -1.0
+    ]
+   }
+  },
+  {
+   "name": "front_caster_swing_arm",
+   "parent": "front_caster_arm_mount",
+   "component": {
+    "loc": [
+     3.9194,
+     -0.2557,
+     1.1725
+    ],
+    "rpy": [
+     -0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   }
+  },
+  {
+   "name": "front_caster_wheel_l",
+   "parent": "front_caster_swing_arm",
+   "component": {
+    "loc": [
+     24.8744,
+     -18.1945,
+     2.4427
+    ],
+    "rpy": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     -0.0,
+     -1.0
+    ]
+   }
+  },
+  {
+   "name": "front_caster_wheel_r",
+   "parent": "front_caster_swing_arm",
+   "component": {
+    "loc": [
+     24.8744,
+     17.683,
+     2.4427
+    ],
+    "rpy": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     -0.0,
+     -1.0
+    ]
+   }
+  },
+  {
+   "name": "rear_caster_arm_mount",
+   "parent": "mebot",
+   "component": {
+    "loc": [
+     -53.8656,
+     -0.267,
+     16.4125
+    ],
+    "rpy": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     -0.0,
+     -1.0
+    ]
+   }
+  },
+  {
+   "name": "rear_caster_aux_linkage",
+   "parent": "rear_caster_arm_mount",
+   "component": {
+    "loc": [
+     -58.0868,
+     -0.5845,
+     36.3935
+    ],
+    "rpy": [
+     -0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   }
+  },
+  {
+   "name": "rear_caster_motor",
+   "parent": "rear_caster_arm_mount",
+   "component": {
+    "loc": [
+     -45.3024,
+     -6.7758,
+     6.8406
+    ],
+    "rpy": [
+     -0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   }
+  },
+  {
+   "name": "rear_caster_motor_rod",
+   "parent": "rear_caster_motor",
+   "component": {
+    "loc": [
+     -48.6931,
+     -6.7758,
+     29.987
+    ],
+    "rpy": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     -0.0,
+     -1.0
+    ]
+   }
+  },
+  {
+   "name": "rear_caster_motor_dampener_pivot",
+   "parent": "rear_caster_arm_mount",
+   "component": {
+    "loc": [
+     -57.0406,
+     -0.5113,
+     23.7125
+    ],
+    "rpy": [
+     -0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   }
+  },
+  {
+   "name": "rear_caster_dampener",
+   "parent": "rear_caster_motor_dampener_pivot",
+   "component": {
+    "loc": [
+     -64.1526,
+     -0.2636,
+     23.7125
+    ],
+    "rpy": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     -0.0,
+     -1.0
+    ]
+   }
+  },
+  {
+   "name": "rear_caster_dampener_rod",
+   "parent": "rear_caster_dampener",
+   "component": {
+    "loc": [
+     -64.1526,
+     -0.2636,
+     11.6125
+    ],
+    "rpy": [
+     -0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   }
+  },
+  {
+   "name": "rear_caster_suspension_arm",
+   "parent": "rear_caster_arm_mount",
+   "component": {
+    "loc": [
+     -54.5006,
+     -3.5214,
+     33.5575
+    ],
+    "rpy": [
+     -0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   }
+  },
+  {
+   "name": "rear_caster_swing_arm",
+   "parent": "rear_caster_arm_mount",
+   "component": {
+    "loc": [
+     -57.0406,
+     -0.267,
+     3.7125
+    ],
+    "rpy": [
+     -0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   }
+  },
+  {
+   "name": "rear_casteer_wheel_l",
+   "parent": "rear_caster_swing_arm",
+   "component": {
+    "loc": [
+     -77.9956,
+     -8.6935,
+     4.9825
+    ],
+    "rpy": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     -0.0,
+     -1.0
+    ]
+   }
+  },
+  {
+   "name": "rear_caster_wheel_r",
+   "parent": "rear_caster_swing_arm",
+   "component": {
+    "loc": [
+     -77.9956,
+     8.1594,
+     4.9825
+    ],
+    "rpy": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "quat_xyzw": [
+     0.0,
+     0.0,
+     -0.0,
+     -1.0
+    ]
+   }
+  }
+ ],
+ "sockets": [
+  {
+   "name": "seat_base",
+   "bone": "mebot",
+   "loc": [
+    34.5,
+    -0.0,
+    25.6381
+   ],
+   "rpy": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ ],
+ "bodies": [
+  {
+   "bone": "drive_motor_l",
+   "primitives": [
+    {
+     "type": "box",
+     "center": [
+      -11.7849,
+      1.875,
+      -2.395
+     ],
+     "rpy": [
+      -0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      36.8956,
+      12.4735,
+      18.0892
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "drive_motor_r",
+   "primitives": [
+    {
+     "type": "box",
+     "center": [
+      -11.7849,
+      -1.875,
+      -2.395
+     ],
+     "rpy": [
+      -0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      36.8955,
+      12.4735,
+      18.0892
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "drive_wheel_l",
+   "primitives": [
+    {
+     "type": "hull",
+     "n": 84,
+     "min": [
+      -18.3831,
+      -3.7518,
+      -18.3038
+     ],
+     "max": [
+      18.4169,
+      3.7794,
+      18.52
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "drive_wheel_r",
+   "primitives": [
+    {
+     "type": "hull",
+     "n": 77,
+     "min": [
+      -18.384,
+      -3.753,
+      -18.2792
+     ],
+     "max": [
+      18.416,
+      3.7518,
+      18.5208
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "dw_main_plate_l",
+   "primitives": [
+    {
+     "type": "box",
+     "center": [
+      13.0189,
+      -3.91,
+      3.9403
+     ],
+     "rpy": [
+      -0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      50.6505,
+      11.1049,
+      19.4899
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "dw_main_plate_r",
+   "primitives": [
+    {
+     "type": "box",
+     "center": [
+      13.0189,
+      3.91,
+      3.9403
+     ],
+     "rpy": [
+      -0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      50.6505,
+      11.1049,
+      19.4899
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "elevator_dampener_aux_link_l",
+   "primitives": [
+    {
+     "type": "box",
+     "center": [
+      0.0103,
+      1.0251,
+      -0.0444
+     ],
+     "rpy": [
+      -0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      6.4858,
+      5.5726,
+      4.2063
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "elevator_dampener_aux_link_r",
+   "primitives": [
+    {
+     "type": "box",
+     "center": [
+      0.0103,
+      -1.0251,
+      -0.0444
+     ],
+     "rpy": [
+      -0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      6.4858,
+      5.5726,
+      4.2063
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "elevator_dampener_l",
+   "primitives": [
+    {
+     "type": "box",
+     "center": [
+      6.1043,
+      -0.4455,
+      2.5933
+     ],
+     "rpy": [
+      -0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      14.0696,
+      5.5367,
+      7.983
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "elevator_dampener_link_l",
+   "primitives": [
+    {
+     "type": "box",
+     "center": [
+      0.3539,
+      1.8173,
+      1.2455
+     ],
+     "rpy": [
+      -0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      3.5847,
+      5.5726,
+      8.99
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "elevator_dampener_link_r",
+   "primitives": [
+    {
+     "type": "box",
+     "center": [
+      0.3539,
+      -1.8173,
+      1.2455
+     ],
+     "rpy": [
+      -0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      3.5847,
+      5.5726,
+      8.99
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "elevator_dampener_r",
+   "primitives": [
+    {
+     "type": "box",
+     "center": [
+      6.1043,
+      0.4455,
+      2.5933
+     ],
+     "rpy": [
+      -0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      14.0696,
+      5.5367,
+      7.983
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "elevator_dampener_rod_l",
+   "primitives": [
+    {
+     "type": "box",
+     "center": [
+      4.0406,
+      0.0865,
+      1.1828
+     ],
+     "rpy": [
+      -0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      9.17,
+      3.0409,
+      5.2646
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "elevator_dampener_rod_r",
+   "primitives": [
+    {
+     "type": "box",
+     "center": [
+      4.0406,
+      0.0865,
+      1.1828
+     ],
+     "rpy": [
+      -0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      9.17,
+      3.0409,
+      5.2646
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "front_caster_arm_mount",
+   "primitives": [
+    {
+     "type": "box",
+     "center": [
+      2.0211,
+      -8.227,
+      2.1694
+     ],
+     "rpy": [
+      -0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      5.9571,
+      21.7493,
+      33.3921
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "front_caster_linkage",
+   "primitives": [
+    {
+     "type": "box",
+     "center": [
+      -1.2886,
+      0.3381,
+      -0.8045
+     ],
+     "rpy": [
+      -0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      12.4067,
+      15.4655,
+      8.5768
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "front_caster_linkage_arm",
+   "primitives": [
+    {
+     "type": "box",
+     "center": [
+      2.1889,
+      -0.3175,
+      -4.9772
+     ],
+     "rpy": [
+      -0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      6.8599,
+      1.9241,
+      12.5883
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "front_caster_linkage_aux",
+   "primitives": [
+    {
+     "type": "box",
+     "center": [
+      3.5906,
+      -0.3311,
+      1.3467
+     ],
+     "rpy": [
+      -0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      9.8358,
+      9.628,
+      5.2959
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "front_caster_linkage_aux_arm",
+   "primitives": [
+    {
+     "type": "box",
+     "center": [
+      -0.0,
+      0.1594,
+      -9.962
+     ],
+     "rpy": [
+      -0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      2.56,
+      6.7534,
+      23.1716
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "front_caster_motor",
+   "primitives": [
+    {
+     "type": "box",
+     "center": [
+      3.7384,
+      -4.1028,
+      9.3678
+     ],
+     "rpy": [
+      -0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      16.5823,
+      15.9734,
+      29.4276
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "front_caster_motor_rod",
+   "primitives": [
+    {
+     "type": "box",
+     "center": [
+      -2.746,
+      -0.0,
+      -7.0933
+     ],
+     "rpy": [
+      -0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      6.8808,
+      1.4726,
+      14.813
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "front_caster_swing_arm",
+   "primitives": [
+    {
+     "type": "box",
+     "center": [
+      10.795,
+      -0.0,
+      -0.0282
+     ],
+     "rpy": [
+      -0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      25.6648,
+      41.6878,
+      5.6372
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "front_caster_wheel_l",
+   "primitives": [
+    {
+     "type": "hull",
+     "n": 103,
+     "min": [
+      -7.5881,
+      -1.8111,
+      -7.616
+     ],
+     "max": [
+      7.5728,
+      1.6889,
+      7.5321
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "front_caster_wheel_r",
+   "primitives": [
+    {
+     "type": "hull",
+     "n": 103,
+     "min": [
+      -7.5923,
+      -1.6947,
+      -7.6159
+     ],
+     "max": [
+      7.5685,
+      1.8365,
+      7.5321
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "mebot",
+   "primitives": [
+    {
+     "type": "box",
+     "center": [
+      25.505,
+      -0.0,
+      12.6394
+     ],
+     "rpy": [
+      -0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      58.7921,
+      32.9726,
+      31.5229
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "motor_elevator_l",
+   "primitives": [
+    {
+     "type": "box",
+     "center": [
+      13.8685,
+      -4.0864,
+      1.437
+     ],
+     "rpy": [
+      -0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      31.7702,
+      16.0152,
+      10.4127
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "motor_elevator_pivot_l",
+   "primitives": [
+    {
+     "type": "box",
+     "center": [
+      0.0137,
+      0.3251,
+      0.7761
+     ],
+     "rpy": [
+      -0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      3.4822,
+      5.5726,
+      11.344
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "motor_elevator_pivot_r",
+   "primitives": [
+    {
+     "type": "box",
+     "center": [
+      0.0137,
+      -0.3251,
+      0.7761
+     ],
+     "rpy": [
+      -0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      3.4822,
+      5.5726,
+      11.344
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "motor_elevator_r",
+   "primitives": [
+    {
+     "type": "box",
+     "center": [
+      13.8685,
+      4.0864,
+      1.437
+     ],
+     "rpy": [
+      -0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      31.7702,
+      16.0152,
+      10.4127
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "motor_elevator_rod_l",
+   "primitives": [
+    {
+     "type": "box",
+     "center": [
+      -7.6041,
+      -0.0,
+      -0.589
+     ],
+     "rpy": [
+      -0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      15.4281,
+      1.4726,
+      2.6438
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "motor_elevator_rod_link_l",
+   "primitives": [
+    {
+     "type": "box",
+     "center": [
+      -1.5612,
+      -1.5021,
+      -0.1678
+     ],
+     "rpy": [
+      -0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      5.6211,
+      3.9603,
+      2.8153
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "motor_elevator_rod_link_r",
+   "primitives": [
+    {
+     "type": "box",
+     "center": [
+      -1.5612,
+      1.5021,
+      -0.1678
+     ],
+     "rpy": [
+      -0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      5.6211,
+      3.9603,
+      2.8153
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "motor_elevator_rod_r",
+   "primitives": [
+    {
+     "type": "box",
+     "center": [
+      -7.6041,
+      0.0,
+      -0.589
+     ],
+     "rpy": [
+      -0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      15.4281,
+      1.4726,
+      2.6438
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "motor_swing_arm_l",
+   "primitives": [
+    {
+     "type": "box",
+     "center": [
+      12.8854,
+      -3.331,
+      3.2829
+     ],
+     "rpy": [
+      -0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      51.4921,
+      9.9612,
+      22.5993
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "motor_swing_arm_r",
+   "primitives": [
+    {
+     "type": "box",
+     "center": [
+      12.8854,
+      3.331,
+      3.2829
+     ],
+     "rpy": [
+      -0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      51.4921,
+      9.9612,
+      22.5993
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "rear_casteer_wheel_l",
+   "primitives": [
+    {
+     "type": "hull",
+     "n": 119,
+     "min": [
+      -10.0998,
+      -2.1406,
+      -10.0934
+     ],
+     "max": [
+      10.1003,
+      1.9598,
+      10.1332
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "rear_caster_arm_mount",
+   "primitives": [
+    {
+     "type": "box",
+     "center": [
+      -2.0211,
+      -1.8305,
+      2.1655
+     ],
+     "rpy": [
+      -0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      5.9571,
+      21.9564,
+      33.4
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "rear_caster_aux_linkage",
+   "primitives": [
+    {
+     "type": "box",
+     "center": [
+      -2.2287,
+      0.3175,
+      -4.9628
+     ],
+     "rpy": [
+      -0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      6.9323,
+      1.9241,
+      12.5525
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "rear_caster_dampener",
+   "primitives": [
+    {
+     "type": "box",
+     "center": [
+      -0.4235,
+      -0.4455,
+      -6.1058
+     ],
+     "rpy": [
+      -0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      5.5216,
+      10.9073,
+      14.1793
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "rear_caster_dampener_rod",
+   "primitives": [
+    {
+     "type": "box",
+     "center": [
+      0.0176,
+      0.0133,
+      -4.5032
+     ],
+     "rpy": [
+      -0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      3.0415,
+      8.4115,
+      9.0965
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "rear_caster_motor",
+   "primitives": [
+    {
+     "type": "box",
+     "center": [
+      -1.3054,
+      4.1028,
+      9.8459
+     ],
+     "rpy": [
+      -0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      10.9864,
+      15.9735,
+      30.8056
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "rear_caster_motor_dampener_pivot",
+   "primitives": [
+    {
+     "type": "box",
+     "center": [
+      -3.5863,
+      0.5874,
+      1.5647
+     ],
+     "rpy": [
+      -0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      9.846,
+      10.9599,
+      5.7368
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "rear_caster_motor_rod",
+   "primitives": [
+    {
+     "type": "box",
+     "center": [
+      1.0573,
+      -0.0,
+      -7.5482
+     ],
+     "rpy": [
+      -0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      3.5743,
+      1.4726,
+      15.4055
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "rear_caster_suspension_arm",
+   "primitives": [
+    {
+     "type": "box",
+     "center": [
+      1.1952,
+      -0.3381,
+      -0.9303
+     ],
+     "rpy": [
+      -0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      11.6637,
+      15.4655,
+      9.608
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "rear_caster_swing_arm",
+   "primitives": [
+    {
+     "type": "box",
+     "center": [
+      -10.7923,
+      -0.0,
+      -0.0938
+     ],
+     "rpy": [
+      -0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      25.6594,
+      29.5021,
+      5.4918
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "rear_caster_wheel_r",
+   "primitives": [
+    {
+     "type": "hull",
+     "n": 119,
+     "min": [
+      -10.1086,
+      -2.0504,
+      -10.093
+     ],
+     "max": [
+      10.0915,
+      2.0813,
+      10.1336
+     ]
+    }
+   ]
+  }
+ ],
+ "constraints": [
+  {
+   "name": "dw_main_plate_l",
+   "child": "dw_main_plate_l",
+   "parent": "mebot",
+   "pos_in_parent": [
+    16.682014,
+    -16.011088,
+    11.342
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "sec_axis_in_parent": [
+    0.0,
+    1.0,
+    0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Limited",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 40.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "elevator_dampener_l",
+   "child": "elevator_dampener_l",
+   "parent": "dw_main_plate_l",
+   "pos_in_parent": [
+    7.620004,
+    -5.129769,
+    5.714999
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    -0.0
+   ],
+   "sec_axis_in_parent": [
+    -0.0,
+    1.0,
+    -0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "elevator_dampener_rod_l",
+   "child": "elevator_dampener_rod_l",
+   "parent": "elevator_dampener_l",
+   "pos_in_parent": [
+    11.52238,
+    -0.054359,
+    3.967217
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    -0.0
+   ],
+   "sec_axis_in_parent": [
+    -0.0,
+    1.0,
+    -0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "elevator_dampener_link_l",
+   "child": "elevator_dampener_link_l",
+   "parent": "dw_main_plate_l",
+   "pos_in_parent": [
+    26.125789,
+    -6.208624,
+    7.641375
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    -0.0
+   ],
+   "sec_axis_in_parent": [
+    -0.0,
+    1.0,
+    -0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "elevator_dampener_aux_link_l",
+   "child": "elevator_dampener_aux_link_l",
+   "parent": "elevator_dampener_link_l",
+   "pos_in_parent": [
+    1.780979,
+    0.792162,
+    -1.029927
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    -0.0
+   ],
+   "sec_axis_in_parent": [
+    -0.0,
+    1.0,
+    -0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "motor_elevator_pivot_l",
+   "child": "motor_elevator_pivot_l",
+   "parent": "dw_main_plate_l",
+   "pos_in_parent": [
+    29.884988,
+    -4.71646,
+    10.968776
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    -0.0
+   ],
+   "sec_axis_in_parent": [
+    -0.0,
+    1.0,
+    -0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "motor_elevator_rod_link_l",
+   "child": "motor_elevator_rod_link_l",
+   "parent": "motor_elevator_pivot_l",
+   "pos_in_parent": [
+    -1e-06,
+    1.269993,
+    5.08
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    -0.0
+   ],
+   "sec_axis_in_parent": [
+    -0.0,
+    1.0,
+    -0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "motor_swing_arm_l",
+   "child": "motor_swing_arm_l",
+   "parent": "dw_main_plate_l",
+   "pos_in_parent": [
+    3e-06,
+    -2.189158,
+    -3e-06
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    -0.0
+   ],
+   "sec_axis_in_parent": [
+    -0.0,
+    1.0,
+    -0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Limited",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "drive_motor_l",
+   "child": "drive_motor_l",
+   "parent": "motor_swing_arm_l",
+   "pos_in_parent": [
+    31.876996,
+    -5.952504,
+    -1.38
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    -0.0
+   ],
+   "sec_axis_in_parent": [
+    -0.0,
+    1.0,
+    -0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "drive_wheel_l",
+   "child": "drive_wheel_l",
+   "parent": "drive_motor_l",
+   "pos_in_parent": [
+    1e-06,
+    -6.001998,
+    -1e-06
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "sec_axis_in_parent": [
+    0.0,
+    1.0,
+    0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Free",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "motor_elevator_l",
+   "child": "motor_elevator_l",
+   "parent": "motor_swing_arm_l",
+   "pos_in_parent": [
+    -10.371974,
+    -2.527303,
+    12.667592
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    -0.0
+   ],
+   "sec_axis_in_parent": [
+    -0.0,
+    1.0,
+    -0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "motor_elevator_rod_l",
+   "child": "motor_elevator_rod_l",
+   "parent": "motor_elevator_l",
+   "pos_in_parent": [
+    37.865084,
+    -3e-06,
+    3.180292
+   ],
+   "pri_axis_in_parent": [
+    0.997564,
+    -1e-06,
+    0.069756
+   ],
+   "sec_axis_in_parent": [
+    0.0,
+    1.0,
+    8e-06
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Limited",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 10.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "dw_main_plate_r",
+   "child": "dw_main_plate_r",
+   "parent": "mebot",
+   "pos_in_parent": [
+    16.682014,
+    16.52251,
+    11.342
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "sec_axis_in_parent": [
+    0.0,
+    1.0,
+    0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Limited",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 40.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "elevator_dampener_link_r",
+   "child": "elevator_dampener_link_r",
+   "parent": "dw_main_plate_r",
+   "pos_in_parent": [
+    26.125792,
+    6.208625,
+    7.641378
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    -0.0
+   ],
+   "sec_axis_in_parent": [
+    -0.0,
+    1.0,
+    -0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "elevator_dampener_aux_link_r",
+   "child": "elevator_dampener_aux_link_r",
+   "parent": "elevator_dampener_link_r",
+   "pos_in_parent": [
+    1.780982,
+    -0.792162,
+    -1.029932
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    -0.0
+   ],
+   "sec_axis_in_parent": [
+    -0.0,
+    1.0,
+    -0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "elevator_dampener_r",
+   "child": "elevator_dampener_r",
+   "parent": "dw_main_plate_r",
+   "pos_in_parent": [
+    7.62001,
+    4.634444,
+    5.715001
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    -0.0
+   ],
+   "sec_axis_in_parent": [
+    -0.0,
+    1.0,
+    -0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "elevator_dampener_rod_r",
+   "child": "elevator_dampener_rod_r",
+   "parent": "elevator_dampener_r",
+   "pos_in_parent": [
+    11.522374,
+    -0.066017,
+    3.967217
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    -0.0
+   ],
+   "sec_axis_in_parent": [
+    -0.0,
+    1.0,
+    -0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "motor_elevator_pivot_r",
+   "child": "motor_elevator_pivot_r",
+   "parent": "dw_main_plate_r",
+   "pos_in_parent": [
+    29.884991,
+    4.716462,
+    10.968776
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    -0.0
+   ],
+   "sec_axis_in_parent": [
+    -0.0,
+    1.0,
+    -0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "motor_elevator_rod_link_r",
+   "child": "motor_elevator_rod_link_r",
+   "parent": "motor_elevator_pivot_r",
+   "pos_in_parent": [
+    1e-06,
+    -1.269993,
+    5.08
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    -0.0
+   ],
+   "sec_axis_in_parent": [
+    -0.0,
+    1.0,
+    -0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "motor_swing_arm_r",
+   "child": "motor_swing_arm_r",
+   "parent": "dw_main_plate_r",
+   "pos_in_parent": [
+    9e-06,
+    2.189159,
+    0.0
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    -0.0
+   ],
+   "sec_axis_in_parent": [
+    -0.0,
+    1.0,
+    -0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Limited",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "drive_motor_r",
+   "child": "drive_motor_r",
+   "parent": "motor_swing_arm_r",
+   "pos_in_parent": [
+    31.877002,
+    5.952509,
+    -1.38
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    -0.0
+   ],
+   "sec_axis_in_parent": [
+    -0.0,
+    1.0,
+    -0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "drive_wheel_r",
+   "child": "drive_wheel_r",
+   "parent": "drive_motor_r",
+   "pos_in_parent": [
+    4e-06,
+    6.001998,
+    3e-06
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "sec_axis_in_parent": [
+    0.0,
+    1.0,
+    0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Free",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "motor_elevator_r",
+   "child": "motor_elevator_r",
+   "parent": "motor_swing_arm_r",
+   "pos_in_parent": [
+    -10.371974,
+    2.527305,
+    12.667592
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    -0.0
+   ],
+   "sec_axis_in_parent": [
+    -0.0,
+    1.0,
+    -0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "motor_elevator_rod_r",
+   "child": "motor_elevator_rod_r",
+   "parent": "motor_elevator_r",
+   "pos_in_parent": [
+    37.865081,
+    1e-06,
+    3.180289
+   ],
+   "pri_axis_in_parent": [
+    0.997564,
+    -1e-06,
+    0.069756
+   ],
+   "sec_axis_in_parent": [
+    0.0,
+    1.0,
+    1.1e-05
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Limited",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 10.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "front_caster_arm_mount",
+   "child": "front_caster_arm_mount",
+   "parent": "mebot",
+   "pos_in_parent": [
+    54.610014,
+    10.159995,
+    11.048999
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "sec_axis_in_parent": [
+    0.0,
+    1.0,
+    0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "front_caster_linkage",
+   "child": "front_caster_linkage",
+   "parent": "front_caster_arm_mount",
+   "pos_in_parent": [
+    0.635005,
+    -6.905627,
+    17.145006
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    -0.0
+   ],
+   "sec_axis_in_parent": [
+    -0.0,
+    1.0,
+    -0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Free",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "front_caster_linkage_arm",
+   "child": "front_caster_linkage_arm",
+   "parent": "front_caster_linkage",
+   "pos_in_parent": [
+    3.847951,
+    -2.974453,
+    2.455431
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    -0.0
+   ],
+   "sec_axis_in_parent": [
+    -0.0,
+    1.0,
+    -0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Free",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "front_caster_linkage_aux",
+   "child": "front_caster_linkage_aux",
+   "parent": "front_caster_arm_mount",
+   "pos_in_parent": [
+    3.175005,
+    -10.160004,
+    7.300003
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    -0.0
+   ],
+   "sec_axis_in_parent": [
+    -0.0,
+    1.0,
+    -0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Free",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "front_caster_linkage_aux_arm",
+   "child": "front_caster_linkage_aux_arm",
+   "parent": "front_caster_linkage_aux",
+   "pos_in_parent": [
+    7.112004,
+    -0.159375,
+    -6e-06
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    -0.0
+   ],
+   "sec_axis_in_parent": [
+    -0.0,
+    1.0,
+    -0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Free",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "front_caster_motor",
+   "child": "front_caster_motor",
+   "parent": "front_caster_arm_mount",
+   "pos_in_parent": [
+    -13.932584,
+    -3.65125,
+    -7.610147
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    -0.0
+   ],
+   "sec_axis_in_parent": [
+    -0.0,
+    1.0,
+    -0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "front_caster_motor_rod",
+   "child": "front_caster_motor_rod",
+   "parent": "front_caster_motor",
+   "pos_in_parent": [
+    8.551671,
+    2e-06,
+    21.774301
+   ],
+   "pri_axis_in_parent": [
+    0.5,
+    -5.8e-05,
+    0.866025
+   ],
+   "sec_axis_in_parent": [
+    4.2e-05,
+    1.0,
+    4.3e-05
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Limited",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 10.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "front_caster_swing_arm",
+   "child": "front_caster_swing_arm",
+   "parent": "front_caster_arm_mount",
+   "pos_in_parent": [
+    3.175004,
+    -10.160004,
+    -12.700002
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    -0.0
+   ],
+   "sec_axis_in_parent": [
+    -0.0,
+    1.0,
+    -0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Limited",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "front_caster_wheel_l",
+   "child": "front_caster_wheel_l",
+   "parent": "front_caster_swing_arm",
+   "pos_in_parent": [
+    20.954989,
+    -17.938751,
+    1.270117
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    -0.0
+   ],
+   "sec_axis_in_parent": [
+    -0.0,
+    1.0,
+    -0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Free",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "front_caster_wheel_r",
+   "child": "front_caster_wheel_r",
+   "parent": "front_caster_swing_arm",
+   "pos_in_parent": [
+    20.954993,
+    17.938748,
+    1.270117
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    -0.0
+   ],
+   "sec_axis_in_parent": [
+    -0.0,
+    1.0,
+    -0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Free",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "rear_caster_arm_mount",
+   "child": "rear_caster_arm_mount",
+   "parent": "mebot",
+   "pos_in_parent": [
+    1.2e-05,
+    -0.011293,
+    13.588999
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "sec_axis_in_parent": [
+    0.0,
+    1.0,
+    0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "rear_caster_aux_linkage",
+   "child": "rear_caster_aux_linkage",
+   "parent": "rear_caster_suspension_arm",
+   "pos_in_parent": [
+    -3.586149,
+    2.936875,
+    2.835977
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    -0.0
+   ],
+   "sec_axis_in_parent": [
+    -0.0,
+    1.0,
+    -0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Free",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "rear_caster_motor",
+   "child": "rear_caster_motor",
+   "parent": "rear_caster_arm_mount",
+   "pos_in_parent": [
+    8.563235,
+    -6.508751,
+    -9.571943
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    -0.0
+   ],
+   "sec_axis_in_parent": [
+    -0.0,
+    1.0,
+    -0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "rear_caster_motor_rod",
+   "child": "rear_caster_motor_rod",
+   "parent": "rear_caster_motor",
+   "pos_in_parent": [
+    -3.390682,
+    1e-06,
+    23.146388
+   ],
+   "pri_axis_in_parent": [
+    -0.173648,
+    1e-05,
+    0.984808
+   ],
+   "sec_axis_in_parent": [
+    2.2e-05,
+    1.0,
+    -6e-06
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Limited",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 10.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "rear_caster_motor_dampener_pivot",
+   "child": "rear_caster_motor_dampener_pivot",
+   "parent": "rear_caster_arm_mount",
+   "pos_in_parent": [
+    -3.175002,
+    -0.2443,
+    7.300003
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    -0.0
+   ],
+   "sec_axis_in_parent": [
+    -0.0,
+    1.0,
+    -0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Free",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "rear_caster_dampener",
+   "child": "rear_caster_dampener",
+   "parent": "rear_caster_motor_dampener_pivot",
+   "pos_in_parent": [
+    -7.111996,
+    0.247737,
+    -1.2e-05
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    -0.0
+   ],
+   "sec_axis_in_parent": [
+    -0.0,
+    1.0,
+    -0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Free",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "rear_caster_dampener_rod",
+   "child": "rear_caster_dampener_rod",
+   "parent": "rear_caster_dampener",
+   "pos_in_parent": [
+    -6e-06,
+    -0.0,
+    -12.100005
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "sec_axis_in_parent": [
+    0.0,
+    1.0,
+    0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Limited",
+    "limit_cm": 5.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "rear_caster_suspension_arm",
+   "child": "rear_caster_suspension_arm",
+   "parent": "rear_caster_arm_mount",
+   "pos_in_parent": [
+    -0.634992,
+    -3.254376,
+    17.145005
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    -0.0
+   ],
+   "sec_axis_in_parent": [
+    -0.0,
+    1.0,
+    -0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Free",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "rear_caster_swing_arm",
+   "child": "rear_caster_swing_arm",
+   "parent": "rear_caster_arm_mount",
+   "pos_in_parent": [
+    -3.17499,
+    -1e-06,
+    -12.700003
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    -0.0
+   ],
+   "sec_axis_in_parent": [
+    -0.0,
+    1.0,
+    -0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Limited",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "rear_casteer_wheel_l",
+   "child": "rear_casteer_wheel_l",
+   "parent": "rear_caster_swing_arm",
+   "pos_in_parent": [
+    -20.954996,
+    -8.426455,
+    1.270004
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    -0.0
+   ],
+   "sec_axis_in_parent": [
+    -0.0,
+    1.0,
+    -0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Free",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "rear_caster_wheel_r",
+   "child": "rear_caster_wheel_r",
+   "parent": "rear_caster_swing_arm",
+   "pos_in_parent": [
+    -20.954996,
+    8.426448,
+    1.269999
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    -0.0
+   ],
+   "sec_axis_in_parent": [
+    -0.0,
+    1.0,
+    -0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Free",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "UserConstraint",
+   "child": "front_caster_linkage_arm",
+   "parent": "front_caster_linkage_aux",
+   "pos_in_parent": [
+    5.413132,
+    0.279923,
+    2.010709
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "sec_axis_in_parent": [
+    -0.0,
+    1.0,
+    0.0
+   ],
+   "pos_in_child": [
+    4.105181,
+    0.0,
+    -10.289726
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Free",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "UserConstraint_0",
+   "child": "front_caster_linkage_aux_arm",
+   "parent": "front_caster_swing_arm",
+   "pos_in_parent": [
+    7.112004,
+    -0.159374,
+    -0.247744
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "sec_axis_in_parent": [
+    -0.0,
+    1.0,
+    0.0
+   ],
+   "pos_in_child": [
+    -1e-06,
+    -0.0,
+    -20.247743
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Free",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "UserConstraint_1",
+   "child": "front_caster_motor_rod",
+   "parent": "front_caster_linkage",
+   "pos_in_parent": [
+    -6.015919,
+    3.254379,
+    -2.980853
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    -0.0
+   ],
+   "sec_axis_in_parent": [
+    -0.0,
+    1.0,
+    -0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Free",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "UserConstraint_2",
+   "child": "rear_caster_aux_linkage",
+   "parent": "rear_caster_motor_dampener_pivot",
+   "pos_in_parent": [
+    -5.706081,
+    -0.073201,
+    2.389034
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "sec_axis_in_parent": [
+    0.0,
+    1.0,
+    0.0
+   ],
+   "pos_in_child": [
+    -4.659942,
+    -0.0,
+    -10.291945
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Free",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "UserConstraint_3",
+   "child": "rear_caster_dampener_rod",
+   "parent": "rear_caster_swing_arm",
+   "pos_in_parent": [
+    -7.112014,
+    0.003438,
+    -0.011708
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "sec_axis_in_parent": [
+    -0.0,
+    1.0,
+    0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    -7.911697
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Free",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "UserConstraint_4",
+   "child": "rear_caster_motor_rod",
+   "parent": "rear_caster_suspension_arm",
+   "pos_in_parent": [
+    5.807546,
+    -3.254374,
+    -3.57056
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    -0.0
+   ],
+   "sec_axis_in_parent": [
+    -0.0,
+    1.0,
+    -0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Free",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "UserConstraint_5",
+   "child": "motor_elevator_rod_link_l",
+   "parent": "motor_elevator_rod_l",
+   "pos_in_parent": [
+    2.391874,
+    1.269996,
+    0.200894
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "sec_axis_in_parent": [
+    0.0,
+    1.0,
+    0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Free",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "UserConstraint_6",
+   "child": "motor_elevator_rod_link_r",
+   "parent": "motor_elevator_rod_r",
+   "pos_in_parent": [
+    2.391876,
+    -1.269998,
+    0.200894
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "sec_axis_in_parent": [
+    0.0,
+    1.0,
+    0.0
+   ],
+   "pos_in_child": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Free",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": true
+  },
+  {
+   "name": "UserConstraint_7",
+   "child": "elevator_dampener_link_r",
+   "parent": "elevator_dampener_rod_r",
+   "pos_in_parent": [
+    6.983408,
+    1.640198,
+    2.740322
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    -0.0,
+    0.0
+   ],
+   "sec_axis_in_parent": [
+    0.0,
+    1.0,
+    0.0
+   ],
+   "pos_in_child": [
+    -0.0,
+    0.0,
+    4.781161
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Free",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": false
+  },
+  {
+   "name": "UserConstraint_8",
+   "child": "motor_elevator_pivot_r",
+   "parent": "elevator_dampener_aux_link_r",
+   "pos_in_parent": [
+    1.978217,
+    -0.700001,
+    0.846979
+   ],
+   "pri_axis_in_parent": [
+    1.0,
+    -0.0,
+    0.0
+   ],
+   "sec_axis_in_parent": [
+    0.0,
+    1.0,
+    0.0
+   ],
+   "pos_in_child": [
+    -0.0,
+    0.0,
+    -3.510351
+   ],
+   "linear": {
+    "x": "Locked",
+    "y": "Locked",
+    "z": "Locked",
+    "limit_cm": 0.0
+   },
+   "swing1": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "swing2": {
+    "motion": "Free",
+    "limit_deg": 45.0
+   },
+   "twist": {
+    "motion": "Locked",
+    "limit_deg": 45.0
+   },
+   "disable_collision": false
+  }
+ ]
+}
