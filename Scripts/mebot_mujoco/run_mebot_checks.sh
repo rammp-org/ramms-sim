@@ -11,7 +11,7 @@ op(){ if ! "$PY" Scripts/editor_remote_exec.py --code "unreal._ramms_mebot_op='$
       "$PY" Scripts/editor_remote_exec.py --file "$S/mebot_op.py" 2>&1 | grep -E "\[mebot\]|Error\]" | sed 's/^\[Info\] //; s/^\[Error\] //'
       local st=${PIPESTATUS[0]}; if [ "$st" -ne 0 ]; then echo "!! $* failed"; FAIL=1; fi; return "$st"; }
 cleanup(){ op end; sleep 3; }
-trap cleanup EXIT
+trap cleanup EXIT   # early exits; the normal end runs cleanup itself, so its result counts
 
 op begin || exit 1
 sleep 25
@@ -54,5 +54,7 @@ op pad Gamepad_RightTriggerAxis 1.0; sleep 1; op pad_release; sleep 6
 op expect_motor translator_l 4 20
 op state
 
+trap - EXIT
+cleanup
 if [ "$FAIL" -ne 0 ]; then echo "MEBOT CHECKS FAILED"; else echo "all MeBot checks passed"; fi
 exit "$FAIL"

@@ -84,9 +84,11 @@ class Sim:
             self.d.ctrl[self.act[k]] = self.cmd[k]
         for s in ("l", "r"):
             e = self.wheel_goal[s] - self.d.joint("drive_wheel_" + s).qvel[0]
-            self.integ[s] = max(-3.0, min(3.0, self.integ[s] + e * dt))
+            # The integral stops at what the motor can give: past that it winds up, the wheels' speeds part,
+            # and a turn in place drifts along an arc.
             tq = P["drive"]["torque"]
-            self.d.ctrl[self.act["drive_" + s]] = max(-tq, min(tq, 20.0 * e + 40.0 * self.integ[s]))
+            self.integ[s] = max(-tq / 100.0, min(tq / 100.0, self.integ[s] + e * dt))
+            self.d.ctrl[self.act["drive_" + s]] = max(-tq, min(tq, 60.0 * e + 100.0 * self.integ[s]))
         if "front_omni_l" in self.act:         # the powered-front variant's hub motors
             for s in ("l", "r"):
                 if self.front_goal is None:
@@ -187,11 +189,14 @@ def check_scene(scene):
     _, _, yaw = s.pitch_roll_yaw()
     check("drive wheels + drive forward, straight", dx > 0.4 and abs(yaw - yaw0) < 5, "%+.2f m, yaw %+.1f deg" % (dx, yaw - yaw0))
 
+    # In place: about the drive axle's midpoint (the chassis origin is aft of it and circles in a correct turn).
+    axle0 = (s.body("drive_wheel_l") + s.body("drive_wheel_r"))[:2] / 2
     s.run(seconds=2.0, wheels=(-2.0, 2.0))
     s.run(seconds=1.0, wheels=(0.0, 0.0))
     _, _, yaw2 = s.pitch_roll_yaw()
     dyaw = (yaw2 - yaw + 180) % 360 - 180
-    check("left -, right + turns left in place", dyaw > 30, "yaw %+.0f deg" % dyaw)
+    drift = float(((s.body("drive_wheel_l") + s.body("drive_wheel_r"))[:2] / 2 - axle0) @ ((s.body("drive_wheel_l") + s.body("drive_wheel_r"))[:2] / 2 - axle0)) ** 0.5
+    check("left -, right + turns left in place", dyaw > 30 and drift < 0.06, "yaw %+.0f deg, drive axle midpoint moved %.1f cm" % (dyaw, drift * 100))
 
     if "front_omni_l" in s.act:
         s.run(goals={"elevator_l": deg(-15), "elevator_r": deg(-15)})
