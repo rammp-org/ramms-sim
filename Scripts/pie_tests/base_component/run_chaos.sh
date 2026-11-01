@@ -68,9 +68,16 @@ ci pad_axis Gamepad_LeftY 0.6; sleep 0.5; ci expect drive.forward 0.54 0.58; ci 
 ci pad_axis Gamepad_LeftY 0 Gamepad_LeftX 0.5; sleep 0.5; ci expect drive.turn 0.42 0.46; ci expect drive.forward -0.01 0.01
 # The drive stick's twist turns only where its X does not: nothing on this differential drive.
 ci pad_axis Gamepad_LeftX 0 Gamepad_RightX 0.8; sleep 0.5; ci expect drive.turn -0.01 0.01; ci pad_axis Gamepad_RightX 0
-ci pad_axis Gamepad_RightY 1.0; sleep 1.0; ci pad_axis Gamepad_RightY 0; sleep 1.5; ci expect lift.motor_swing_arm_l 15 45
-ci pad_axis Gamepad_RightTriggerAxis 1.0; sleep 1.0; ci pad_axis Gamepad_RightTriggerAxis 0; sleep 1.5; ci expect lift.dw_main_plate_l 4 16
-ci pad_key Gamepad_RightShoulder down; sleep 1.0; ci pad_key Gamepad_RightShoulder up; sleep 1.5; ci expect lift.front_caster_swing_arm 15 45
+# A held key and the stick on the same controls combine: W's forward is not overwritten by the stick's 0.
+ci pad_key W down; ci pad_axis Gamepad_LeftX 0.5; sleep 0.5; ci expect drive.forward 0.99 1.01; ci expect drive.turn 0.42 0.46
+ci pad_axis Gamepad_LeftX 0; sleep 0.5; ci expect drive.forward 0.99 1.01; ci expect drive.turn -0.01 0.01; ci pad_key W up; sleep 0.5
+# The lift groups, held for a fixed stretch of game time (the editor lets go, so the round trips add nothing),
+# each lift's change since its mark (an earlier section may have left it anywhere): 30 deg/s and 10 cm/s. The
+# elevators start near the top of their range (the injection above raised them), so down 0.5 s, then up.
+ci mark lift.motor_swing_arm_l; ci pad_hold 0.5 Gamepad_RightY -1.0; sleep 2.5; ci expect_change lift.motor_swing_arm_l -20 -10
+ci mark lift.motor_swing_arm_l; ci pad_hold 0.5 Gamepad_RightY 1.0; sleep 2.5; ci expect_change lift.motor_swing_arm_l 10 20
+ci mark lift.dw_main_plate_l; ci pad_hold 1.0 Gamepad_RightTriggerAxis 1.0; sleep 3; ci expect_change lift.dw_main_plate_l 6 14
+ci mark lift.front_caster_swing_arm; ci pad_hold 1.0 Gamepad_RightShoulder 1; sleep 3; ci expect_change lift.front_caster_swing_arm 20 40
 ci pad_release
 f "$S/chaos_reset_pose.py"; sleep 2
 echo "--- control HUD (ramms-ui panel + joystick, auto-spawned) ---"
