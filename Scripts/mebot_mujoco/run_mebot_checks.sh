@@ -1,7 +1,7 @@
 #!/bin/bash
 # PIE checks of the MeBot MuJoCo pawn on Map_MebotCurb_URL: it stands, drives, turns, every lift
-# moves to its commanded position in its own units, and the gamepad drives it through the chair's
-# input map. Needs a running editor (Scripts/editor_remote_exec.py). PYTHON overrides the interpreter.
+# moves to its commanded position in its own units, the gamepad drives it through the chair's
+# input map, and the arm on its seat answers arm.* / gripper.* while the base still drives. Needs a running editor (Scripts/editor_remote_exec.py). PYTHON overrides the interpreter.
 # Exit status: nonzero if any check failed (PIE is still ended).
 S=$(cd "$(dirname "$0")" && pwd); ROOT=$(cd "$S/../.." && pwd); cd "$ROOT" || exit 1
 PY=${PYTHON:-python3}
@@ -53,6 +53,16 @@ op expect_motor elevator_l 0.08 0.30
 op pad Gamepad_RightTriggerAxis 1.0; sleep 1; op pad_release; sleep 6
 op expect_motor translator_l 4 20
 op state
+
+# arm.up moves the gripper along its own up (the teleop's local frame), which the stowed arm holds sideways: the
+# check is that it moves. Then the base still drives (backwards: the curb is ahead) with the arm's IK running.
+echo "--- arm (in the MJCF, on the seat): arm.up moves the gripper, gripper.close closes it; the base keeps its commands ---"
+op mark_body arm_bracelet_link; op set arm.up 1; sleep 1.5; op release arm.up; sleep 1
+op expect_body_moved arm_bracelet_link 5 60
+op trigger gripper.close; sleep 1.5
+op expect_control gripper.closed 0.9 1.1
+op mark; op set drive.forward -0.5; sleep 2; op release drive.forward; sleep 1.5
+op expect_moved x -250 -40
 
 trap - EXIT
 cleanup

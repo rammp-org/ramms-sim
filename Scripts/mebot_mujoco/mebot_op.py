@@ -18,6 +18,9 @@
   expect_yaw <lo> <hi>       the heading changed by lo..hi degrees since mark (positive: clockwise from above)
   expect_motor <id> <lo> <hi>      a motor's value (rad or cm) is in lo..hi
   expect_level <deg>         |pitch| and |roll| are under deg
+  expect_control <id> <lo> <hi>    a control-surface value (e.g. gripper.closed) is in lo..hi
+  mark_body <body>           remember where an MJCF body is (for expect_body_moved)
+  expect_body_moved <body> <lo> <hi>  the body moved lo..hi cm (any direction) since mark_body
 """
 import math
 
@@ -168,5 +171,29 @@ else:
         log("pitch %+.1f roll %+.1f (expect under %g) -> %s" % (rot.pitch, rot.roll, lim, "ok" if ok else "FAIL"))
         if not ok:
             raise RuntimeError("pitch %.1f / roll %.1f over %g deg" % (rot.pitch, rot.roll, lim))
+    elif op[0] == "expect_control":
+        v = cs.get_control_value(op[1])
+        lo, hi = float(op[2]), float(op[3])
+        log("%s = %+.3f (expect %g..%g) -> %s" % (op[1], v, lo, hi, "ok" if lo <= v <= hi else "FAIL"))
+        if not lo <= v <= hi:
+            raise RuntimeError("%s = %.3f, outside %g..%g" % (op[1], v, lo, hi))
+    elif op[0] in ("mark_body", "expect_body_moved"):
+        body = next((c for c in pawn.get_components_by_class(unreal.SceneComponent) if c.get_name() == op[1]), None)
+        if body is None:
+            raise RuntimeError("%s has no body %s" % (pawn.get_name(), op[1]))
+        p = body.get_world_location()
+        if op[0] == "mark_body":
+            unreal._ramms_mebot_body_mark = (op[1], (p.x, p.y, p.z))
+            log("mark %s at (%.1f, %.1f, %.1f)" % (op[1], p.x, p.y, p.z))
+        else:
+            name, p0 = getattr(unreal, "_ramms_mebot_body_mark", (None, (0.0, 0.0, 0.0)))
+            if name != op[1]:
+                raise RuntimeError("no mark on %s (mark_body it first)" % op[1])
+            dist = math.sqrt((p.x - p0[0]) ** 2 + (p.y - p0[1]) ** 2 + (p.z - p0[2]) ** 2)
+            lo, hi = float(op[2]), float(op[3])
+            log("%s moved %.1f cm (%+.1f, %+.1f, %+.1f) (expect %g..%g) -> %s" % (op[1], dist, p.x - p0[0], p.y - p0[1], p.z - p0[2], lo, hi,
+                                                                       "ok" if lo <= dist <= hi else "FAIL"))
+            if not lo <= dist <= hi:
+                raise RuntimeError("%s moved %.1f cm, outside %g..%g" % (op[1], dist, lo, hi))
     else:
         raise RuntimeError("unknown op %s" % op[0])

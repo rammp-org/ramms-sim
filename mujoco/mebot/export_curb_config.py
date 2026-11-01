@@ -36,7 +36,7 @@ def main():
     args = ap.parse_args()
     cx = S.Crossing(args.variant, "up", 0.15, 0.03)   # the tables do not depend on the curb
     m, d = cx.m, mujoco.MjData(cx.m)
-    mujoco.mj_forward(m, d)
+    S.B.hold_arm_stowed(m, d)                         # the mass model has the arm stowed
 
     def table(key):
         qs, bs = cx.tables[key]

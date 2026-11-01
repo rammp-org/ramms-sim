@@ -13,6 +13,11 @@ articulation gets the RAMMS wiring the chair pawn (BP_Mebot_Ramms) has, driving 
   CurbController     URammsMebotCurbController: the curb crossing (curb.negotiate / curb.abort / curb.phase),
                      configured from mujoco/mebot/curb_config_powered_front.json (export_curb_config.py)
   DriveModeSelector  the differential drive and the curb crossing as drive modes, differential first
+  On the seat body   the chair's seat, rails, arm mount and camera mounts and cameras (meshes, where BP_Mebot_Ramms
+                     carries them), and RammsSeat: its seated occupant, with the chair's settings copied
+  ArmIK, ArmTeleop   the Gen3 arm in the MJCF: URammsMjEndEffectorController (only the arm's joints; home = the MJCF's
+                     arm_stow) and URammsMjArmTeleopComponent (arm.* / gripper.* on the control surface), with the
+                     settings of the standalone arm (gen3_2f85_fixed) copied
 
 The powered front omni wheels are left to the control surface as raw motors (motor.front_omni_*):
 nothing drives them in normal driving, so they freewheel. Everything geometric (ranges, the wheel
@@ -49,6 +54,32 @@ TOP_TURN_DEG_S = 70.0
 ANGULAR = [("motor_swing_arm_l", "elevator_l", "elevator_speed_deg_s"), ("motor_swing_arm_r", "elevator_r", "elevator_speed_deg_s"),
            ("front_caster_swing_arm", "front_arm", "caster_arm_speed_deg_s"), ("rear_caster_swing_arm", "rear_lift", "rear_lift_speed_deg_s")]
 LINEAR = [("dw_main_plate_l", "translator_l", "translator_speed_cm_s"), ("dw_main_plate_r", "translator_r", "translator_speed_cm_s")]
+# The seat's parts on the MJCF's seat body (its frame is the seat_base socket's), where BP_Mebot_Ramms carries them on its
+# mesh: (component, static mesh, location cm, rotation (pitch, yaw, roll) deg), from the socket. Decoration: no collision.
+SEAT_PARTS = [
+    ("Seat", "/RammsAssets/Robots/RAMMP/Seat/rammp_seat", (0.0, 0.0, 0.0), (0.0, 0.0, 0.0)),
+    ("rail_l", "/RammsAssets/Robots/RAMMP/Mounts/rammp_mount_rail", (2.0, -26.5, 8.5), (0.0, 0.0, 0.0)),
+    ("rail_r", "/RammsAssets/Robots/RAMMP/Mounts/rammp_mount_rail", (2.0, 26.5, 8.5), (0.0, 0.0, 0.0)),
+    ("mount_arm", "/RammsAssets/Robots/RAMMP/Mounts/rammp_mount_arm", (16.0, 26.5, 10.5), (0.0, 0.0, 0.0)),
+    ("mount_luci_l", "/RammsAssets/Robots/RAMMP/Mounts/rammp_mount_luci", (18.0, -26.5, 7.0), (0.0, 180.0, 0.0)),
+    ("mount_luci_r", "/RammsAssets/Robots/RAMMP/Mounts/rammp_mount_luci", (18.0, 26.5, 7.0), (0.0, 0.0, 0.0)),
+    ("SM_LUCI_FL", "/RammsAssets/Sensors/LUCI/SM_LUCI_FL_F", (19.0, -21.0, 1.0), (0.0, 180.0, -90.0)),
+    ("SM_LUCI_FR", "/RammsAssets/Sensors/LUCI/SM_LUCI_FR_F", (19.0, 21.0, 1.0), (0.0, -180.0, -90.0)),
+    ("SM_Gemini_FL", "/RammsAssets/Sensors/Gemini_336L/SM_Orbbec_Gemini_336L", (21.5, -26.5, 8.5), (0.0, 0.0, 90.0)),
+    ("SM_Gemini_FR", "/RammsAssets/Sensors/Gemini_336L/SM_Orbbec_Gemini_336L", (21.5, 26.5, 8.5), (0.0, 0.0, -90.0)),
+]
+# Settings copied from elsewhere, so the two cannot drift apart: the seated occupant from the chair, the arm's IK and
+# teleop from the standalone arm.
+CHAIR = "/Game/Robots/BP_Mebot_Ramms"
+ARM = "/Game/Robots/URL/gen3_2f85_fixed"
+SEAT_SETTINGS = ["spawn_on_begin_play", "occupant_mode", "occupant_actor_class", "randomize_appearance", "occupant_mesh",
+                 "occupant_offset", "pose_bone_offsets", "align_pelvis", "pelvis_location", "body_adjustments", "left_hand",
+                 "right_hand", "left_foot", "right_foot", "passive_sway", "sway_amount", "trunk_control", "voluntary_motion",
+                 "voluntary_amount", "look_where_going", "look_at_people"]
+IK_SETTINGS = ["end_effector_site_name", "gripper_actuator_suffix", "damping_lambda", "step_gain", "control_orientation",
+               "apply_home_on_bind", "track_base_frame", "enabled"]
+TELEOP_SETTINGS = ["teleop_enabled", "enable_key_polling", "local_frame", "linear_speed", "angular_speed", "fast_multiplier",
+                   "slow_multiplier", "forward_sign", "strafe_sign", "up_sign", "yaw_sign", "pitch_sign", "roll_sign"]
 
 EAL = unreal.EditorAssetLibrary
 AT = unreal.AssetToolsHelpers.get_asset_tools()
@@ -70,6 +101,10 @@ def log(s):
 xml = open(os.path.join(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_dir()), MJCF_REL), encoding="utf-8").read()
 joints = {m.group(1): m.group(0) for m in re.finditer(r'<joint name="([^"]+)"[^>]*>', xml)}
 numeric = {m.group(1): float(m.group(2)) for m in re.finditer(r'<numeric name="([^"]+)" data="([-\d.e]+)"/>', xml)}
+arm_stow = re.search(r'<numeric name="arm_stow" data="([^"]+)"/>', xml)
+if not arm_stow:
+    raise RuntimeError("%s has no arm (numeric arm_stow): build it without --no-arm" % MJCF_REL)
+arm_stow = [float(v) for v in arm_stow.group(1).split()]
 
 
 def joint_attr(joint, attr, default=""):
@@ -153,6 +188,23 @@ def setp(o, **props):
         o.set_editor_property(k, v)
 
 
+def template(path, cls):
+    """The component of class cls in the Blueprint at path (its template: what an instance starts with)."""
+    other = EAL.load_asset(path)
+    if not other:
+        raise RuntimeError("missing %s" % path)
+    for h in handles(other):
+        o = SDL.get_object_for_blueprint(SDS.k2_find_subobject_data_from_handle(h), other)
+        if o and isinstance(o, cls):
+            return o
+    raise RuntimeError("%s has no %s" % (path, cls.__name__))
+
+
+def copy_settings(dst, src, names):
+    for n in names:
+        dst.set_editor_property(n, src.get_editor_property(n))
+
+
 pawn_path = PAWN_DIR + "/" + PAWN_NAME
 if EAL.does_asset_exist(pawn_path):
     bp = EAL.load_asset(pawn_path)
@@ -208,6 +260,24 @@ setp(top, target_arm_length=550.0, relative_rotation=unreal.Rotator(roll=0.0, pi
      use_pawn_control_rotation=False, inherit_pitch=False, inherit_roll=False, inherit_yaw=False)
 setp(add_component(bp, unreal.CameraComponent, "TopCamera", parent_var="TopArm"), auto_activate=False)
 
+# The seat's parts and its occupant on the seat body; the arm's IK and teleop (the arm itself is in the MJCF).
+for name, mesh, loc, rot in SEAT_PARTS:
+    part = add_component(bp, unreal.StaticMeshComponent, name, parent_var="seat")
+    setp(part, static_mesh=EAL.load_asset(mesh), relative_location=unreal.Vector(*loc),
+         relative_rotation=unreal.Rotator(pitch=rot[0], yaw=rot[1], roll=rot[2]), mobility=unreal.ComponentMobility.MOVABLE)
+    part.set_collision_profile_name("NoCollision")
+    part.set_editor_property("generate_overlap_events", False)
+occupant = add_component(bp, unreal.RammsSeatComponent, "RammsSeat", parent_var="seat")
+copy_settings(occupant, template(CHAIR, unreal.RammsSeatComponent), SEAT_SETTINGS)
+# On the seat body's origin, the socket, as on the chair. Set, not left: URLab re-parents a component added under a
+# body keeping where it was, so it would sit the body's offset back and down.
+setp(occupant, relative_location=unreal.Vector(0.0, 0.0, 0.0), relative_rotation=unreal.Rotator(pitch=0.0, yaw=0.0, roll=0.0))
+ik = add_component(bp, unreal.RammsMjEndEffectorController, "ArmIK")
+copy_settings(ik, template(ARM, unreal.RammsMjEndEffectorController), IK_SETTINGS)
+# Mounted on the chassis, not on a mocap target: no tracking base; the target rides the chassis (track_base_frame).
+setp(ik, home_arm_angles=arm_stow, base_target_body_name="", smooth_base_target=False)
+copy_settings(add_component(bp, unreal.RammsMjArmTeleopComponent, "ArmTeleop"), template(ARM, unreal.RammsMjArmTeleopComponent), TELEOP_SETTINGS)
+
 # The curb crossing, configured from the model (export_curb_config.py), and the drive modes it switches between.
 with open(os.path.join(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_dir()), CURB_CONFIG_REL), encoding="utf-8") as fh:
     curb_fields = json.load(fh)["config"]
@@ -240,3 +310,4 @@ log("curb controller: %d / %d / %d table points, rear lift up to %.1f cm" % tupl
     + [max(curb_fields["rear_table"]["height_cm"])]))
 log("saved %s: wheel radius %.1f cm, lifts %s" % (pawn_path, numeric["drive_wheel_radius"] * 100.0,
     ", ".join("%s->%s %g" % (c, m, numeric[s]) for c, m, s in ANGULAR + LINEAR)))
+log("seat: %d parts and RammsSeat on the seat body; arm stowed at %s rad" % (len(SEAT_PARTS), " ".join("%.3f" % q for q in arm_stow)))
