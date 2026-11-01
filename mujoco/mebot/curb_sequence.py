@@ -4,12 +4,15 @@
     python mujoco/mebot/curb_sequence.py [--variant standard|powered_front] [--dir up|down] [--height 0.15]
                                          [--clip out.mp4 [--speedup 8]]
 
-The chassis stays level throughout and rides just under curb height (raised for a climb, lowered for a descent),
-so its frame clears the curb edge. Each support -- front omni wheels, drive wheels, rear omni wheels -- is lifted
-over the edge and set down in turn, and every touchdown lowers until the pair carries load (as a load or
-motor-current reading would tell the controller). The rule: the rear omni wheels are not lifted until both drive
-wheels are on the far level, translated aft and carrying load, with the centre of mass ahead of their axle; the
-run aborts if that does not hold.
+The chassis stays level and rides just under curb height (raised for a climb, lowered for a descent), so its
+frame clears the curb edge: the height is picked from where every support reaches the road and, lifted, clears
+the upper level (the run aborts at once if none works). Each support -- front omni wheels, drive wheels, rear
+omni wheels -- is lifted over the edge and set down in turn, and every touchdown lowers from the wheels' measured
+height until the pair carries load (as a load or motor-current reading would tell the controller). The rear is
+sprung, so it sags as it takes load: while its wheels are down, its lift is trimmed against the chassis's pitch.
+The rule: the rear omni wheels are not lifted until both drive wheels are on the far level, translated aft and
+carrying load, with the centre of mass ahead of their axle; the run aborts if that does not hold. On a descent
+the chassis comes down on the drive and front wheels before the rear is set down, as the rear reaches least.
 
 standard       with the drive wheels up, the translators carry them forward over the edge; set down, they are
                translated aft braked, which pulls the chassis forward over them.
@@ -33,8 +36,8 @@ import build_mebot_mjcf as B  # noqa: E402
 
 P = B.PARAMS
 FACE = 1.5            # the curb face's x (m); up: the upper level ahead, down: the robot starts on it
-LIFTS = ("elevator_l", "elevator_r", "translator_l", "translator_r", "front_arm", "rear_arm")
-TOUCH = {"drive": ("drive_wheel_l", "drive_wheel_r"), "front_arm": ("front_omni_l", "front_omni_r"), "rear_arm": ("rear_omni_l", "rear_omni_r")}
+LIFTS = ("elevator_l", "elevator_r", "translator_l", "translator_r", "front_arm", "rear_lift")
+TOUCH = {"drive": ("drive_wheel_l", "drive_wheel_r"), "front_arm": ("front_omni_l", "front_omni_r"), "rear_lift": ("rear_omni_l", "rear_omni_r")}
 AFT = -0.30           # the translators' aft position for the rear lift (m)
 LOADED = 0.10         # the rule: each drive wheel carries this share of the weight before the rear lift
 LAND = 0.12           # descents: the lifted drive wheels' centres this far past their radius beyond the edge (m), so the
@@ -61,7 +64,7 @@ class Crossing:
         self.r_ro = m.numeric("rear_omni_radius").data[0]
         deg = math.radians
         self.RATE = {"elevator_l": deg(P["elevator"]["speed_deg_s"]), "elevator_r": deg(P["elevator"]["speed_deg_s"]),
-                     "front_arm": deg(P["caster_arm"]["speed_deg_s"]), "rear_arm": deg(P["caster_arm"]["speed_deg_s"]),
+                     "front_arm": deg(P["caster_arm"]["speed_deg_s"]), "rear_lift": deg(P["rear_lift"]["speed_deg_s"]),
                      "translator_l": P["translator"]["speed_cm_s"] / 100, "translator_r": P["translator"]["speed_cm_s"] / 100}
         self.cmd = {k: 0.0 for k in LIFTS}
         self.goal = dict(self.cmd)
@@ -77,19 +80,27 @@ class Crossing:
                     self.support[b] = s
         self.weight = m.body_subtreemass[m.body("chassis").id] * 9.81
         self.tables = self.support_tables()
+        d0 = mujoco.MjData(m)
+        mujoco.mj_forward(m, d0)
+        floor = min(d0.body(b).xpos[2] - r for b, r in (("drive_wheel_l", self.r_dw), ("front_omni_l", self.r_fo), ("rear_omni_l", self.r_ro)))
+        self.belly = min(d0.geom_xpos[g][2] - m.geom_size[g][2] for g in range(m.ngeom)
+                         if m.geom_bodyid[g] == m.body("chassis").id and m.geom_type[g] == mujoco.mjtGeom.mjGEOM_BOX and m.geom_contype[g]) - floor
         self.log, self.strikes = [], []
         self.label = ""
         self.worst = [0.0, 0.0]
         self.on_frame = None
         self.watch_rear = False                # while the chassis is pulled forward: the rear omni wheels must stay clear
+        self.level = True                      # trim the sprung rear's lift to keep the chassis level (off while it is lifted)
+        self.trim = 0.0
 
     # --- model geometry
     def support_tables(self):
-        """b(q): how far each support's bottom rises (m, chassis level) as its joint turns, from the kinematics."""
+        """b(q): how far each support's bottom rises (m, chassis level) from the reference pose as its joint turns:
+        the drive wheels and front omni wheels from the kinematics; the sprung rear through its linkage, unloaded."""
         m, d0 = self.m, mujoco.MjData(self.m)
         mujoco.mj_forward(m, d0)
-        out = {}
-        for joint, body, r in (("elevator_l", "drive_wheel_l", self.r_dw), ("front_arm", "front_omni_l", self.r_fo), ("rear_arm", "rear_omni_l", self.r_ro)):
+        out = {"rear_lift": self.rear_table()}
+        for joint, body, r in (("elevator_l", "drive_wheel_l", self.r_dw), ("front_arm", "front_omni_l", self.r_fo)):
             adr = m.jnt_qposadr[m.joint(joint).id]
             dd = mujoco.MjData(m)
             qs = np.radians(np.arange(-45, 45.01, 0.25))
@@ -101,6 +112,46 @@ class Crossing:
                 bs.append(dd.body(body).xpos[2] - r)
             out[joint] = (qs, np.array(bs[:-1]) - bs[-1])
         return out
+
+    def rear_table(self):
+        """The rear lift's b(q), unloaded: a copy of the robot with its chassis held, no gravity and no contacts,
+        its rear lift stepped across its range and the linkage and damper left to settle at each step."""
+        spec = mujoco.MjSpec.from_file(os.path.join(HERE, "mebot_powered_front_scene.xml" if self.powered else "mebot_scene.xml"))
+        spec.delete(spec.joint("root"))
+        m = spec.compile()
+        m.opt.gravity[:] = 0
+        m.opt.disableflags |= mujoco.mjtDisableBit.mjDSBL_CONTACT
+        d = mujoco.MjData(m)
+        mujoco.mj_kinematics(m, d)
+        ref_bottom = d.body("rear_omni_l").xpos[2] - self.r_ro     # at the reference pose
+        act = m.actuator("rear_lift").id
+        lo, hi = m.actuator_ctrlrange[act]
+        qs, bs = [], []
+        for i, q in enumerate(list(np.linspace(0.0, lo, 21)) + list(np.linspace(lo, hi, 61))):
+            d.ctrl[act] = q                      # out from the reference pose, then across, a step at a time
+            for _ in range(150):
+                mujoco.mj_step(m, d)
+            if i >= 21:
+                qs.append(d.joint("rear_lift").qpos[0])
+                bs.append(d.body("rear_omni_l").xpos[2] - self.r_ro - ref_bottom)
+        return np.array(qs), np.array(bs)
+
+    def crossing_height(self):
+        """The chassis's height above the road (m, from its reference pose) for the crossing, from the heights at
+        which every support reaches the road and, lifted, clears the upper level by the clearance, and the frame
+        clears the upper level by 2 cm: a quarter of the way up that band, since its top is what the sprung rear's
+        sag and the touchdowns eat into."""
+        lo = self.h + 0.02 - self.belly
+        hi = 1.0
+        for support, (_, bs) in self.tables.items():
+            hi = min(hi, -bs.min())                  # reaches the road
+            lo = max(lo, self.h + self.clr - bs.max())  # lifted, clears the upper level
+        if lo > hi:
+            raise RuntimeError("no crossing height works for a %.0f cm curb: the frame and the lifts need %.3f m, the "
+                               "supports reach the road only from %.3f m" % (self.h * 100, lo, hi))
+        H = lo + 0.25 * (hi - lo)
+        self.log.append("        crossing height %.3f m (works from %.3f to %.3f)" % (H, lo, hi))
+        return H
 
     def q_for(self, support, b):
         qs, bs = self.tables["elevator_l" if support == "drive" else support]
@@ -147,13 +198,17 @@ class Crossing:
     # --- control
     def step(self):
         m, d, dt = self.m, self.d, self.m.opt.timestep
+        if self.level:                         # the rear sags as it takes load: trim its lift against the chassis's pitch
+            lo, hi = m.actuator_ctrlrange[self.A["rear_lift"]]
+            self.trim -= 2.0 * math.radians(self.pitch_roll()[0]) * dt
+            self.trim = max(lo - self.cmd["rear_lift"], min(hi - self.cmd["rear_lift"], self.trim))
         for k in LIFTS:
             err = self.goal[k] - self.cmd[k]
             self.cmd[k] += max(-self.rate[k] * dt, min(self.rate[k] * dt, err))
             q = d.joint(k).qpos[0]
             lim = 0.03 if k.startswith("translator") else math.radians(10)
             self.integ[k] = max(-lim, min(lim, self.integ[k] + 2.0 * (self.cmd[k] - q) * dt))   # the servo's integral action
-            d.ctrl[self.A[k]] = self.cmd[k] + self.integ[k]
+            d.ctrl[self.A[k]] = self.cmd[k] + self.integ[k] + (self.trim if k == "rear_lift" else 0.0)
         tq = P["drive"]["torque"]
         for s in ("l", "r"):
             j = d.joint("drive_wheel_" + s)
@@ -240,7 +295,7 @@ class Crossing:
 
     def gap(self, support, level):
         """How far the higher of a support's two wheels is above level (m)."""
-        r = {"drive": self.r_dw, "front_arm": self.r_fo, "rear_arm": self.r_ro}[support]
+        r = {"drive": self.r_dw, "front_arm": self.r_fo, "rear_lift": self.r_ro}[support]
         return max(self.d.body(w).xpos[2] - r for w in TOUCH[support]) - (self.h if level == "curb" else 0.0)
 
     def touch_down(self, support, level, each=0.0, settle=1.0):
@@ -277,6 +332,14 @@ class Crossing:
         if not (on and aft and margin > 0.03):
             raise RuntimeError("rule not met: " + msg)
 
+    def levelling(self, on):
+        """Start or stop the rear's levelling trim; stopping folds the trim into the rear lift's command."""
+        if not on:
+            self.cmd["rear_lift"] += self.trim
+            self.goal["rear_lift"] = self.cmd["rear_lift"]
+            self.trim = 0.0
+        self.level = on
+
     def phase(self, label, fn):
         self.label = label
         t0 = self.d.time
@@ -289,11 +352,11 @@ class Crossing:
     # --- the sequences
     def climb(self):
         h, clr = self.h, self.clr
-        Hc = h - 0.02                          # the chassis's height for the crossing: the frame clears the curb edge
+        Hc = self.crossing_height()
         lift = h + clr - Hc                    # a lifted support clears the curb top by clr
         ph = self.phase
         ph("Settle", lambda: self.wait(1.5))
-        ph("Raise the chassis level for the crossing", lambda: self.move(self.goals_for({"drive": -Hc, "front_arm": -Hc, "rear_arm": -Hc})))
+        ph("Raise the chassis level for the crossing", lambda: self.move(self.goals_for({"drive": -Hc, "front_arm": -Hc, "rear_lift": -Hc})))
         ph("Drive up to the curb", lambda: self.drive_until(lambda: self.x("front_omni_l") + self.r_fo >= FACE - 0.05, speed=0.25))
         ph("Front omni wheels up", lambda: self.move(self.goals_for({"front_arm": lift})))
         ph("Drive until the drive wheels reach the curb", lambda: self.drive_until(lambda: self.x("drive_wheel_l") + self.r_dw >= FACE - 0.03))
@@ -309,19 +372,21 @@ class Crossing:
         if not self.powered:
             ph("Drive wheels aft (braked): pulls the chassis forward", self.pull_aft)
         self.gate_rear("curb")
-        ph("Rear omni wheels up", lambda: self.move(self.goals_for({"rear_arm": lift})))
+        self.levelling(False)
+        ph("Rear omni wheels up", lambda: self.move(self.goals_for({"rear_lift": lift})))
         on = ("drive", "front") if self.powered else ("drive",)
         ph("Drive until the rear omni wheels are over the curb", lambda: self.drive_until(lambda: self.x("rear_omni_l") - self.r_ro >= FACE + 0.03, on=on))
-        ph("Rear omni wheels down on the curb", lambda: self.touch_down("rear_arm", "curb"))
+        ph("Rear omni wheels down on the curb", lambda: self.touch_down("rear_lift", "curb"))
+        self.levelling(True)
         self.finish()
 
     def descend(self):
         h, clr = self.h, self.clr
-        Hc = h - 0.03                          # the chassis's height above the road: the frame clears the upper level
+        Hc = self.crossing_height()
         lift, on_upper = h + clr - Hc, h - Hc  # a lifted support clears the upper level by clr; one on it
         ph = self.phase
         ph("Settle", lambda: self.wait(1.5))
-        ph("Lower the chassis level for the crossing", lambda: self.move(self.goals_for({"drive": on_upper, "front_arm": on_upper, "rear_arm": on_upper})))
+        ph("Lower the chassis level for the crossing", lambda: self.move(self.goals_for({"drive": on_upper, "front_arm": on_upper, "rear_lift": on_upper})))
         ph("Drive up to the edge (front omni wheels over it)", lambda: self.drive_until(lambda: self.x("drive_wheel_l") >= FACE - 0.07))
         ph("Front omni wheels down to the road", lambda: self.touch_down("front_arm", "floor"))
         ph("Drive wheels up", lambda: self.move(self.goals_for({"drive": lift})))
@@ -335,10 +400,17 @@ class Crossing:
         if not self.powered:
             ph("Drive wheels aft (braked): pulls the chassis forward", self.pull_aft)
         self.gate_rear("floor")
-        ph("Rear omni wheels up", lambda: self.move(self.goals_for({"rear_arm": lift})))
+        self.levelling(False)
+        ph("Rear omni wheels up", lambda: self.move(self.goals_for({"rear_lift": lift})))
         on = ("drive", "front") if self.powered else ("drive",)
         ph("Drive until the rear omni wheels are past the edge", lambda: self.drive_until(lambda: self.x("rear_omni_l") - self.r_ro >= FACE + 0.03, on=on))
-        ph("Rear omni wheels down to the road", lambda: self.touch_down("rear_arm", "floor"))
+        # Everything under the frame is over the road now: lower the chassis on the drive and front wheels, so the
+        # sprung rear, which reaches least, has less to reach.
+        drop = Hc / 2
+        ph("Lower the chassis on the drive and front wheels", lambda: self.move(self.goals_for(
+            {"drive": self.b_now("drive") + drop, "front_arm": self.b_now("front_arm") + drop})))
+        ph("Rear omni wheels down to the road", lambda: self.touch_down("rear_lift", "floor"))
+        self.levelling(True)
         ph("Drive clear of the edge", lambda: self.drive_until(lambda: self.x("rear_omni_l") - self.r_ro >= FACE + 0.15, on=on))
         self.finish()
 
@@ -363,9 +435,20 @@ class Crossing:
 
     def finish(self):
         ph = self.phase
-        ph("Drive wheels up a little", lambda: self.move(self.goals_for({"drive": self.b_now("drive") + 0.03})))
-        ph("Translators back to centre", lambda: self.move({"translator_l": 0.0, "translator_r": 0.0}))
+        ph("Translators back to centre, the drive wheels rolling under it", self.recentre)
         ph("Back to the driving pose", lambda: self.move({k: 0.0 for k in LIFTS}, settle=1.5))
+
+    def recentre(self):
+        """Translators back to 0 while the drive wheels roll at the plates' speed, so the chassis stays put."""
+        start = self.cmd["translator_l"]
+
+        def during(done):
+            v = 0.0 if done else math.copysign(self.rate["translator_l"], -start)
+            self.drive["speed"] = v / self.r_dw
+            return True
+        self.move({"translator_l": 0.0, "translator_r": 0.0}, settle=0.0, during=during)
+        self.brake()
+        self.wait(0.8)
 
 
 def clip_writer(path, speedup, cx):
@@ -407,7 +490,9 @@ def clip_writer(path, speedup, cx):
             return "air" if s not in con else "%s %4.0fN" % ("curb" if con[s][0] == "curb" else "road", con[s][1])
         p, r = c.pitch_roll()
         lines = ["elevators %+5.1f deg   translators %+5.1f cm" % (math.degrees(c.d.joint("elevator_l").qpos[0]), c.d.joint("translator_l").qpos[0] * 100),
-                 "front arm %+5.1f deg   rear arm %+5.1f deg" % (math.degrees(c.d.joint("front_arm").qpos[0]), math.degrees(c.d.joint("rear_arm").qpos[0])),
+                 "front arm %+5.1f deg   rear lift %+5.1f deg (arm %+5.1f, damper %4.1f mm)" % (
+                     math.degrees(c.d.joint("front_arm").qpos[0]), math.degrees(c.d.joint("rear_lift").qpos[0]),
+                     math.degrees(c.d.joint("rear_arm").qpos[0]), (c.d.joint("rear_spring").qpos[0] - P["rear_spring"]["travel_cm"][0] / 100) * 1000),
                  "front omni %-10s drive %-10s rear omni %-10s" % (st("front_omni_l"), st("drive_wheel_l"), st("rear_omni_l")),
                  "chassis pitch %+5.1f deg  roll %+5.1f deg   t %5.1f s" % (p, r, c.d.time)]
         dr.rectangle([0, H - 30 * len(lines) - 44, 660, H], fill=(0, 0, 0, 150))

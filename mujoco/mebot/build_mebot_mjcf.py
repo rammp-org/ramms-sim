@@ -20,15 +20,20 @@ The model, in MuJoCo's frame (m; X forward, Y left, Z up; the floor at z = 0 und
         drive_wheel_*  hinge about Y, motor-driven
     front_arm          hinge about Y: one arm carrying both front omni wheels
       front_omni_*     omni wheels: a hub on the axle and two staggered rows of passive barrel rollers
-    rear_arm           the same at the rear
+    rear_arm           the same at the rear, but sprung: it is not driven itself
       rear_omni_*
+    rear_lift          hinge about Y: the rear suspension arm, which the rear actuator turns; through the aux link,
+                       the damper's pivot and the damper (rear_spring, a preloaded spring-damper on its rod) it
+                       pushes the rear arm down
   and passive linkages (LINKAGES) that carry the linear actuators' and links' meshes
 
-Lift joints are driven directly (position actuators at the joints). The linear actuators and their links are
-passive bodies that follow those joints through loop closures (the physics asset's user constraints), so the
-meshes move as the robot does; they carry no load. Signs: a positive elevator / arm angle puts its wheels down,
-raising the chassis; a positive translator moves its drive wheel forward; drive wheels and the powered front
-omni wheels are torque motors, positive forward.
+Lift joints are driven directly (position actuators at the joints, the rear one at the suspension arm). The
+linear actuators and their links are passive bodies that follow those joints through loop closures (the
+physics asset's user constraints), so the meshes move as the robot does; apart from the rear chain they carry no
+load. The rear aux link hangs on the suspension arm (the physics asset's constraint; its skeleton bone is
+parented to the frame), which is what makes the rear chain drive the rear arm. Signs: a positive
+elevator / arm / rear-lift angle puts its wheels down, raising the chassis; a positive translator moves its drive
+wheel forward; drive wheels and the powered front omni wheels are torque motors, positive forward.
 
 The omni wheels' rollers are measured from the visual meshes (count, rows, axis radius, length) and rebuilt as
 barrels whose outer profile is the wheel's circle, so the wheel rolls round. Each wheel sits where its rollers
@@ -67,6 +72,11 @@ PARAMS = {
     # Actuators: position gain, velocity gain, force/torque limit; speeds for the commands.
     "elevator": {"kp": 3000.0, "kv": 200.0, "force": 600.0, "speed_deg_s": 6.0},      # N*m/rad, N*m*s/rad, N*m
     "caster_arm": {"kp": 2000.0, "kv": 100.0, "force": 400.0, "speed_deg_s": 6.0},
+    "rear_lift": {"kp": 3000.0, "kv": 150.0, "force": 400.0, "speed_deg_s": 8.0},      # at the suspension arm (~6 deg/s at the rear arm)
+    "rear_lift_deg": (-35.0, 44.0),        # +44: the rear arm at its 45 deg stop; near -40 the rear actuator passes dead centre
+    # The rear damper: spring rate, damping, the preload it holds against its top-out stop, and its travel from the
+    # reference pose (top-out first; positive compresses it, as load on the rear wheels does).
+    "rear_spring": {"stiffness": 200000.0, "damping": 5000.0, "preload": 600.0, "travel_cm": (-1.0, 2.0)},  # N/m, N*s/m, N
     "translator": {"kp": 30000.0, "kv": 2000.0, "force": 1500.0, "speed_cm_s": 2.0},  # N/m, N*s/m, N
     "drive": {"torque": 60.0, "max_speed_rad_s": 9.0},                                 # N*m; 9 rad/s ~ 6 km/h
     "front_omni_drive": {"torque": 15.0, "max_speed_rad_s": 22.0},                     # the powered-front variant
@@ -88,17 +98,22 @@ OMNI_WHEELS = {"front_omni_l": ("front_arm", "front_caster_wheel_l"), "front_omn
                "rear_omni_l": ("rear_arm", "rear_casteer_wheel_l"), "rear_omni_r": ("rear_arm", "rear_caster_wheel_r")}
 OMNI_RUBBER = "caster_rubber"  # the omni wheels' roller material: measured, then replaced by the generated rollers
 
-# Passive linkages: (body, parent body, frame bone, joint). Each carries its frame bone's meshes; slides run along
-# the Unreal constraint's linear axis. The rear actuator and suspension arm stay on the chassis: in the Unreal
-# asset nothing connects them to the rear arm.
+# Linkages: (body, parent body, frame bone, joint). Each carries its frame bone's meshes; slides run along the
+# Unreal constraint's linear axis. All are passive except rear_lift (driven) and rear_spring (the damper).
 LINKAGES = [
     ("elevator_act_l", "elevator_l", "motor_elevator_l", "hinge"), ("elevator_rod_l", "elevator_act_l", "motor_elevator_rod_l", "slide"),
     ("elevator_act_r", "elevator_r", "motor_elevator_r", "hinge"), ("elevator_rod_r", "elevator_act_r", "motor_elevator_rod_r", "slide"),
     ("front_aux", "chassis", "front_caster_linkage_aux", "hinge"), ("front_aux_arm", "front_aux", "front_caster_linkage_aux_arm", "hinge"),
     ("front_link", "chassis", "front_caster_linkage", "hinge"), ("front_link_arm", "front_link", "front_caster_linkage_arm", "hinge"),
     ("front_act", "chassis", "front_caster_motor", "hinge"), ("front_rod", "front_act", "front_caster_motor_rod", "slide"),
-    ("rear_damper", "chassis", "rear_caster_dampener", "hinge"), ("rear_damper_rod", "rear_damper", "rear_caster_dampener_rod", "slide"),
+    ("rear_lift", "chassis", "rear_caster_suspension_arm", "hinge"),
+    ("rear_act", "chassis", "rear_caster_motor", "hinge"), ("rear_rod", "rear_act", "rear_caster_motor_rod", "slide"),
+    ("rear_aux", "rear_lift", "rear_caster_aux_linkage", "hinge"),
+    ("rear_pivot", "chassis", "rear_caster_motor_dampener_pivot", "hinge"),
+    ("rear_damper", "rear_pivot", "rear_caster_dampener", "hinge"), ("rear_spring", "rear_damper", "rear_caster_dampener_rod", "slide"),
 ]
+LINKAGE_PARENT = {lk[0]: lk[1] for lk in LINKAGES}
+REAR_LIFT_AXIS = "0 -1 0"  # positive turns the suspension arm the way that pushes the rear wheels down
 
 
 def f(x):
@@ -309,7 +324,10 @@ class Model:
                 continue
             p = self.comp([self.bones[child][i] + c["pos_in_child"][i] for i in range(3)])
             o = self.origin(b1)
-            out.append((b1, [p[i] - o[i] for i in range(3)], b2))
+            anchor = [p[i] - o[i] for i in range(3)]
+            if LINKAGE_PARENT.get(b1) == b2 and max(abs(a) for a in anchor) < 1e-6:
+                continue                                     # already the linkage's own joint
+            out.append((b1, anchor, b2))
         return out
 
 
@@ -408,7 +426,16 @@ def build(m, P, powered_front):
             pad = " " * ind
             out.append('%s<body name="%s" pos="%s">' % (pad, body, fv(m.rel(body, parent))))
             axis = "0 1 0" if joint == "hinge" else fv(m.slide_axis(bone))
-            out.append('%s  <joint name="%s" class="linkage" type="%s" axis="%s"/>' % (pad, body, joint, axis))
+            if body == "rear_lift":
+                out.append('%s  <joint name="%s" type="hinge" axis="%s" range="%s %s" damping="10" armature="1"/>' % (
+                    pad, body, REAR_LIFT_AXIS, f(deg(P["rear_lift_deg"][0])), f(deg(P["rear_lift_deg"][1]))))
+            elif body == "rear_spring":
+                sp = P["rear_spring"]
+                top = sp["travel_cm"][0] * UE_TO_M
+                out.append('%s  <joint name="%s" type="slide" axis="%s" range="%s %s" stiffness="%s" springref="%s" damping="%s" armature="5"/>' % (
+                    pad, body, axis, f(top), f(sp["travel_cm"][1] * UE_TO_M), f(sp["stiffness"]), f(top - sp["preload"] / sp["stiffness"]), f(sp["damping"])))
+            else:
+                out.append('%s  <joint name="%s" class="linkage" type="%s" axis="%s"/>' % (pad, body, joint, axis))
             out.append('%s  <inertial pos="0 0 0" mass="%s" diaginertia="0.0005 0.0005 0.0005"/>' % (pad, f(M["linkage"])))
             out += [pad + "  " + g for g in m.visuals(body)]
             out += linkages(body, ind + 2)
@@ -440,10 +467,11 @@ def build(m, P, powered_front):
 
     for arm, axis in (("front_arm", "0 1 0"), ("rear_arm", "0 -1 0")):
         # The rear arm's wheels trail its pivot, so its axis is reversed: positive is wheels down at both ends.
-        bone = BODIES[arm][0]
+        # The rear arm is not driven: the rear chain pushes it through the damper.
         L.append('      <body name="%s" pos="%s">' % (arm, fv(m.rel(arm, "chassis"))))
-        L.append('        <joint name="%s" type="hinge" axis="%s" range="%s %s" damping="10" armature="1"/>' % (
-            arm, axis, f(deg(P["caster_arm_deg"][0])), f(deg(P["caster_arm_deg"][1]))))
+        L.append('        <joint name="%s" type="hinge" axis="%s" range="%s %s" damping="%s" armature="%s"/>' % (
+            arm, axis, f(deg(P["caster_arm_deg"][0])), f(deg(P["caster_arm_deg"][1])), "10" if arm == "front_arm" else "1",
+            "1" if arm == "front_arm" else "0.05"))
         L += ["        " + g for g in m.boxes(arm, M["caster_arm"])]
         L += ["        " + g for g in m.visuals(arm)]
         for wname, (parent, _) in OMNI_WHEELS.items():
@@ -456,7 +484,7 @@ def build(m, P, powered_front):
 
     L.append('  <equality>')
     for b1, anchor, b2 in m.closures():
-        L.append('    <connect body1="%s" body2="%s" anchor="%s" solref="0.005 1"/>' % (b1, b2, fv(anchor)))
+        L.append('    <connect body1="%s" body2="%s" anchor="%s" solref="0.005 1" solimp="0.99 0.999 0.001"/>' % (b1, b2, fv(anchor)))
     L.append('  </equality>')
 
     L.append('  <actuator>')
@@ -472,10 +500,9 @@ def build(m, P, powered_front):
             s, s, f(e["kp"]), f(e["kv"]), f(-e["force"]), f(e["force"]), f(deg(P["elevator_deg"][0])), f(deg(P["elevator_deg"][1]))))
         L.append('    <position name="translator_%s" joint="translator_%s" kp="%s" kv="%s" forcerange="%s %s" ctrlrange="%s %s"/>' % (
             s, s, f(t["kp"]), f(t["kv"]), f(-t["force"]), f(t["force"]), f(P["translator_cm"][0] * UE_TO_M), f(P["translator_cm"][1] * UE_TO_M)))
-    for a in ("front_arm", "rear_arm"):
-        c = P["caster_arm"]
+    for a, c, rng in (("front_arm", P["caster_arm"], P["caster_arm_deg"]), ("rear_lift", P["rear_lift"], P["rear_lift_deg"])):
         L.append('    <position name="%s" joint="%s" kp="%s" kv="%s" forcerange="%s %s" ctrlrange="%s %s"/>' % (
-            a, a, f(c["kp"]), f(c["kv"]), f(-c["force"]), f(c["force"]), f(deg(P["caster_arm_deg"][0])), f(deg(P["caster_arm_deg"][1]))))
+            a, a, f(c["kp"]), f(c["kv"]), f(-c["force"]), f(c["force"]), f(deg(rng[0])), f(deg(rng[1]))))
     L.append('  </actuator>')
 
     L.append('  <sensor>')

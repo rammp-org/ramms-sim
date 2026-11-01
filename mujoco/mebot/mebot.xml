@@ -86,11 +86,6 @@
       <geom class="visual" mesh="front_caster_arm_mount__chassis_metal" pos="0.538656 -0.002557 -0.028235" rgba="0.3728 0.3728 0.3728 1"/>
       <geom class="visual" mesh="mebot__chassis_metal" pos="0.538656 -0.002557 -0.028235" rgba="0.3728 0.3728 0.3728 1"/>
       <geom class="visual" mesh="rear_caster_arm_mount__chassis_metal" pos="0.538656 -0.002557 -0.028235" rgba="0.3728 0.3728 0.3728 1"/>
-      <geom class="visual" mesh="rear_caster_aux_linkage__caster_arm_metal" pos="0.538656 -0.002557 -0.028235" rgba="0.102 0.5451 0.8118 1"/>
-      <geom class="visual" mesh="rear_caster_motor__elevator_body" pos="0.538656 -0.002557 -0.028235" rgba="0.1055 0.1485 0.1552 1"/>
-      <geom class="visual" mesh="rear_caster_motor_dampener_pivot__caster_arm_metal" pos="0.538656 -0.002557 -0.028235" rgba="0.102 0.5451 0.8118 1"/>
-      <geom class="visual" mesh="rear_caster_motor_rod__elevator_rod" pos="0.538656 -0.002557 -0.028235" rgba="0.4824 0.4824 0.4824 1"/>
-      <geom class="visual" mesh="rear_caster_suspension_arm__caster_arm_metal" pos="0.538656 -0.002557 -0.028235" rgba="0.102 0.5451 0.8118 1"/>
       <site name="seat" pos="0.345 0 0.256381" size="0.02"/>
       <body name="rider" pos="0.345 0 0.506381">
         <geom name="rider" class="visual" type="box" size="0.2 0.2 0.3" rgba="0.6 0.45 0.35 0.3"/>
@@ -430,7 +425,7 @@
         </body>
       </body>
       <body name="rear_arm" pos="-0.03175 0.000113 0.00889">
-        <joint name="rear_arm" type="hinge" axis="0 -1 0" range="-0.785398 0.785398" damping="10" armature="1"/>
+        <joint name="rear_arm" type="hinge" axis="0 -1 0" range="-0.785398 0.785398" damping="1" armature="0.05"/>
         <geom name="rear_arm_rear_caster_swing_arm" class="collision" type="box" pos="-0.107923 0 -0.000938" size="0.128297 0.14751 0.027459" mass="2.5"/>
         <geom class="visual" mesh="rear_caster_swing_arm__caster_arm_metal" pos="0.570406 -0.00267 -0.037125" rgba="0.102 0.5451 0.8118 1"/>
         <body name="rear_omni_l" pos="-0.20955 0.109409 0.0127">
@@ -834,25 +829,52 @@
           <geom class="visual" mesh="front_caster_motor_rod__elevator_rod" pos="0.046365 0.06253 -0.280367" rgba="0.4824 0.4824 0.4824 1"/>
         </body>
       </body>
-      <body name="rear_damper" pos="-0.10287 7.9e-05 0.20889">
-        <joint name="rear_damper" class="linkage" type="hinge" axis="0 1 0"/>
+      <body name="rear_lift" pos="-0.00635 0.032657 0.30734">
+        <joint name="rear_lift" type="hinge" axis="0 -1 0" range="-0.610865 0.767945" damping="10" armature="1"/>
         <inertial pos="0 0 0" mass="0.3" diaginertia="0.0005 0.0005 0.0005"/>
-        <geom class="visual" mesh="rear_caster_dampener__caster_dampener" pos="0.641526 -0.002636 -0.237125" rgba="0.2398 0.2398 0.2398 1"/>
-        <body name="rear_damper_rod" pos="0 0 -0.121">
-          <joint name="rear_damper_rod" class="linkage" type="slide" axis="0 -0 1"/>
+        <geom class="visual" mesh="rear_caster_suspension_arm__caster_arm_metal" pos="0.545006 -0.035214 -0.335575" rgba="0.102 0.5451 0.8118 1"/>
+        <body name="rear_aux" pos="-0.035862 -0.029369 0.02836">
+          <joint name="rear_aux" class="linkage" type="hinge" axis="0 1 0"/>
           <inertial pos="0 0 0" mass="0.3" diaginertia="0.0005 0.0005 0.0005"/>
-          <geom class="visual" mesh="rear_caster_dampener_rod__caster_dampener_rod" pos="0.641526 -0.002636 -0.116125" rgba="0.4746 0.4746 0.4746 1"/>
+          <geom class="visual" mesh="rear_caster_aux_linkage__caster_arm_metal" pos="0.580868 -0.005845 -0.363935" rgba="0.102 0.5451 0.8118 1"/>
+        </body>
+      </body>
+      <body name="rear_act" pos="0.085632 0.065201 0.040171">
+        <joint name="rear_act" class="linkage" type="hinge" axis="0 1 0"/>
+        <inertial pos="0 0 0" mass="0.3" diaginertia="0.0005 0.0005 0.0005"/>
+        <geom class="visual" mesh="rear_caster_motor__elevator_body" pos="0.453024 -0.067758 -0.068406" rgba="0.1055 0.1485 0.1552 1"/>
+        <body name="rear_rod" pos="-0.033907 0 0.231464">
+          <joint name="rear_rod" class="linkage" type="slide" axis="-0.173648 -1e-05 0.984808"/>
+          <inertial pos="0 0 0" mass="0.3" diaginertia="0.0005 0.0005 0.0005"/>
+          <geom class="visual" mesh="rear_caster_motor_rod__elevator_rod" pos="0.486931 -0.067758 -0.29987" rgba="0.4824 0.4824 0.4824 1"/>
+        </body>
+      </body>
+      <body name="rear_pivot" pos="-0.03175 0.002556 0.20889">
+        <joint name="rear_pivot" class="linkage" type="hinge" axis="0 1 0"/>
+        <inertial pos="0 0 0" mass="0.3" diaginertia="0.0005 0.0005 0.0005"/>
+        <geom class="visual" mesh="rear_caster_motor_dampener_pivot__caster_arm_metal" pos="0.570406 -0.005113 -0.237125" rgba="0.102 0.5451 0.8118 1"/>
+        <body name="rear_damper" pos="-0.07112 -0.002477 0">
+          <joint name="rear_damper" class="linkage" type="hinge" axis="0 1 0"/>
+          <inertial pos="0 0 0" mass="0.3" diaginertia="0.0005 0.0005 0.0005"/>
+          <geom class="visual" mesh="rear_caster_dampener__caster_dampener" pos="0.641526 -0.002636 -0.237125" rgba="0.2398 0.2398 0.2398 1"/>
+          <body name="rear_spring" pos="0 0 -0.121">
+            <joint name="rear_spring" type="slide" axis="0 -0 1" range="-0.01 0.02" stiffness="200000" springref="-0.013" damping="5000" armature="5"/>
+            <inertial pos="0 0 0" mass="0.3" diaginertia="0.0005 0.0005 0.0005"/>
+            <geom class="visual" mesh="rear_caster_dampener_rod__caster_dampener_rod" pos="0.641526 -0.002636 -0.116125" rgba="0.4746 0.4746 0.4746 1"/>
+          </body>
         </body>
       </body>
     </body>
   </worldbody>
   <equality>
-    <connect body1="front_link_arm" body2="front_aux" anchor="0.0410518 0 -0.102897" solref="0.005 1"/>
-    <connect body1="front_aux_arm" body2="front_arm" anchor="-1e-08 0 -0.202477" solref="0.005 1"/>
-    <connect body1="front_rod" body2="front_link" anchor="0 0 0" solref="0.005 1"/>
-    <connect body1="rear_damper_rod" body2="rear_arm" anchor="0 0 -0.079117" solref="0.005 1"/>
-    <connect body1="translator_l" body2="elevator_rod_l" anchor="0.29885 0.034465 0.160488" solref="0.005 1"/>
-    <connect body1="translator_r" body2="elevator_rod_r" anchor="0.29885 -0.034465 0.160488" solref="0.005 1"/>
+    <connect body1="front_link_arm" body2="front_aux" anchor="0.0410518 0 -0.102897" solref="0.005 1" solimp="0.99 0.999 0.001"/>
+    <connect body1="front_aux_arm" body2="front_arm" anchor="-1e-08 0 -0.202477" solref="0.005 1" solimp="0.99 0.999 0.001"/>
+    <connect body1="front_rod" body2="front_link" anchor="0 0 0" solref="0.005 1" solimp="0.99 0.999 0.001"/>
+    <connect body1="rear_aux" body2="rear_pivot" anchor="-0.0465994 0 -0.102919" solref="0.005 1" solimp="0.99 0.999 0.001"/>
+    <connect body1="rear_spring" body2="rear_arm" anchor="0 0 -0.079117" solref="0.005 1" solimp="0.99 0.999 0.001"/>
+    <connect body1="rear_rod" body2="rear_lift" anchor="0 0 0" solref="0.005 1" solimp="0.99 0.999 0.001"/>
+    <connect body1="translator_l" body2="elevator_rod_l" anchor="0.29885 0.034465 0.160488" solref="0.005 1" solimp="0.99 0.999 0.001"/>
+    <connect body1="translator_r" body2="elevator_rod_r" anchor="0.29885 -0.034465 0.160488" solref="0.005 1" solimp="0.99 0.999 0.001"/>
   </equality>
   <actuator>
     <motor name="drive_l" joint="drive_wheel_l" ctrlrange="-60 60"/>
@@ -862,7 +884,7 @@
     <position name="elevator_r" joint="elevator_r" kp="3000" kv="200" forcerange="-600 600" ctrlrange="-0.785398 0.785398"/>
     <position name="translator_r" joint="translator_r" kp="30000" kv="2000" forcerange="-1500 1500" ctrlrange="-0.4 0.4"/>
     <position name="front_arm" joint="front_arm" kp="2000" kv="100" forcerange="-400 400" ctrlrange="-0.785398 0.785398"/>
-    <position name="rear_arm" joint="rear_arm" kp="2000" kv="100" forcerange="-400 400" ctrlrange="-0.785398 0.785398"/>
+    <position name="rear_lift" joint="rear_lift" kp="3000" kv="150" forcerange="-400 400" ctrlrange="-0.610865 0.767945"/>
   </actuator>
   <sensor>
     <framequat name="chassis_quat" objtype="body" objname="chassis"/>

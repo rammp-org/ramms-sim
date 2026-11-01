@@ -21,7 +21,7 @@ sys.path.insert(0, HERE)
 import build_mebot_mjcf as B  # noqa: E402
 
 P = B.PARAMS
-LIFTS = ("elevator_l", "elevator_r", "translator_l", "translator_r", "front_arm", "rear_arm")
+LIFTS = ("elevator_l", "elevator_r", "translator_l", "translator_r", "front_arm", "rear_lift")
 WHEELS = ("drive_wheel_l", "drive_wheel_r", "front_omni_l", "front_omni_r", "rear_omni_l", "rear_omni_r")
 
 
@@ -31,7 +31,8 @@ class Sim:
         self.d = mujoco.MjData(self.m)
         self.act = {self.m.actuator(i).name: i for i in range(self.m.nu)}
         el, arm, tr = math.radians(P["elevator"]["speed_deg_s"]), math.radians(P["caster_arm"]["speed_deg_s"]), P["translator"]["speed_cm_s"] / 100
-        self.rate = {"elevator_l": el, "elevator_r": el, "front_arm": arm, "rear_arm": arm, "translator_l": tr, "translator_r": tr}
+        rear = math.radians(P["rear_lift"]["speed_deg_s"])
+        self.rate = {"elevator_l": el, "elevator_r": el, "front_arm": arm, "rear_lift": rear, "translator_l": tr, "translator_r": tr}
         self.cmd = {k: 0.0 for k in LIFTS}
         self.goal = dict(self.cmd)
         self.wheel_goal = {"l": 0.0, "r": 0.0}
@@ -146,6 +147,9 @@ def check_scene(scene):
     on = s.touching()
     check("stands on all six wheels", on == set(WHEELS), "touching: %s" % ", ".join(sorted(on)))
     check("stands level", abs(p) < 3 and abs(r) < 1, "pitch %+.1f roll %+.1f deg" % (p, r))
+    top = P["rear_spring"]["travel_cm"][0] / 100
+    check("the rear wheels' load compresses the damper", s.q("rear_spring") > top + 0.001,
+          "damper %.1f mm off its top-out" % ((s.q("rear_spring") - top) * 1000))
 
     z0 = s.body("chassis")[2]
     s.run(goals={"elevator_l": deg(10), "elevator_r": deg(10)})
@@ -167,13 +171,13 @@ def check_scene(scene):
           "drive wheel %+.1f cm on the chassis (L %.1f, R %.1f cm)" % (drel * 100, s.q("translator_l") * 100, s.q("translator_r") * 100))
     s.run(goals={"translator_l": 0.0, "translator_r": 0.0})
 
-    for arm in ("front_arm", "rear_arm"):
-        z0 = s.body(arm)[2]
-        s.run(goals={arm: deg(15)})
+    for lift, arm in (("front_arm", "front_arm"), ("rear_lift", "rear_arm")):
+        z0, a0 = s.body(arm)[2], s.q(arm)
+        s.run(goals={lift: deg(15)})
         dz = s.body(arm)[2] - z0
-        check("%s +15 deg raises its end of the chassis" % arm.replace("_", " "), dz > 0.01, "pivot %+.1f cm, arm %.1f deg" % (
-            dz * 100, math.degrees(s.q(arm))))
-        s.run(goals={arm: 0.0})
+        check("%s +15 deg raises its end of the chassis" % lift.replace("_", " "), dz > 0.01, "pivot %+.1f cm, %s %+.1f deg" % (
+            dz * 100, arm.replace("_", " "), math.degrees(s.q(arm) - a0)))
+        s.run(goals={lift: 0.0})
 
     x0 = s.body("chassis")[0]
     _, _, yaw0 = s.pitch_roll_yaw()
