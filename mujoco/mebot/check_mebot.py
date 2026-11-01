@@ -22,6 +22,8 @@ import build_mebot_mjcf as B  # noqa: E402
 
 P = B.PARAMS
 LIFTS = ("elevator_l", "elevator_r", "translator_l", "translator_r", "front_arm", "rear_lift")
+WHEEL_ACCEL = 4.0     # rad/s^2 (0.7 m/s^2 at the rim): wheel speeds ramp, as a motor controller's do; a step saturates
+                      # the motors, and the speeds part while they are saturated
 WHEELS = ("drive_wheel_l", "drive_wheel_r", "front_omni_l", "front_omni_r", "rear_omni_l", "rear_omni_r")
 
 
@@ -29,6 +31,7 @@ class Sim:
     def __init__(self, scene):
         self.m = mujoco.MjModel.from_xml_path(scene)
         self.d = mujoco.MjData(self.m)
+        B.hold_arm_stowed(self.m, self.d)       # the arm stowed, and held there
         self.act = {self.m.actuator(i).name: i for i in range(self.m.nu)}
         el, arm, tr = math.radians(P["elevator"]["speed_deg_s"]), math.radians(P["caster_arm"]["speed_deg_s"]), P["translator"]["speed_cm_s"] / 100
         rear = math.radians(P["rear_lift"]["speed_deg_s"])
@@ -36,6 +39,7 @@ class Sim:
         self.cmd = {k: 0.0 for k in LIFTS}
         self.goal = dict(self.cmd)
         self.wheel_goal = {"l": 0.0, "r": 0.0}
+        self.wheel_cmd = {"l": 0.0, "r": 0.0}
         self.integ = {"l": 0.0, "r": 0.0}
         self.front_goal = None                  # the powered front omni wheels freewheel unless given a speed
         self.front_integ = {"l": 0.0, "r": 0.0}
@@ -83,7 +87,9 @@ class Sim:
             self.cmd[k] += max(-self.rate[k] * dt, min(self.rate[k] * dt, err))
             self.d.ctrl[self.act[k]] = self.cmd[k]
         for s in ("l", "r"):
-            e = self.wheel_goal[s] - self.d.joint("drive_wheel_" + s).qvel[0]
+            err = self.wheel_goal[s] - self.wheel_cmd[s]
+            self.wheel_cmd[s] += max(-WHEEL_ACCEL * dt, min(WHEEL_ACCEL * dt, err))
+            e = self.wheel_cmd[s] - self.d.joint("drive_wheel_" + s).qvel[0]
             # The integral stops at what the motor can give: past that it winds up, the wheels' speeds part,
             # and a turn in place drifts along an arc.
             tq = P["drive"]["torque"]
@@ -101,9 +107,11 @@ class Sim:
         mujoco.mj_step(self.m, self.d)
 
     def closure_mm(self):
-        """The largest gap across the linkages' loop closures, mm."""
+        """The largest gap across the loop closures (the connect constraints: the linkages', and the arm's gripper's), mm."""
         worst = 0.0
         for i in range(self.m.neq):
+            if self.m.eq_type[i] != mujoco.mjtEq.mjEQ_CONNECT:
+                continue
             b1, b2 = self.m.eq_obj1id[i], self.m.eq_obj2id[i]
             p1 = self.d.xpos[b1] + self.d.xmat[b1].reshape(3, 3) @ self.m.eq_data[i][0:3]
             p2 = self.d.xpos[b2] + self.d.xmat[b2].reshape(3, 3) @ self.m.eq_data[i][3:6]
@@ -189,14 +197,16 @@ def check_scene(scene):
     _, _, yaw = s.pitch_roll_yaw()
     check("drive wheels + drive forward, straight", dx > 0.4 and abs(yaw - yaw0) < 5, "%+.2f m, yaw %+.1f deg" % (dx, yaw - yaw0))
 
-    # In place: about the drive axle's midpoint (the chassis origin is aft of it and circles in a correct turn).
+    # In place: about the drive axle's midpoint (the chassis origin is aft of it and circles in a correct turn). Loaded
+    # with the seat, rider and arm the drive wheels scrub a few centimetres sideways; a turn about the chassis origin
+    # would carry the midpoint about 25 cm.
     axle0 = (s.body("drive_wheel_l") + s.body("drive_wheel_r"))[:2] / 2
     s.run(seconds=2.0, wheels=(-2.0, 2.0))
     s.run(seconds=1.0, wheels=(0.0, 0.0))
     _, _, yaw2 = s.pitch_roll_yaw()
     dyaw = (yaw2 - yaw + 180) % 360 - 180
     drift = float(((s.body("drive_wheel_l") + s.body("drive_wheel_r"))[:2] / 2 - axle0) @ ((s.body("drive_wheel_l") + s.body("drive_wheel_r"))[:2] / 2 - axle0)) ** 0.5
-    check("left -, right + turns left in place", dyaw > 30 and drift < 0.06, "yaw %+.0f deg, drive axle midpoint moved %.1f cm" % (dyaw, drift * 100))
+    check("left -, right + turns left in place", dyaw > 30 and drift < 0.12, "yaw %+.0f deg, drive axle midpoint moved %.1f cm" % (dyaw, drift * 100))
 
     if "front_omni_l" in s.act:
         s.run(goals={"elevator_l": deg(-15), "elevator_r": deg(-15)})

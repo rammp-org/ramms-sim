@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build the MeBot's MJCF models and test scenes from its Unreal geometry.
 
-    python mujoco/mebot/build_mebot_mjcf.py [--rider-kg 75]
+    python mujoco/mebot/build_mebot_mjcf.py [--rider-kg 75] [--no-arm]
 
 Reads source/mebot_ue.json (extract_ue_mebot.py) and source/mebot_meshes.json with meshes/
 (extract_ue_mebot_meshes.py), both from the public ramms-assets MeBot, and writes next to this file:
@@ -12,9 +12,15 @@ Reads source/mebot_ue.json (extract_ue_mebot.py) and source/mebot_meshes.json wi
   meshes/omni_front_roller.stl, meshes/omni_rear_roller.stl
                                       the omni wheels' rollers, generated from the measured rollers
 
+Each robot carries the Kinova Gen3 + Robotiq 2F-85 (../gen3_2f85/gen3_2f85_fixed.xml) on its seat's arm mount, its
+names prefixed arm_, and its stowed pose as the numeric arm_stow; --no-arm leaves it off.
+
 The model, in MuJoCo's frame (m; X forward, Y left, Z up; the floor at z = 0 under the wheels):
 
-  chassis              free joint; the frame, the caster-arm mounts, the seat and its rider
+  chassis              free joint; the frame and the caster-arm mounts
+    seat               welded to the chassis on the seat_base socket: the seat (its mass), its rider and the arm mount
+      rider            the rider's mass
+      arm_base_link    the Gen3 arm on the arm mount, where the Unreal chair carries it (arm_*: its joints and actuators)
     translator_l / _r  slide along X: the drive-wheel plate (left / right independently)
       elevator_l / _r  hinge about Y at the swing arm's pivot: the drive wheel's height
         drive_wheel_*  hinge about Y, motor-driven
@@ -53,6 +59,7 @@ import argparse
 import json
 import math
 import os
+import re
 import struct
 
 import numpy as np
@@ -61,26 +68,34 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 # --------------------------------------------------------------------------- PLACEHOLDERS (to be measured)
 PARAMS = {
-    # Masses, kg. The robot without its rider comes to about 90 kg.
-    "mass": {"chassis": 50.0, "translator": 3.0, "elevator": 9.0, "drive_wheel": 2.5, "caster_arm": 2.5,
+    # Masses, kg. The base without its seat, rider and arm comes to about 120 kg.
+    "mass": {"chassis": 80.0, "translator": 3.0, "elevator": 9.0, "drive_wheel": 2.5, "caster_arm": 2.5,
              "omni_hub": 0.5, "omni_roller": 0.01, "linkage": 0.3},
+    # The seat with its rails and mounts, apart from the chassis: under 80 kg; the Unreal chair's meshes come to about
+    # 40 kg. Its centre of mass sits a third of the way up its mesh's bounds (SEAT_BOUNDS_CM).
+    "seat_kg": 40.0,
     "rider_kg": 75.0,                      # --rider-kg; 0 leaves the seat empty
     "rider_above_seat_cm": 25.0,           # the rider's centre of mass above the seat socket
     # Joint ranges: None takes the Unreal physics asset's limits (ASSET_RANGES, from source/mebot_ue.json).
     "elevator_deg": None,
     "caster_arm_deg": None,                # the front arm's, and the rear arm's stop
     "translator_cm": None,
-    # Actuators: position gain, velocity gain, force/torque limit; speeds for the commands.
-    "elevator": {"kp": 3000.0, "kv": 200.0, "force": 600.0, "speed_deg_s": 6.0},      # N*m/rad, N*m*s/rad, N*m
-    "caster_arm": {"kp": 2000.0, "kv": 100.0, "force": 400.0, "speed_deg_s": 6.0},
-    "rear_lift": {"kp": 3000.0, "kv": 150.0, "force": 400.0, "speed_deg_s": 8.0},      # at the suspension arm (~6 deg/s at the rear arm)
+    # Actuators: position gain, velocity gain, force/torque limit; speeds for the commands. The lifts' servos are stiff
+    # (3x, damping 1.75x, since the seat and arm went on): the electrohydraulic actuators hold where they are put.
+    "elevator": {"kp": 9000.0, "kv": 350.0, "force": 600.0, "speed_deg_s": 6.0},      # N*m/rad, N*m*s/rad, N*m
+    "caster_arm": {"kp": 6000.0, "kv": 175.0, "force": 400.0, "speed_deg_s": 6.0},
+    "rear_lift": {"kp": 9000.0, "kv": 260.0, "force": 400.0, "speed_deg_s": 8.0},      # at the suspension arm (~6 deg/s at the rear arm)
     "rear_lift_deg": (-35.0, 44.0),        # +44: the rear arm at its 45 deg stop; near -40 the rear actuator passes dead centre
     # The rear damper: spring rate, damping, the preload it holds against its top-out stop, and its travel from the
     # reference pose (top-out first; positive compresses it, as load on the rear wheels does).
     "rear_spring": {"stiffness": 200000.0, "damping": 5000.0, "preload": 600.0, "travel_cm": (-1.0, 2.0)},  # N/m, N*s/m, N
     "translator": {"kp": 30000.0, "kv": 2000.0, "force": 1500.0, "speed_cm_s": 2.0},  # N/m, N*s/m, N
-    "drive": {"torque": 60.0, "max_speed_rad_s": 9.0},                                 # N*m; 9 rad/s ~ 6 km/h
+    # N*m; 9 rad/s ~ 6 km/h; the geared motor's inertia at the wheel, kg*m^2 (with less, a wheel that slips spins up at once)
+    "drive": {"torque": 60.0, "max_speed_rad_s": 9.0, "armature": 0.1},
     "front_omni_drive": {"torque": 15.0, "max_speed_rad_s": 22.0},                     # the powered-front variant
+    # The arm stowed: the Gen3's Retract position, folded upright over its base beside the rider and behind the front
+    # omni wheels (rad, joint_1..7; the numeric arm_stow: the Unreal IK's home pose and the curb mass model's arm).
+    "arm_stow": [0.0, -0.34906585, 3.14159265, -2.54818071, 0.0, -0.87266463, 1.57079633],
 }
 # ---------------------------------------------------------------------------
 
@@ -119,6 +134,13 @@ ASSET_RANGES = {"elevator_deg": ("motor_swing_arm_l", "motor_swing_arm_r"),
                 "caster_arm_deg": ("front_caster_swing_arm", "rear_caster_swing_arm"),
                 "translator_cm": ("dw_main_plate_l", "dw_main_plate_r")}
 REAR_LIFT_AXIS = "0 -1 0"  # positive turns the suspension arm the way that pushes the rear wheels down
+# The seat (ramms-assets' rammp_seat, on the seat_base socket): its mesh's bounds in its own frame, Unreal cm.
+SEAT_BOUNDS_CM = ((-48.5, -35.6, -2.8), (39.8, 35.1, 58.3))
+# Where BP_Mebot_Ramms carries the arm's base (its arm mount on the right rail), from the seat_base socket, Unreal cm.
+ARM_MOUNT_CM = (16.0, 26.5, 12.0)
+ARM_XML = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "gen3_2f85", "gen3_2f85_fixed.xml")
+ARM_PREFIX = "arm_"
+ARM_JOINTS = ["joint_%d" % i for i in range(1, 8)]
 
 
 def f(x):
@@ -389,8 +411,9 @@ def build(m, P, powered_front):
     deg = math.radians
     name = "mebot_powered_front" if powered_front else "mebot"
     L = ['<mujoco model="%s">' % name,
-         '  <!-- Generated by build_mebot_mjcf.py from source/mebot_ue.json and source/mebot_meshes.json; edit the generator,',
-         '       not this file. Masses, joint ranges and actuator limits are PLACEHOLDERS (see PARAMS). -->',
+         '  <!-- Generated by build_mebot_mjcf.py from source/mebot_ue.json and source/mebot_meshes.json (the arm from',
+         '       ../gen3_2f85/gen3_2f85_fixed.xml); edit the generator, not this file. Masses, joint ranges and actuator',
+         '       limits are PLACEHOLDERS (see PARAMS). -->',
          '  <compiler angle="radian" autolimits="true"/>',
          '  <option timestep="0.002" integrator="implicitfast" cone="elliptic" impratio="10"/>',
          '  <default>',
@@ -426,17 +449,27 @@ def build(m, P, powered_front):
     seat = m.sockets["seat_base"]
     seat_c = m.comp([m.bones[seat["bone"]][i] + seat["loc"][i] for i in range(3)])
     o = m.origin("chassis")
-    L.append('      <site name="seat" pos="%s" size="0.02"/>' % fv([seat_c[i] - o[i] for i in range(3)]))
+    # The seat: welded to the chassis on its socket, so the Unreal pawn can hang the seat's meshes, its occupant and
+    # sensors on it. Its frame is the socket's, in MuJoCo's axes (Unreal's Y flipped).
+    L.append('      <body name="seat" pos="%s">' % fv([seat_c[i] - o[i] for i in range(3)]))
+    L.append('        <site name="seat" pos="0 0 0" size="0.02"/>')
+    if P["seat_kg"] > 0:
+        lo, hi = SEAT_BOUNDS_CM
+        dims = [(hi[i] - lo[i]) * UE_TO_M for i in range(3)]
+        com = [(lo[0] + hi[0]) / 2 * UE_TO_M, -(lo[1] + hi[1]) / 2 * UE_TO_M, (lo[2] + (hi[2] - lo[2]) / 3) * UE_TO_M]
+        k = P["seat_kg"] / 12
+        L.append('        <inertial pos="%s" mass="%s" diaginertia="%s %s %s"/>' % (
+            fv(com), f(P["seat_kg"]), f(k * (dims[1] ** 2 + dims[2] ** 2)), f(k * (dims[0] ** 2 + dims[2] ** 2)), f(k * (dims[0] ** 2 + dims[1] ** 2))))
+    L.append('        <site name="arm_mount" pos="%s" size="0.02"/>' % fv([ARM_MOUNT_CM[0] * UE_TO_M, -ARM_MOUNT_CM[1] * UE_TO_M, ARM_MOUNT_CM[2] * UE_TO_M]))
     if P["rider_kg"] > 0:
-        rider = [seat_c[i] - o[i] for i in range(3)]
-        rider[2] += P["rider_above_seat_cm"] * UE_TO_M
-        L.append('      <body name="rider" pos="%s">' % fv(rider))
+        L.append('        <body name="rider" pos="0 0 %s">' % f(P["rider_above_seat_cm"] * UE_TO_M))
         # Transparent: the rider is its mass. (URLab draws any alpha above 0 opaque, which would hide the
         # robot; MuJoCo clips can tint it in.)
-        L.append('        <geom name="rider" class="visual" type="box" size="0.2 0.2 0.3" rgba="0.6 0.45 0.35 0"/>')
-        L.append('        <inertial pos="0 0 0" mass="%s" diaginertia="%s %s %s"/>' % (
+        L.append('          <geom name="rider" class="visual" type="box" size="0.2 0.2 0.3" rgba="0.6 0.45 0.35 0"/>')
+        L.append('          <inertial pos="0 0 0" mass="%s" diaginertia="%s %s %s"/>' % (
             f(P["rider_kg"]), f(P["rider_kg"] * 0.13 / 12 * 4), f(P["rider_kg"] * 0.13 / 12 * 4), f(P["rider_kg"] * 0.08 / 12 * 4)))
-        L.append('      </body>')
+        L.append('        </body>')
+    L.append('      </body>')
 
     children = {}
     for lk in LINKAGES:
@@ -479,7 +512,7 @@ def build(m, P, powered_front):
         L += linkages(el, 10)
         radius, width = m.wheel_size(DRIVE_WHEELS[s])
         L.append('          <body name="%s" pos="%s">' % (dw, fv(m.rel(dw, el))))
-        L.append('            <joint name="%s" type="hinge" axis="0 1 0" damping="0.05" armature="0.01"/>' % dw)
+        L.append('            <joint name="%s" type="hinge" axis="0 1 0" damping="0.05" armature="%s"/>' % (dw, f(P["drive"]["armature"])))
         L.append('            <geom name="%s" class="collision" type="cylinder" fromto="0 %s 0 0 %s 0" size="%s" mass="%s"/>' % (
             dw, f(-width / 2), f(width / 2), f(radius), f(M["drive_wheel"])))
         L += ["            " + g for g in m.visuals(dw)]
@@ -531,7 +564,8 @@ def build(m, P, powered_front):
     L.append('    <framequat name="chassis_quat" objtype="body" objname="chassis"/>')
     L.append('    <framepos name="chassis_pos" objtype="body" objname="chassis"/>')
     L.append('  </sensor>')
-    # The reference pose, every lift at 0: what the Unreal pawn is put in (and stood on the ground) at spawn.
+    # The reference pose, every lift at 0 (with_arm adds the arm stowed): what the Unreal pawn is put in (and stood
+    # on the ground) at spawn.
     L.append('  <keyframe><key name="home"/></keyframe>')
     L.append('</mujoco>')
     return "\n".join(L) + "\n"
@@ -560,9 +594,84 @@ def write(path, text):
     os.replace(path + ".tmp", path)
 
 
+def with_arm(text, P):
+    """The model text with the Gen3 + 2F-85 (ARM_XML) spliced in on the seat's arm mount, its names prefixed ARM_PREFIX,
+    and its stowed pose as the numeric arm_stow. Spliced as text, not through MjSpec.attach and to_xml, so the robot's
+    own elements stay as the generator writes them: to_xml would rewrite every actuator as <general>, and the Unreal
+    import and pawn builder read <motor> and <position>."""
+    import xml.etree.ElementTree as ET
+    arm = ET.parse(ARM_XML).getroot()
+    refs = ("name", "class", "childclass", "mesh", "material", "joint", "joint1", "joint2", "body1", "body2", "tendon")
+    for el in arm.iter():
+        for a in refs:
+            if a in el.attrib:
+                el.set(a, ARM_PREFIX + el.get(a))
+        if el.tag == "mesh" and "file" in el.attrib:   # found from this model's folder
+            el.set("file", os.path.relpath(os.path.join(os.path.dirname(ARM_XML), el.get("file")), HERE).replace(os.sep, "/"))
+
+    def block(tag, indent):
+        out = []
+        for child in arm.findall(tag):
+            for el in list(child):
+                ET.indent(el, space="  ", level=indent // 2)
+                out.append(" " * indent + ET.tostring(el, encoding="unicode").strip())
+        return out
+
+    # The arm's top-level defaults go in a class of their own, so they reach only the arm. Like the robot's own geoms,
+    # the arm collides only with the world, not with the chassis it is mounted on; its contacts keep MuJoCo's defaults.
+    defaults = ['    <default class="%smain">' % ARM_PREFIX,
+                '      <geom contype="2" conaffinity="1" friction="1 0.005 0.0001" solref="0.02 1"/>'] + block("default", 6) + ['    </default>']
+    base_link = arm.find("worldbody/body")
+    base_link.set("pos", fv([ARM_MOUNT_CM[0] * UE_TO_M, -ARM_MOUNT_CM[1] * UE_TO_M, ARM_MOUNT_CM[2] * UE_TO_M]))
+    base_link.set("childclass", ARM_PREFIX + "main")
+    ET.indent(base_link, space="  ", level=4)
+    body = ["        " + ET.tostring(base_link, encoding="unicode").strip()]
+    stow = ['    <numeric name="arm_stow" data="%s"/>' % " ".join(f(q) for q in P["arm_stow"])]
+    extra = (["  <contact>"] + block("contact", 4) + ["  </contact>", "  <tendon>"] + block("tendon", 4) + ["  </tendon>"])
+
+    def insert(text, marker, lines, before=True):
+        assert text.count(marker) == 1, marker
+        add = "".join(l + "\n" for l in lines)
+        return text.replace(marker, add + marker if before else marker + add)
+
+    text = insert(text, "  </default>\n", defaults)
+    text = insert(text, "  </custom>\n", stow)
+    text = insert(text, "  </asset>\n", block("asset", 4))
+    mount = re.search(r'        <site name="arm_mount"[^\n]*\n', text).group(0)
+    text = insert(text, mount, body, before=False)
+    text = insert(text, "  </equality>\n", block("equality", 4))
+    text = insert(text, "  <actuator>\n", extra)
+    text = insert(text, "  </actuator>\n", block("actuator", 4))
+    # The home keyframe with the arm stowed, so what puts the robot in it at spawn (the Unreal pawn's SimControl)
+    # agrees with the arm's IK, which starts there too: from the all-zero pose, upright, the IK swung it across.
+    import mujoco
+    spec = mujoco.MjSpec.from_string(text)
+    spec.modelfiledir = HERE
+    m = spec.compile()
+    qpos, ctrl = m.qpos0.copy(), [0.0] * m.nu
+    for name, q in zip(ARM_JOINTS, P["arm_stow"]):
+        qpos[m.jnt_qposadr[m.joint(ARM_PREFIX + name).id]] = q
+        ctrl[m.actuator(ARM_PREFIX + name).id] = q
+    key = '  <keyframe><key name="home" qpos="%s" ctrl="%s"/></keyframe>' % (" ".join(f(q) for q in qpos), " ".join(f(c) for c in ctrl))
+    assert text.count('  <keyframe><key name="home"/></keyframe>') == 1
+    return text.replace('  <keyframe><key name="home"/></keyframe>', key)
+
+
+def hold_arm_stowed(m, d):
+    """Put the arm's joints at its numeric arm_stow and its position servos holding there (a model without the arm
+    keeps its pose), then bring d up to date."""
+    import mujoco
+    if mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_NUMERIC, "arm_stow") >= 0:
+        for name, q in zip(ARM_JOINTS, m.numeric("arm_stow").data):
+            d.qpos[m.jnt_qposadr[m.joint(ARM_PREFIX + name).id]] = q
+            d.ctrl[m.actuator(ARM_PREFIX + name).id] = q
+    mujoco.mj_forward(m, d)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--rider-kg", type=float, default=PARAMS["rider_kg"])
+    ap.add_argument("--no-arm", action="store_true", help="leave the arm off the seat")
     args = ap.parse_args()
     P = dict(PARAMS, rider_kg=args.rider_kg)
     with open(os.path.join(HERE, "source", "mebot_ue.json"), encoding="utf-8") as fh:
@@ -583,9 +692,11 @@ def main():
         write_stl(os.path.join(HERE, "meshes", "omni_%s_roller.stl" % kind), roller_mesh(a["radius"], a["axis_radius"], a["half_length"]))
     for powered in (False, True):
         name = "mebot_powered_front" if powered else "mebot"
-        write(os.path.join(HERE, name + ".xml"), build(m, P, powered))
+        text = build(m, P, powered)
+        write(os.path.join(HERE, name + ".xml"), text if args.no_arm else with_arm(text, P))
         write(os.path.join(HERE, name + "_scene.xml"), SCENE % {"name": name})
-    print("wrote mebot.xml, mebot_powered_front.xml and their scenes (floor at Unreal z = %.2f cm)" % m.ground_z)
+    print("wrote mebot.xml, mebot_powered_front.xml and their scenes (floor at Unreal z = %.2f cm)%s" % (
+        m.ground_z, "" if args.no_arm else ", the arm on the seat"))
     for s in ("l", "r"):
         r, w = m.wheel_size(DRIVE_WHEELS[s])
         print("  drive wheel %s: radius %.3f, width %.3f" % (s, r, w))

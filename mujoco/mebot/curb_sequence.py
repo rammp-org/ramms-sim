@@ -58,6 +58,7 @@ class Crossing:
             c.pos = [c.pos[0] + 0.2, c.pos[1], c.pos[2] + h]
         self.m = m = spec.compile()
         self.d = mujoco.MjData(m)
+        B.hold_arm_stowed(m, self.d)           # the arm stowed, and held there
         self.A = {m.actuator(i).name: i for i in range(m.nu)}
         self.r_dw = m.numeric("drive_wheel_radius").data[0]
         self.r_fo = m.numeric("front_omni_radius").data[0]
@@ -118,6 +119,8 @@ class Crossing:
         its rear lift stepped across its range and the linkage and damper left to settle at each step."""
         spec = mujoco.MjSpec.from_file(os.path.join(HERE, "mebot_powered_front_scene.xml" if self.powered else "mebot_scene.xml"))
         spec.delete(spec.joint("root"))
+        for k in list(spec.keys):              # sized to the free robot's qpos
+            spec.delete(k)
         m = spec.compile()
         m.opt.gravity[:] = 0
         m.opt.disableflags |= mujoco.mjtDisableBit.mjDSBL_CONTACT
@@ -170,6 +173,10 @@ class Crossing:
 
     def x(self, body):
         return self.d.body(body).xpos[0]
+
+    def rear_x(self):
+        """The rear omni wheel further back: both are past the edge once it is."""
+        return min(self.x("rear_omni_l"), self.x("rear_omni_r"))
 
     def pitch_roll(self):
         w, x, y, z = self.d.body("chassis").xquat
@@ -375,7 +382,7 @@ class Crossing:
         self.levelling(False)
         ph("Rear omni wheels up", lambda: self.move(self.goals_for({"rear_lift": lift})))
         on = ("drive", "front") if self.powered else ("drive",)
-        ph("Drive until the rear omni wheels are over the curb", lambda: self.drive_until(lambda: self.x("rear_omni_l") - self.r_ro >= FACE + 0.03, on=on))
+        ph("Drive until the rear omni wheels are over the curb", lambda: self.drive_until(lambda: self.rear_x() - self.r_ro >= FACE + 0.03, on=on))
         ph("Rear omni wheels down on the curb", lambda: self.touch_down("rear_lift", "curb"))
         self.levelling(True)
         self.finish()
@@ -403,12 +410,16 @@ class Crossing:
         self.levelling(False)
         ph("Rear omni wheels up", lambda: self.move(self.goals_for({"rear_lift": lift})))
         on = ("drive", "front") if self.powered else ("drive",)
-        ph("Drive until the rear omni wheels are past the edge", lambda: self.drive_until(lambda: self.x("rear_omni_l") - self.r_ro >= FACE + 0.03, on=on))
+        past = lambda: self.rear_x() - self.r_ro >= FACE + 0.03
+        ph("Drive until the rear omni wheels are past the edge", lambda: self.drive_until(past, on=on))
         # Everything under the frame is over the road now: lower the chassis on the drive and front wheels, so the
         # sprung rear, which reaches least, has less to reach.
         drop = Hc / 2
         ph("Lower the chassis on the drive and front wheels", lambda: self.move(self.goals_for(
             {"drive": self.b_now("drive") + drop, "front_arm": self.b_now("front_arm") + drop})))
+        # Lowering on the braked drive wheels swings them on their arms, which can roll the robot back: past the edge
+        # again (a no-op when it did not).
+        ph("Creep on until the rear omni wheels are past it again", lambda: self.drive_until(past, on=on))
         ph("Rear omni wheels down to the road", lambda: self.touch_down("rear_lift", "floor"))
         self.levelling(True)
         ph("Drive clear of the edge", lambda: self.drive_until(lambda: self.x("rear_omni_l") - self.r_ro >= FACE + 0.15, on=on))

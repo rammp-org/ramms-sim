@@ -96,7 +96,9 @@ for marker in {PROJECT_DIR.replace(os.sep, "/"), PROJECT_DIR, os.path.expanduser
         raise RuntimeError("%s still records '%s'; it would not be portable" % (saved, marker))
 print("[import] %s records no machine-specific paths" % os.path.basename(saved))
 
-# Every mesh path must resolve, the way URLab resolves it, to a file in mujoco/mebot.
+# Every mesh path must resolve, the way URLab resolves it, to a file in this repository's mujoco/ folder: the robot's
+# own in mujoco/mebot, the arm's in mujoco/gen3_2f85.
+mujoco_dir = os.path.dirname(model_dir)
 SDS = unreal.get_engine_subsystem(unreal.SubobjectDataSubsystem)
 B = unreal.SubobjectDataBlueprintFunctionLibrary
 outside, total = [], 0
@@ -109,10 +111,10 @@ for h in SDS.k2_gather_subobject_data_for_blueprint(bp):
     source = o.get_editor_property("source_file")
     base = os.path.dirname(source if os.path.isabs(source) else os.path.join(PROJECT_DIR, source))
     where = os.path.normpath(f if os.path.isabs(f) else os.path.join(base, f))
-    if not where.startswith(model_dir + os.sep) or not os.path.exists(where):
+    if not where.startswith(mujoco_dir + os.sep) or not os.path.exists(where):
         outside.append("%s -> %s" % (f, where))
 if outside:
-    raise RuntimeError("%d of %d mesh paths do not resolve to a file in %s, e.g. %s" % (len(outside), total, model_dir, outside[0]))
-print("[import] all %d mesh paths resolve to files in %s" % (total, model_dir))
+    raise RuntimeError("%d of %d mesh paths do not resolve to a file in %s, e.g. %s" % (len(outside), total, mujoco_dir, outside[0]))
+print("[import] all %d mesh paths resolve to files in %s" % (total, mujoco_dir))
 meshes = EAL.list_assets(MESHES, recursive=True) if EAL.does_directory_exist(MESHES) else []
 print("[import] %d mesh assets in %s" % (len(meshes), MESHES))

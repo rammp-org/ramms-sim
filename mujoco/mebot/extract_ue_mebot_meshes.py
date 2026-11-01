@@ -6,8 +6,9 @@ Run in the editor (read-only: nothing is saved). The skeletal mesh is rigid -- e
 weight -- so each triangle belongs to one bone. Writes, next to this file:
 
   meshes/<bone>__<material>.stl   binary STL, in metres and MuJoCo's axes (X forward, Y left, Z up), in the
-                                  skeletal mesh's component space (the bones' reference pose); parts over
-                                  MAX_TRIANGLES are simplified to MAX_TRIANGLES or a quarter of theirs, whichever is more
+                                  skeletal mesh's component space (the bones' reference pose), wound outward;
+                                  parts over MAX_TRIANGLES are simplified to MAX_TRIANGLES or a quarter of theirs,
+                                  whichever is more
   source/mebot_meshes.json        each part's file, bone, material, colour (the material's DiffuseColor, sRGB)
                                   and triangle counts
 
@@ -36,13 +37,15 @@ def srgb(c):
 
 
 def write_stl(path, verts, tris):
-    """verts in Unreal component space (cm); written in metres, MuJoCo axes (Y flipped, so winding reversed)."""
+    """verts in Unreal component space (cm); written in metres, MuJoCo axes (Y flipped), wound outward. Unreal's
+    front faces are clockwise in its left-handed axes; flipping Y mirrors them into right-handed counter-clockwise
+    ones, so the triangles keep their order (reversing it turned every part inside out)."""
     v = [(p.x * UE_TO_M, -p.y * UE_TO_M, p.z * UE_TO_M) for p in verts]
     with open(path + ".tmp", "wb") as f:
         f.write(b"mebot visual mesh".ljust(80, b" "))
         f.write(struct.pack("<I", len(tris)))
         for t in tris:
-            a, b, c = v[t.x], v[t.z], v[t.y]
+            a, b, c = v[t.x], v[t.y], v[t.z]
             u = [b[i] - a[i] for i in range(3)]
             w = [c[i] - a[i] for i in range(3)]
             n = [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]]

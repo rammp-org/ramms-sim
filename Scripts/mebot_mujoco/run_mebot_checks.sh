@@ -1,7 +1,7 @@
 #!/bin/bash
 # PIE checks of the MeBot MuJoCo pawn on Map_MebotCurb_URL: it stands, drives, turns, every lift
-# moves to its commanded position in its own units, and the gamepad drives it through the chair's
-# input map. Needs a running editor (Scripts/editor_remote_exec.py). PYTHON overrides the interpreter.
+# moves to its commanded position in its own units, the gamepad drives it through the chair's
+# input map, and the arm on its seat answers arm.* / gripper.* while the base still drives. Needs a running editor (Scripts/editor_remote_exec.py). PYTHON overrides the interpreter.
 # Exit status: nonzero if any check failed (PIE is still ended).
 S=$(cd "$(dirname "$0")" && pwd); ROOT=$(cd "$S/../.." && pwd); cd "$ROOT" || exit 1
 PY=${PYTHON:-python3}
@@ -53,6 +53,32 @@ op expect_motor elevator_l 0.08 0.30
 op pad Gamepad_RightTriggerAxis 1.0; sleep 1; op pad_release; sleep 6
 op expect_motor translator_l 4 20
 op state
+
+# arm.up moves the gripper along its own up (the teleop's local frame), which the stowed arm holds sideways: the
+# check is that it moves, and that arm.stow brings it back. The gripper's fingers are read at their driver joint
+# (0 open, 0.8 closed), not only the teleop's flag. Then the base still drives (backwards: the curb is ahead) with
+# the arm's IK running.
+echo "--- arm (in the MJCF, on the seat): it moves on arm.up and stows on arm.stow; the gripper closes and opens; the base keeps its commands ---"
+op mark_body arm_bracelet_link; op expect_control arm.stowed 0.9 1.1
+op set arm.up 1; sleep 1.5; op release arm.up; sleep 1
+op expect_body_moved arm_bracelet_link 5 60
+op expect_control arm.stowed -0.1 0.1
+op trigger arm.stow; sleep 4
+op expect_control arm.stowed 0.9 1.1
+op expect_body_moved arm_bracelet_link 0 3
+# Stowed, it answers the arm controls again; then stowed once more for what follows.
+op set arm.up 1; sleep 1; op release arm.up; sleep 1
+op expect_body_moved arm_bracelet_link 5 60
+op trigger arm.stow; sleep 4
+op expect_control arm.stowed 0.9 1.1
+op expect_joint arm_2f85_right_driver_joint -0.05 0.1
+op trigger gripper.close; sleep 1.5
+op expect_control gripper.closed 0.9 1.1
+op expect_joint arm_2f85_right_driver_joint 0.6 0.85
+op trigger gripper.open; sleep 1.5
+op expect_joint arm_2f85_right_driver_joint -0.05 0.1
+op mark; op set drive.forward -0.5; sleep 2; op release drive.forward; sleep 1.5
+op expect_moved x -250 -40
 
 trap - EXIT
 cleanup
