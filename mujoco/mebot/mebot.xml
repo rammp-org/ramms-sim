@@ -62,10 +62,10 @@
     <numeric name="drive_wheel_radius" data="0.184059"/>
     <numeric name="front_omni_radius" data="0.0765865"/>
     <numeric name="rear_omni_radius" data="0.101073"/>
-    <numeric name="elevator_speed_deg_s" data="6"/>
-    <numeric name="caster_arm_speed_deg_s" data="6"/>
-    <numeric name="rear_lift_speed_deg_s" data="8"/>
-    <numeric name="translator_speed_cm_s" data="2"/>
+    <numeric name="elevator_speed_deg_s" data="18"/>
+    <numeric name="caster_arm_speed_deg_s" data="30"/>
+    <numeric name="rear_lift_speed_deg_s" data="26"/>
+    <numeric name="translator_speed_cm_s" data="13"/>
     <numeric name="arm_stow" data="0 -0.349066 3.14159 -2.54818 0 -0.872665 1.5708"/>
   </custom>
   <asset>

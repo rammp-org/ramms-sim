@@ -57,7 +57,7 @@ LINEAR = [("dw_main_plate_l", "translator_l", "translator_speed_cm_s"), ("dw_mai
 # The seat's parts on the MJCF's seat body (its frame is the seat_base socket's), where BP_Mebot_Ramms carries them on its
 # mesh: (component, static mesh, location cm, rotation (pitch, yaw, roll) deg), from the socket. Decoration: no collision.
 SEAT_PARTS = [
-    ("Seat", "/RammsAssets/Robots/RAMMP/Seat/rammp_seat", (0.0, 0.0, 0.0), (0.0, 0.0, 0.0)),
+    ("SeatMesh", "/RammsAssets/Robots/RAMMP/Seat/rammp_seat", (0.0, 0.0, 0.0), (0.0, 0.0, 0.0)),
     ("rail_l", "/RammsAssets/Robots/RAMMP/Mounts/rammp_mount_rail", (2.0, -26.5, 8.5), (0.0, 0.0, 0.0)),
     ("rail_r", "/RammsAssets/Robots/RAMMP/Mounts/rammp_mount_rail", (2.0, 26.5, 8.5), (0.0, 0.0, 0.0)),
     ("mount_arm", "/RammsAssets/Robots/RAMMP/Mounts/rammp_mount_arm", (16.0, 26.5, 10.5), (0.0, 0.0, 0.0)),
@@ -179,7 +179,10 @@ def add_component(bp, cls, var_name, parent_var=None):
     o = SDL.get_object(SDL.get_data(new_h))
     if not o:
         raise RuntimeError("add_new_subobject(%s) failed: %s" % (var_name, fail))
-    SDS.rename_subobject(new_h, unreal.Text(var_name))
+    # Unreal's names ignore case: a name another component has (the seat body's "seat" for "Seat") is refused, and
+    # the component, left with its default name, would be added again on every run.
+    if not SDS.rename_subobject(new_h, unreal.Text(var_name)):
+        raise RuntimeError("could not name the new %s %s: is the name taken?" % (cls.__name__, var_name))
     return o
 
 

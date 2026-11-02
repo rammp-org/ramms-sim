@@ -40,6 +40,8 @@ LIFTS = ("elevator_l", "elevator_r", "translator_l", "translator_r", "front_arm"
 TOUCH = {"drive": ("drive_wheel_l", "drive_wheel_r"), "front_arm": ("front_omni_l", "front_omni_r"), "rear_lift": ("rear_omni_l", "rear_omni_r")}
 AFT = -0.30           # the translators' aft position for the rear lift (m)
 LOADED = 0.10         # the rule: each drive wheel carries this share of the weight before the rear lift
+LEVEL_GAIN = 8.0      # the rear's levelling trim: rad/s of rear lift per rad of pitch, at most the rear lift's speed. Fast
+                      # enough to level the chassis while the translators re-centre (3 s at 13 cm/s)
 LAND = 0.12           # descents: the lifted drive wheels' centres this far past their radius beyond the edge (m), so the
                       # swing arms and motors, which trail the wheels, clear the edge as the wheels swing down
 
@@ -207,7 +209,8 @@ class Crossing:
         m, d, dt = self.m, self.d, self.m.opt.timestep
         if self.level:                         # the rear sags as it takes load: trim its lift against the chassis's pitch
             lo, hi = m.actuator_ctrlrange[self.A["rear_lift"]]
-            self.trim -= 2.0 * math.radians(self.pitch_roll()[0]) * dt
+            cap = self.rate["rear_lift"] * dt
+            self.trim -= max(-cap, min(cap, LEVEL_GAIN * math.radians(self.pitch_roll()[0]) * dt))
             self.trim = max(lo - self.cmd["rear_lift"], min(hi - self.cmd["rear_lift"], self.trim))
         for k in LIFTS:
             err = self.goal[k] - self.cmd[k]
@@ -368,7 +371,7 @@ class Crossing:
         ph("Front omni wheels up", lambda: self.move(self.goals_for({"front_arm": lift})))
         ph("Drive until the drive wheels reach the curb", lambda: self.drive_until(lambda: self.x("drive_wheel_l") + self.r_dw >= FACE - 0.03))
         ph("Front omni wheels down on the curb", lambda: self.touch_down("front_arm", "curb"))
-        ph("Drive wheels up", lambda: self.move(self.goals_for({"drive": lift})))
+        ph("Drive wheels up", lambda: self.drive_wheels_up(lift))
         if self.powered:
             target = FACE + 0.65 * self.r_dw
             ph("Front omni wheels pull it forward; drive wheels aft", lambda: self.pull_forward(lambda: self.x("drive_wheel_l") >= target))
@@ -396,7 +399,7 @@ class Crossing:
         ph("Lower the chassis level for the crossing", lambda: self.move(self.goals_for({"drive": on_upper, "front_arm": on_upper, "rear_lift": on_upper})))
         ph("Drive up to the edge (front omni wheels over it)", lambda: self.drive_until(lambda: self.x("drive_wheel_l") >= FACE - 0.07))
         ph("Front omni wheels down to the road", lambda: self.touch_down("front_arm", "floor"))
-        ph("Drive wheels up", lambda: self.move(self.goals_for({"drive": lift})))
+        ph("Drive wheels up", lambda: self.drive_wheels_up(lift))
         if self.powered:
             target = FACE + self.r_dw + LAND
             ph("Front omni wheels pull it forward; drive wheels aft", lambda: self.pull_forward(lambda: self.x("drive_wheel_l") >= target))
@@ -424,6 +427,14 @@ class Crossing:
         self.levelling(True)
         ph("Drive clear of the edge", lambda: self.drive_until(lambda: self.x("rear_omni_l") - self.r_ro >= FACE + 0.15, on=on))
         self.finish()
+
+    def drive_wheels_up(self, lift):
+        """The drive wheels up, the powered front omni wheels' hubs holding the robot from here: braked, the drive
+        wheels grip the road as their arms swing them up and push the chassis back, and once they are off it nothing
+        else stops it rolling."""
+        if self.powered:
+            self.front["speed"] = 0.0
+        self.move(self.goals_for({"drive": lift}))
 
     def pull_forward(self, there):
         """Powered front: translators to AFT while the front omni wheels pull the robot forward until there()."""

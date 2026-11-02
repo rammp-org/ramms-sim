@@ -81,15 +81,18 @@ PARAMS = {
     "caster_arm_deg": None,                # the front arm's, and the rear arm's stop
     "translator_cm": None,
     # Actuators: position gain, velocity gain, force/torque limit; speeds for the commands. The lifts' servos are stiff
-    # (3x, damping 1.75x, since the seat and arm went on): the electrohydraulic actuators hold where they are put.
-    "elevator": {"kp": 9000.0, "kv": 350.0, "force": 600.0, "speed_deg_s": 6.0},      # N*m/rad, N*m*s/rad, N*m
-    "caster_arm": {"kp": 6000.0, "kv": 175.0, "force": 400.0, "speed_deg_s": 6.0},
-    "rear_lift": {"kp": 9000.0, "kv": 260.0, "force": 400.0, "speed_deg_s": 8.0},      # at the suspension arm (~6 deg/s at the rear arm)
+    # (3x, damping 1.75x, since the seat and arm went on): the electrohydraulic actuators hold where they are put. The
+    # speeds are estimated from a video of the robot: the front and rear caster arms go their full throw in 2-4 s and
+    # the carriages theirs in 5-7 s, taken as 3 s and 6 s over this model's ranges; the drive wheels drop in about 2 s,
+    # which on a 15 cm crossing is the elevators' 34-36 deg lift and set-down.
+    "elevator": {"kp": 9000.0, "kv": 350.0, "force": 600.0, "speed_deg_s": 18.0},     # N*m/rad, N*m*s/rad, N*m; 36 deg in 2 s
+    "caster_arm": {"kp": 6000.0, "kv": 175.0, "force": 400.0, "speed_deg_s": 30.0},   # 90 deg in 3 s
+    "rear_lift": {"kp": 9000.0, "kv": 260.0, "force": 400.0, "speed_deg_s": 26.0},    # at the suspension arm: 79 deg in 3 s
     "rear_lift_deg": (-35.0, 44.0),        # +44: the rear arm at its 45 deg stop; near -40 the rear actuator passes dead centre
     # The rear damper: spring rate, damping, the preload it holds against its top-out stop, and its travel from the
     # reference pose (top-out first; positive compresses it, as load on the rear wheels does).
     "rear_spring": {"stiffness": 200000.0, "damping": 5000.0, "preload": 600.0, "travel_cm": (-1.0, 2.0)},  # N/m, N*s/m, N
-    "translator": {"kp": 30000.0, "kv": 2000.0, "force": 1500.0, "speed_cm_s": 2.0},  # N/m, N*s/m, N
+    "translator": {"kp": 30000.0, "kv": 2000.0, "force": 1500.0, "speed_cm_s": 13.0},  # N/m, N*s/m, N; 80 cm in 6 s
     # N*m; 9 rad/s ~ 6 km/h; the geared motor's inertia at the wheel, kg*m^2 (with less, a wheel that slips spins up at once)
     "drive": {"torque": 60.0, "max_speed_rad_s": 9.0, "armature": 0.1},
     "front_omni_drive": {"torque": 15.0, "max_speed_rad_s": 22.0},                     # the powered-front variant
