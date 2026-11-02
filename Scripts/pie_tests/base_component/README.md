@@ -102,4 +102,8 @@ so tests are chains of short scripts with local sleeps, run from **bash**; never
 `set_editor_property` on live PIE components (use the `Set*` UFUNCTIONs); the
 chair's legacy tick re-issues its joystick every frame, so a scripted
 command on the chair needs its actor tick disabled first
-(`cs_common.quiet_local_input`).
+(`cs_common.quiet_local_input`); and the chair Blueprint takes the arm (teleop
+off, so the surface refuses `arm.*` / `gripper.*`) when a `Target`-tagged
+button enters its `ArmWorkspaceTrigger`, giving it back only after the reach
+lands and the arm retracts — the gamepad section drives up to one, so
+`chaos_t1.py` turns the trigger's overlaps off (`cs_common.quiet_arm_workspace`).

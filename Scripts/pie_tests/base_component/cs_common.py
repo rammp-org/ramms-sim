@@ -32,6 +32,29 @@ def quiet_local_input(actor):
     actor.set_actor_tick_enabled(False)
 
 
+def quiet_arm_workspace(actor):
+    """Keep the chair Blueprint from taking the arm. Its ArmWorkspaceTrigger (a
+    sphere on the arm base) reacts to an actor tagged Target (Map_Demo's two
+    buttons) entering it: teleop off, reach for the button, and teleop back only
+    after the reach lands within the controller's pose tolerance and the arm has
+    retracted. Until then the surface refuses arm.* / gripper.*, and a reach that
+    never lands (the chair teleported away first) never gives the arm back. A run
+    that drives the chair to a button would race that sequence, so the trigger's
+    collision goes off: no query, no overlaps."""
+    for c in actor.get_components_by_class(unreal.PrimitiveComponent):
+        if c.get_name() == "ArmWorkspaceTrigger":
+            c.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
+            return True
+    return False
+
+
+def arm_teleop_enabled(actor):
+    """The arm teleop component's master enable (None without one): arm.* and
+    gripper.* controls are refused while it is off."""
+    t = actor.get_component_by_class(unreal.RammsEndEffectorTeleopComponent)
+    return t.get_editor_property("teleop_enabled") if t else None
+
+
 def set_control(cs, cid, value):
     ok = cs.set_control(cid, float(value), SRC)
     if not ok:
