@@ -1594,9 +1594,9 @@
   "fixed_com_ahead_cm": 30.565,
   "drive_assembly_mass_kg": 15.1,
   "drive_assembly_com_from_hub_cm": -15.993,
-  "elevator_speed_deg_s": 6.0,
-  "front_arm_speed_deg_s": 6.0,
-  "rear_lift_speed_deg_s": 8.0,
-  "translator_speed_cm_s": 2.0
+  "elevator_speed_deg_s": 18.0,
+  "front_arm_speed_deg_s": 30.0,
+  "rear_lift_speed_deg_s": 26.0,
+  "translator_speed_cm_s": 13.0
  }
 }

@@ -57,7 +57,7 @@ LINEAR = [("dw_main_plate_l", "translator_l", "translator_speed_cm_s"), ("dw_mai
 # The seat's parts on the MJCF's seat body (its frame is the seat_base socket's), where BP_Mebot_Ramms carries them on its
 # mesh: (component, static mesh, location cm, rotation (pitch, yaw, roll) deg), from the socket. Decoration: no collision.
 SEAT_PARTS = [
-    ("Seat", "/RammsAssets/Robots/RAMMP/Seat/rammp_seat", (0.0, 0.0, 0.0), (0.0, 0.0, 0.0)),
+    ("SeatMesh", "/RammsAssets/Robots/RAMMP/Seat/rammp_seat", (0.0, 0.0, 0.0), (0.0, 0.0, 0.0)),
     ("rail_l", "/RammsAssets/Robots/RAMMP/Mounts/rammp_mount_rail", (2.0, -26.5, 8.5), (0.0, 0.0, 0.0)),
     ("rail_r", "/RammsAssets/Robots/RAMMP/Mounts/rammp_mount_rail", (2.0, 26.5, 8.5), (0.0, 0.0, 0.0)),
     ("mount_arm", "/RammsAssets/Robots/RAMMP/Mounts/rammp_mount_arm", (16.0, 26.5, 10.5), (0.0, 0.0, 0.0)),
@@ -179,7 +179,10 @@ def add_component(bp, cls, var_name, parent_var=None):
     o = SDL.get_object(SDL.get_data(new_h))
     if not o:
         raise RuntimeError("add_new_subobject(%s) failed: %s" % (var_name, fail))
-    SDS.rename_subobject(new_h, unreal.Text(var_name))
+    # Unreal's names ignore case: a name another component has (the seat body's "seat" for "Seat") is refused, and
+    # the component, left with its default name, would be added again on every run.
+    if not SDS.rename_subobject(new_h, unreal.Text(var_name)):
+        raise RuntimeError("could not name the new %s %s: is the name taken?" % (cls.__name__, var_name))
     return o
 
 
@@ -261,6 +264,18 @@ setp(top, target_arm_length=550.0, relative_rotation=unreal.Rotator(roll=0.0, pi
 setp(add_component(bp, unreal.CameraComponent, "TopCamera", parent_var="TopArm"), auto_activate=False)
 
 # The seat's parts and its occupant on the seat body; the arm's IK and teleop (the arm itself is in the MJCF).
+# Earlier runs named the seat's mesh "Seat", which the seat body's "seat" refused: each left a copy under its default
+# name (StaticMesh, StaticMesh1, ...). Those go first.
+stray = []
+for h in handles(bp):
+    d = SDL.get_data(h)
+    o = SDL.get_object(d)
+    if (isinstance(o, unreal.StaticMeshComponent) and str(SDL.get_variable_name(d)).startswith("StaticMesh")
+            and o.get_editor_property("static_mesh") and o.get_editor_property("static_mesh").get_path_name().split(".")[0] == SEAT_PARTS[0][1]):
+        stray.append(h)
+if stray:
+    SDS.delete_subobjects(handles(bp)[0], stray, bp)
+    log("removed %d copies of the seat mesh left by earlier runs" % len(stray))
 for name, mesh, loc, rot in SEAT_PARTS:
     part = add_component(bp, unreal.StaticMeshComponent, name, parent_var="seat")
     setp(part, static_mesh=EAL.load_asset(mesh), relative_location=unreal.Vector(*loc),
