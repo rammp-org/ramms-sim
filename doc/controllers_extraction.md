@@ -138,7 +138,7 @@ until those scripts run green against re-saved assets.
 
 | asset | repo |
 | --- | --- |
-| `BP_Mebot_Ramms`, `BP_Mebot_Mujoco`, `Showcase.umap` | ramms-sim |
+| `BP_RammpGen1_Ramms`, `BP_RammpGen1_Mujoco`, `Showcase.umap` | ramms-sim |
 | `BP_LiftDriveLinkage_Ramms`, `BP_LiftDriveHolonomic_Ramms` | private |
 | **`DT_LiftDriveLinkage_5Bar`** | private |
 

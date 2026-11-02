@@ -66,7 +66,7 @@ cam_actor.set_actor_label(CAM_ACTOR_LABEL)
 # Components go on through the SubobjectDataSubsystem: neither
 # add_component_by_class nor register_component is exposed to Python, and a
 # directly constructed component is never registered, so the capture subsystem
-# would not see it. Same machinery the mebot setup scripts use, with
+# would not see it. Same machinery the RAMMP Gen1 setup scripts use, with
 # ..._for_instance instead of ..._for_blueprint because this is a level actor.
 SDS = unreal.get_engine_subsystem(unreal.SubobjectDataSubsystem)
 B = unreal.SubobjectDataBlueprintFunctionLibrary

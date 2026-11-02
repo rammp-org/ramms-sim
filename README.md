@@ -16,7 +16,7 @@
 </p>
 
 <p align="center">
-  <img src="doc/images/readme/hero.webp" width="100%" alt="The MeBot wheelchair with its Kinova arm driving down a generated downtown sidewalk past pedestrians">
+  <img src="doc/images/readme/hero.webp" width="100%" alt="The RAMMP Gen1 wheelchair with its Kinova arm driving down a generated downtown sidewalk past pedestrians">
 </p>
 
 <p align="center">
@@ -82,7 +82,7 @@
 ## What's inside
 
 **Robots and physics**
-- **MeBot powered wheelchair base**: differential drive with torque and velocity
+- **RAMMP Gen1 powered wheelchair base**: differential drive with torque and velocity
   modes, odometry, front/rear caster swing arms, a lift that raises and tilts
   the base, and drive wheels that slide fore and aft for front-, mid- and
   rear-wheel drive. A parking brake brings a stopped chair to
@@ -96,7 +96,7 @@
   [UnrealRoboticsLab](https://github.com/rammp-org/UnrealRoboticsLab), or the
   experimental [Newton](https://github.com/newton-physics/newton) worker.
 - **A seated person and other robots**: an operator seated in the chair,
-  lift-drive and holonomic research platforms, an accessible van with an
+  the RAMMP Gen2 lift-drive research platforms (holonomic and linkage), an accessible van with an
   articulated ramp, and an ADA door.
 
 **Sensing**
@@ -492,10 +492,10 @@ git submodules:
 
 | Plugin | Path | Description |
 |--------|------|-------------|
-| **RammsCore** | `Plugins/RammsCore/` | Core simulation components — differential drive, MeBot controller, Kinova Gen3 arm with IK solvers, gripper, sensor simulation (ToF, Sonar, IMU), GPU ray tracing, URDF import/export |
+| **RammsCore** | `Plugins/RammsCore/` | Core simulation components — differential drive, RAMMP Gen1 controller, Kinova Gen3 arm with IK solvers, gripper, sensor simulation (ToF, Sonar, IMU), GPU ray tracing, URDF import/export |
 | **CameraCapture** | `Plugins/CameraCapture/` | Multi-camera capture system — RGB + depth + motion vectors with custom camera intrinsics, EXR output, and frustum visualization |
 | **RammsStreaming** | `Plugins/RammsStreaming/` | Real-time binary streaming over TCP (RMSS protocol, port 30030) — image data, depth frames, motion vectors, point clouds |
-| **RammsAssets** | `Plugins/RammsAssets/` | 3D models and materials — Kinova Gen3 arm, gripper, MeBot base, operator seat, ORBBEC and LUCI camera models |
+| **RammsAssets** | `Plugins/RammsAssets/` | 3D models and materials — Kinova Gen3 arm, gripper, RAMMP Gen1 base, operator seat, ORBBEC and LUCI camera models |
 | **RammsHumanPhysics** | `Plugins/RammsHumanPhysics/` | Experimental human body physics plugin for RAMMS |
 | **RammsNewtonPhysics** | `Plugins/RammsNewtonPhysics/` | Experimental Newton Dynamics integration scaffold — third-party detection, fixed-step subsystem, actor bridge component, and articulated robot API for Newton-first full-robot simulation |
 | **RammsMujocoPhysics** | `Plugins/RammsMujocoPhysics/` | Experimental MuJoCo integration scaffold — third-party detection, fixed-step subsystem, and actor bridge component for selective external simulation |
@@ -514,10 +514,10 @@ git submodules:
 ramms-sim/
 ├── Config/                    Project configuration (.ini files)
 ├── Content/                   Blueprints, materials, meshes, levels
-│   ├── Blueprints/              Game logic (BP_MebotGameMode, etc.)
+│   ├── Blueprints/              Game logic (BP_RammpGen1GameMode, etc.)
 │   ├── Maps/                    Test and demo levels (Map_Demo, Map_ArmTest, Map_RampTest, ...)
 │   │   └── Gen/                 Generated example worlds (Map_Gen_Downtown, _Park, _Office, ...)
-│   ├── Robots/                  Robot blueprints (BP_Mebot_Ramms, BP_Mebot_Mujoco, BP_Kinova_Gen3, ...; pawns: doc/robot_pawn.md)
+│   ├── Robots/                  Robot blueprints (BP_RammpGen1_Ramms, BP_RammpGen1_Mujoco, BP_Kinova_Gen3, ...; pawns: doc/robot_pawn.md)
 │   ├── Vehicles/                Accessible van with ramp
 │   ├── ada_door/                Accessible door system
 │   ├── Python/                  init_unreal.py and the RAMMS MCP toolset
@@ -544,9 +544,9 @@ ramms-sim/
 
 ## Simulation Features
 
-### Mobile Robotic Base (MeBot)
+### Mobile Robotic Base (RAMMP Gen1)
 
-Complete simulation of the MeBot powered wheelchair base:
+Complete simulation of the RAMMP Gen1 powered wheelchair base:
 - Differential drive with torque and velocity control modes
 - PID feedback, slip modeling, and odometry tracking
 - Front and rear caster arm articulation
@@ -555,7 +555,7 @@ Complete simulation of the MeBot powered wheelchair base:
 - A parking brake that brings a stopped chair to rest and holds it on ramps
 - Configurable motor parameters (max RPM, torque curves, braking)
 
-**Components:** `URammsDifferentialDriveController`, `UMebotControllerComponent`,
+**Components:** `URammsDifferentialDriveController`, `URammpGen1ControllerComponent`,
 `URammsDifferentialDriveLibrary`
 
 ### Kinova Gen 3 Manipulator
@@ -582,9 +582,9 @@ Controllers never touch physics directly. A robot carries one
 ids, types and ranges) and resolves a backend once; every drive, lift and
 linkage controller then commands motors by id. The same controllers run on:
 
-- **Chaos** skeletal bodies (the default `BP_Mebot_Ramms`), with async physics
+- **Chaos** skeletal bodies (the default `BP_RammpGen1_Ramms`), with async physics
   at a fixed 10 ms step, constraint-motor brakes and slope holding.
-- **MuJoCo** through URLab (`BP_Mebot_Mujoco`, `BP_Gen3_Mujoco`), with MJCF
+- **MuJoCo** through URLab (`BP_RammpGen1_Mujoco`, `BP_Gen3_Mujoco`), with MJCF
   import, 40+ sensors and record/replay.
 - **Newton** (experimental): URLab's MuJoCo data model stepped by an
   out-of-process [Newton](https://github.com/newton-physics/newton) worker on
@@ -793,7 +793,7 @@ global illumination. Key settings in `Config/DefaultEngine.ini`:
 ### Game Settings
 
 - **Default map:** `Maps/Map_Demo`
-- **Default game mode:** `BP_MebotGameMode` (pawn `BP_Mebot_Ramms`, controller `ARammsPlayerController`)
+- **Default game mode:** `BP_RammpGen1GameMode` (pawn `BP_RammpGen1_Ramms`, controller `ARammsPlayerController`)
 - **Splitscreen:** Enabled (2-player horizontal, 3-player top-favored)
 
 ## Python Integration
@@ -837,7 +837,7 @@ The sister repository [ramms-tools](https://github.com/rammp-org/ramms-tools)
 to drive RAMMS from outside the editor. It talks to the engine's **Remote
 Control API** (HTTP port 30010, in the editor and in `-game` / packaged
 builds with the plugin) and ships a library plus CLIs: `ramms-kinova`,
-`ramms-mebot`, `ramms-gripper`, `ramms-pose`, `ramms-imu`, `ramms-stream`,
+`ramms-rammp-gen1`, `ramms-gripper`, `ramms-pose`, `ramms-imu`, `ramms-stream`,
 `ramms-notify`, `ramms-status`, `ramms-tui`, and `ramms-worldgen` for
 [world generation](#world-generation-procedural-randomized-environments).
 
@@ -987,7 +987,7 @@ See [doc/world_generation.md](doc/world_generation.md) and
 
 RammsCore ships bidirectional URDF (Unified Robot Description Format)
 conversion for interoperability with ROS, MoveIt, PyBullet, MuJoCo and other
-robotics tools: export a Physics Asset (e.g. the Kinova Gen3 arm or the MeBot
+robotics tools: export a Physics Asset (e.g. the Kinova Gen3 arm or the RAMMP Gen1
 base) to `<ProjectDir>/urdf/<asset>.urdf`, or import a URDF into a Physics
 Asset. The scripts run inside the UE Editor Python console. See the
 [RammsCore README](Plugins/RammsCore/README.md#urdf-export--import) for

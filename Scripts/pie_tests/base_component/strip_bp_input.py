@@ -1,8 +1,8 @@
 """Strip a robot Blueprint's direct input wiring (key events, input-action
 reads, the per-tick SetDriveInput write) now that keys and the drive go through
-the control surface. unreal._ramms_strip_bp: asset path (default BP_Mebot_Ramms)."""
+the control surface. unreal._ramms_strip_bp: asset path (default BP_RammpGen1_Ramms)."""
 import unreal
-path = getattr(unreal, "_ramms_strip_bp", "/Game/Robots/BP_Mebot_Ramms")
+path = getattr(unreal, "_ramms_strip_bp", "/Game/Robots/BP_RammpGen1_Ramms")
 bp = unreal.EditorAssetLibrary.load_asset(path)
 L = unreal.RammsBlueprintCleanupLibrary
 before = L.list_input_nodes(bp)

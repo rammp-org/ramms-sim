@@ -4,7 +4,7 @@
 
 RAMMS-Sim (Robotic Assistive Mobility and Manipulation Simulation) is an Unreal Engine 5.8 project that provides a high-fidelity simulation environment for robotic assistive technologies. The project simulates:
 
-- **MeBot** - Mobile robotic wheelchair base with differential drive, articulated caster arms, and elevation systems
+- **RAMMP Gen1** - Mobile robotic wheelchair base with differential drive, articulated caster arms, and elevation systems
 - **Kinova Jaco Gen 3** - Robotic manipulator arm with skeletal mesh and joint constraints
 - **Accessible Van** - Van with controllable doors and articulated ramp system
 - **Camera Capture System** - Multi-camera RGB + depth + motion vector data capture
@@ -17,7 +17,7 @@ The project uses a modular plugin architecture with several plugins managed as g
 
 - **RammsCore** (`Plugins/RammsCore/`) - Core simulation components
   - `RammsDifferentialDriveController` - Differential drive physics controller
-  - `MebotControllerComponent` - Linear/angular actuator control for wheelchair
+  - `RammpGen1ControllerComponent` - Linear/angular actuator control for wheelchair
   - `KinovaGen3ControllerComponent` - Robotic arm controller
   - `GripperControllerComponent` - End effector control
   - `VanRampComponent` / `VanDoorComponent` - Vehicle accessibility components
@@ -38,7 +38,7 @@ Plugins/RammsCore/Source/
 Plugins/CameraCapture/Source/
   └── CameraCapture/    - Runtime capture components
 Content/                - Blueprint assets, materials, meshes, levels
-  ├── mebot/           - MeBot wheelchair assets
+  ├── Robots/          - RAMMP Gen1 pawns (BP_RammpGen1_Ramms, RammpGen1/)
   ├── kinova/          - Kinova arm assets
   ├── luci/            - Luci wheelchair assets
   └── VehicleTemplate/ - Base vehicle templates
@@ -51,7 +51,7 @@ py/                     - Python integration scripts
 
 Actor components find and configure child components by name or type:
 - `CaptureComponent` auto-detects all `UIntrinsicSceneCaptureComponent2D` children
-- `MebotControllerComponent` locates constraints by `ConstraintName` property
+- `RammpGen1ControllerComponent` locates constraints by `ConstraintName` property
 - `RammsDifferentialDriveController` finds skeletal mesh via `SkeletalMeshComponentName` or auto-finds first
 
 ### Physics Control Modes
@@ -75,7 +75,7 @@ Camera parameters can be:
 
 ### Motor Configuration Pattern
 
-Components like `MebotControllerComponent` use configuration structs:
+Components like `RammpGen1ControllerComponent` use configuration structs:
 ```cpp
 USTRUCT(BlueprintType)
 struct FAngularMotorConfig {
@@ -153,7 +153,7 @@ Key UE plugins this project depends on:
 
 ### Asset Naming
 
-- Blueprints: `BP_<Name>` (e.g., `BP_MebotGameMode`)
+- Blueprints: `BP_<Name>` (e.g., `BP_RammpGen1GameMode`)
 - Materials: `M_<Name>` (e.g., `M_DmvCapture` for depth+motion capture)
 - Data Assets: `DA_<Name>` (e.g., `DA_RealSense_D435`)
 

@@ -9,13 +9,13 @@ restart the editor); the MuJoCo builders/tests need it, the Chaos chair test
 doesn't. `move_private_assets.py` is the one-shot migration that put them there.
 
 - `make_assets.py` — creates the motor / 5-bar DataTables under
-  `/Game/Robots/Data`, adds `RobotBase` to `BP_Mebot_Ramms`, and builds
+  `/Game/Robots/Data`, adds `RobotBase` to `BP_RammpGen1_Ramms`, and builds
   `BP_LiftDriveLinkage_Ramms` (child of the imported articulation) with the
   base, diff-drive and both centre 5-bar controllers. Idempotent.
 - `make_input_assets.py` — authors the Enhanced Input assets under
   `/Game/Input/Ramms`: the `IA_Ramms_*` actions, the single `IMC_RammsRobot`
   mapping context (every key, once) and one `URammsControlInputMap` per robot
-  family (`DA_RammsInput_LiftDriveLinkage` / `LiftDriveHolonomic` / `Mebot`)
+  family (`DA_RammsInput_LiftDriveLinkage` / `LiftDriveHolonomic` / `RAMMP Gen1`)
   binding actions to control Ids (wildcards such as `motor.*_front_crank`).
   Re-run it to change a key; it overwrites mappings and bindings.
 - `make_pawns.py` — makes `BP_LiftDriveLinkage_Ramms` / `BP_LiftDriveHolonomic_Ramms`
@@ -46,7 +46,7 @@ doesn't. `move_private_assets.py` is the one-shot migration that put them there.
   nothing on the differential drive, W and the stick combining on the drive
   axes, the right stick Y (down, then up) / triggers / bumpers each held for a fixed stretch of game time
   (released by the editor) and moving the elevators / translators / caster
-  arms by their rate's worth since a mark — and the MebotController API is
+  arms by their rate's worth since a mark — and the RammpGen1Controller API is
   exercised.
 - `make_ramp_map.py` — builds `/Game/Maps/Map_RampTest` from the engine's
   default template: a 1:12 (4.8°, the ADA maximum) and a 1:8 (7.1°) ramp with
@@ -80,7 +80,7 @@ doesn't. `move_private_assets.py` is the one-shot migration that put them there.
 - `strip_bp_input.py` — removes a robot Blueprint's direct input wiring (key
   events, input-action reads, the per-tick `SetDriveInput` write) via
   `RammsBlueprintCleanupLibrary` (RammsCoreEditor); run once on
-  `BP_Mebot_Ramms` on 2026-09-15.
+  `BP_RammpGen1_Ramms` on 2026-09-15.
 - `access_send.py` — host-side sender of ramms-access v1 intent packets (UDP
   JSON: `--drive X Y`, `--ee-lin`, `--ee-ang`, `--event`); `access_check.py`
   asserts the surface's owner (`expect_owner drive.forward Autonomy`).

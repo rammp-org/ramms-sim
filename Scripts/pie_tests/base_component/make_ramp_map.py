@@ -3,7 +3,7 @@
 From the engine's default template (floor, sun, sky, PlayerStart): lane A is a 1:12 ramp
 (4.76 deg, the ADA maximum) and lane B a 1:8 ramp (7.13 deg), each 140 cm wide with a flat
 landing at the top. Both rise along +X from x = 0; lane A is at y = 0, lane B at y = 400.
-The project's default game mode (BP_MebotGameMode) spawns BP_Mebot_Ramms at the PlayerStart,
+The project's default game mode (BP_RammpGen1GameMode) spawns BP_RammpGen1_Ramms at the PlayerStart,
 placed on lane A's approach; ramp_test.py teleports it to each lane. Idempotent: an existing
 map is rebuilt in place.
 
@@ -80,7 +80,7 @@ ps.set_actor_location_and_rotation(unreal.Vector(-350.0, 0.0, floor_top + 100.0)
 
 world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
 ws = world.get_world_settings()
-gm = unreal.load_asset("/Game/BP_MebotGameMode")
+gm = unreal.load_asset("/Game/BP_RammpGen1GameMode")
 ws.set_editor_property("default_game_mode", gm.generated_class())
 saved = unreal.EditorLoadingAndSavingUtils.save_current_level()
 log("map saved=%s" % saved)

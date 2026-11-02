@@ -16,7 +16,7 @@ keeps inheriting the vehicle's yaw as well. This is the check that the controls
 survived that -- a sibling test, verify_head_tracking.py, is what proves the rig
 is never re-parented.
 
-Run with PIE running and the Mebot spawned:
+Run with PIE running and the RAMMP Gen1 spawned:
 
     python3 Scripts/editor_remote_exec.py \
         --file Scripts/pie_tests/seat/verify_head_tracking_controls.py
@@ -24,7 +24,7 @@ Run with PIE running and the Mebot spawned:
 
 import unreal
 
-ACTOR = "BP_Mebot_Ramms0"
+ACTOR = "BP_RammpGen1_Ramms0"
 CAMERA = "Front Camera"
 TRACKED = "Front Spring Arm"
 # Inside the component's own pitch clamp, so this measures the AXES rather than

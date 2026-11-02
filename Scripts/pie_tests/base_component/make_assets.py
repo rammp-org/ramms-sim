@@ -1,7 +1,7 @@
 """Create the motor / 5-bar data tables and wire the base-component architecture
-onto the MeBot blueprints. Idempotent: re-running updates existing assets.
+onto the RAMMP Gen1 blueprints. Idempotent: re-running updates existing assets.
 
-- /Game/Robots/Data/DT_Mebot_ChaosMotors      (FRammsMotorSpec)  -> BP_Mebot_Ramms
+- /Game/Robots/Data/DT_RammpGen1_ChaosMotors      (FRammsMotorSpec)  -> BP_RammpGen1_Ramms
 - /RammsPrivateAssets/Robots/Data/DT_LiftDriveLinkage_Motors (FRammsMotorSpec)  -> BP_LiftDriveLinkage_Ramms
 - /RammsPrivateAssets/Robots/Data/DT_LiftDriveLinkage_5Bar   (FRamms5BarLinkageSpec)
 - /RammsPrivateAssets/Robots/BP_LiftDriveLinkage_Ramms : child of lift_drive_linkage (AMjArticulation)
@@ -114,11 +114,11 @@ ensure_dir(PRIVATE_DATA_DIR)
 # here and the BP's own bone names are un-swapped below to match.
 #
 # The chair's other actuators are physics-asset constraint drives (the same
-# constraints UMebotControllerComponent lists): Position motors whose ChaosName
+# constraints URammpGen1ControllerComponent lists): Position motors whose ChaosName
 # is the constraint. Angular ones are commanded/read in radians, linear ones in
 # cm; the Chaos backend infers the driven axis from the constraint's free DOF.
 # Ranges are left to the constraint limits (ControlRange unset).
-dt_chaos = make_table("DT_Mebot_ChaosMotors", unreal.RammsMotorSpec.static_struct(), [
+dt_chaos = make_table("DT_RammpGen1_ChaosMotors", unreal.RammsMotorSpec.static_struct(), [
     motor("left_motor", "Torque", chaos="drive_wheel_l"),
     motor("right_motor", "Torque", chaos="drive_wheel_r"),
     # drive-motor elevators: swing arms that raise/lower each drive wheel
@@ -132,10 +132,10 @@ dt_chaos = make_table("DT_Mebot_ChaosMotors", unreal.RammsMotorSpec.static_struc
     motor("rear_caster_elevator", "Position", chaos="rear_caster_swing_arm"),
 ])
 
-bp = EAL.load_asset("/Game/Robots/BP_Mebot_Ramms")
-log("=== BP_Mebot_Ramms")
+bp = EAL.load_asset("/Game/Robots/BP_RammpGen1_Ramms")
+log("=== BP_RammpGen1_Ramms")
 base = add_component(bp, unreal.RammsRobotBaseComponent, "RobotBase")
-# The robot's control surface: gathers every contributor (drive, MeBot lift,
+# The robot's control surface: gathers every contributor (drive, RAMMP Gen1 lift,
 # camera...) plus unclaimed registry motors; panels / input maps / remote
 # clients drive the chair through it.
 add_component(bp, unreal.RammsRobotControlSurfaceComponent, "ControlSurface")
@@ -143,9 +143,9 @@ add_component(bp, unreal.RammsRobotControlSurfaceComponent, "ControlSurface")
 # (The chair's pawn class, ARammsSkeletalRobotPawn, binds no input itself: the
 # keys reach the robot only through ControlInput and the surface.)
 ctrl_in = add_component(bp, unreal.RammsControlInputComponent, "ControlInput")
-setp(ctrl_in, input_maps=[EAL.load_asset("/Game/Input/Ramms/DA_RammsInput_Mebot")], log_commands=True)
+setp(ctrl_in, input_maps=[EAL.load_asset("/Game/Input/Ramms/DA_RammsInput_RammpGen1")], log_commands=True)
 # Explicit Chaos: Auto's "an articulation attached under me" heuristic is not
-# right for a Chaos base that carries a MuJoCo arm child actor (BP_Mebot_Mujoco).
+# right for a Chaos base that carries a MuJoCo arm child actor (BP_RammpGen1_Mujoco).
 setp(base, motor_table=dt_chaos, backend=unreal.RammsPhysicsBackend.CHAOS,
      chaos_skeletal_mesh_component_name="VehicleMesh")
 _, dd = find_component(bp, cls_name="RammsDifferentialDriveController")
