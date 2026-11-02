@@ -4,7 +4,13 @@
 # input map, and the arm on its seat answers arm.* / gripper.* while the base still drives. Needs a running editor (Scripts/editor_remote_exec.py). PYTHON overrides the interpreter.
 # Exit status: nonzero if any check failed (PIE is still ended).
 S=$(cd "$(dirname "$0")" && pwd); ROOT=$(cd "$S/../.." && pwd); cd "$ROOT" || exit 1
-PY=${PYTHON:-python3}
+PY=${PYTHON:-}
+if [ -z "$PY" ]; then
+    for c in python3 python "/c/Program Files/Epic Games/UE_5.8/Engine/Binaries/ThirdParty/Python3/Win64/python.exe"; do
+        if "$c" -c "import sys" >/dev/null 2>&1; then PY=$c; break; fi
+    done
+fi
+[ -n "$PY" ] || { echo "!! no Python found: set PYTHON"; exit 1; }
 FAIL=0
 op(){ if ! "$PY" Scripts/editor_remote_exec.py --code "unreal._ramms_rammp_gen1_op='$*'" >/dev/null 2>&1; then
           echo "!! could not set the op '$*'"; FAIL=1; return 1; fi

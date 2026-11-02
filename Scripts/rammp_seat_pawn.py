@@ -67,8 +67,10 @@ def add_component(bp, cls, var_name, parent_var=None):
     if not o:
         raise RuntimeError("add_new_subobject(%s) failed: %s" % (var_name, fail))
     # Unreal's names ignore case: a name another component has (the seat body's "seat" for "Seat") is refused, and
-    # the component, left with its default name, would be added again on every run.
+    # the component, left with its default name, would be added again on every run. It goes before the error, so a
+    # later save does not keep it.
     if not SDS.rename_subobject(new_h, unreal.Text(var_name)):
+        SDS.delete_subobject(handles(bp)[0], new_h, bp)
         raise RuntimeError("could not name the new %s %s: is the name taken?" % (cls.__name__, var_name))
     return o
 
@@ -115,8 +117,8 @@ def add_seat_and_arm(bp, stow, seat_body="seat"):
         if (isinstance(o, unreal.StaticMeshComponent) and str(SDL.get_variable_name(d)).startswith("StaticMesh")
                 and o.get_editor_property("static_mesh") and o.get_editor_property("static_mesh").get_path_name().split(".")[0] == SEAT_PARTS[0][1]):
             stray.append(h)
-    if stray:
-        SDS.delete_subobjects(handles(bp)[0], stray, bp)
+    if stray and SDS.delete_subobjects(handles(bp)[0], stray, bp) != len(stray):
+        raise RuntimeError("could not remove the %d stray seat meshes from %s" % (len(stray), bp.get_name()))
     for name, mesh, loc, rot in SEAT_PARTS:
         part = add_component(bp, unreal.StaticMeshComponent, name, parent_var=seat_body)
         setp(part, static_mesh=EAL.load_asset(mesh), relative_location=unreal.Vector(*loc),

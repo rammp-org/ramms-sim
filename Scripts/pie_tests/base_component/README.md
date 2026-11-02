@@ -15,7 +15,7 @@ doesn't. `move_private_assets.py` is the one-shot migration that put them there.
 - `make_input_assets.py` — authors the Enhanced Input assets under
   `/Game/Input/Ramms`: the `IA_Ramms_*` actions, the single `IMC_RammsRobot`
   mapping context (every key, once) and one `URammsControlInputMap` per robot
-  family (`DA_RammsInput_LiftDriveLinkage` / `LiftDriveHolonomic` / `RAMMP Gen1`)
+  family (`DA_RammsInput_LiftDriveLinkage` / `LiftDriveHolonomic` / `RammpGen1`)
   binding actions to control Ids (wildcards such as `motor.*_front_crank`).
   Re-run it to change a key; it overwrites mappings and bindings.
 - `make_pawns.py` — makes `BP_LiftDriveLinkage_Ramms` / `BP_LiftDriveHolonomic_Ramms`

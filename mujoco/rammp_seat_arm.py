@@ -23,7 +23,12 @@ ARM_STOW = [0.0, -0.34906585, 3.14159265, -2.54818071, 0.0, -0.87266463, 1.57079
 
 
 def f(x):
-    return "%.6g" % x
+    """A number for the MJCF text: %.6g, but never in exponent form (the Unreal importer reads a <numeric>'s data
+    with FString::IsNumeric, which refuses it)."""
+    s = "%.6g" % x
+    if "e" in s:
+        s = ("%.9f" % x).rstrip("0").rstrip(".")
+    return s
 
 
 def fv(v):
