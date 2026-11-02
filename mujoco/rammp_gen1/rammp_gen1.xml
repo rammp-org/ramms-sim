@@ -1077,9 +1077,9 @@
     <connect body1="rear_rod" body2="rear_lift" anchor="0 0 0" solref="0.005 1" solimp="0.99 0.999 0.001"/>
     <connect body1="translator_l" body2="elevator_rod_l" anchor="0.29885 0.034465 0.160488" solref="0.005 1" solimp="0.99 0.999 0.001"/>
     <connect body1="translator_r" body2="elevator_rod_r" anchor="0.29885 -0.034465 0.160488" solref="0.005 1" solimp="0.99 0.999 0.001"/>
-    <connect body1="arm_2f85_right_follower" body2="arm_2f85_right_coupler" anchor="0 0 0" solref="0.005" solimp="0.95 0.99" />
-    <connect body1="arm_2f85_left_follower" body2="arm_2f85_left_coupler" anchor="0 0 0" solref="0.005" solimp="0.95 0.99" />
-    <joint joint1="arm_2f85_right_driver_joint" joint2="arm_2f85_left_driver_joint" solref="0.005" solimp="0.95 0.99" />
+    <connect body1="arm_2f85_right_follower" body2="arm_2f85_right_coupler" anchor="0 0 0" solref="0.005" solimp="0.95 0.99" class="arm_main" />
+    <connect body1="arm_2f85_left_follower" body2="arm_2f85_left_coupler" anchor="0 0 0" solref="0.005" solimp="0.95 0.99" class="arm_main" />
+    <joint joint1="arm_2f85_right_driver_joint" joint2="arm_2f85_left_driver_joint" solref="0.005" solimp="0.95 0.99" class="arm_main" />
   </equality>
   <contact>
     <exclude name="arm_base_shoulder" body1="arm_base_link" body2="arm_shoulder_link" />
@@ -1091,7 +1091,7 @@
     <exclude body1="arm_2f85_left_coupler" body2="arm_2f85_left_follower" />
   </contact>
   <tendon>
-    <fixed name="arm_2f85_split">
+    <fixed name="arm_2f85_split" class="arm_main">
       <joint joint="arm_2f85_right_driver_joint" coef="0.5" />
       <joint joint="arm_2f85_left_driver_joint" coef="0.5" />
     </fixed>

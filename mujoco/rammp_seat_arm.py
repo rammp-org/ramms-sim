@@ -77,7 +77,8 @@ def splice_arm(text, model_dir, stow=ARM_STOW, contact=(2, 1), defaults_extra=()
     <general>, and the Unreal import and the pawn builders read <motor> and <position>. model_dir: the folder the model
     is written to (the arm's mesh files are found from it); mesh_dir: where the arm's meshes are, if not beside ARM_XML.
     contact: the arm's contype and conaffinity, the robot's own, so that like the robot's geoms it collides only with the
-    world. defaults_extra: more lines for the arm's default class (the robot's own defaults reach it otherwise)."""
+    world. defaults_extra: more lines for the arm's default class (the robot's own defaults reach it otherwise); its
+    equalities and tendon name that class, so they take its defaults too."""
     arm = ET.parse(ARM_XML).getroot()
     refs = ("name", "class", "childclass", "mesh", "material", "joint", "joint1", "joint2", "body1", "body2", "tendon")
     for el in arm.iter():
@@ -87,6 +88,12 @@ def splice_arm(text, model_dir, stow=ARM_STOW, contact=(2, 1), defaults_extra=()
         if el.tag == "mesh" and "file" in el.attrib:   # found from the model's folder
             src = os.path.join(mesh_dir, os.path.basename(el.get("file"))) if mesh_dir else os.path.join(os.path.dirname(ARM_XML), el.get("file"))
             el.set("file", os.path.relpath(src, model_dir).replace(os.sep, "/"))
+    # The arm's equalities and tendon sit outside the body tree, where its childclass does not reach: without a class
+    # of their own they take the robot's top-level defaults (Gen2's stiff solimp width) instead of the arm's.
+    for tag in ("equality", "tendon"):
+        for child in arm.findall(tag):
+            for el in child:
+                el.attrib.setdefault("class", ARM_PREFIX + "main")
 
     def block(tag, indent):
         out = []
