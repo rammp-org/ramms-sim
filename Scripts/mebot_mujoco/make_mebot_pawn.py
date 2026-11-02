@@ -264,6 +264,18 @@ setp(top, target_arm_length=550.0, relative_rotation=unreal.Rotator(roll=0.0, pi
 setp(add_component(bp, unreal.CameraComponent, "TopCamera", parent_var="TopArm"), auto_activate=False)
 
 # The seat's parts and its occupant on the seat body; the arm's IK and teleop (the arm itself is in the MJCF).
+# Earlier runs named the seat's mesh "Seat", which the seat body's "seat" refused: each left a copy under its default
+# name (StaticMesh, StaticMesh1, ...). Those go first.
+stray = []
+for h in handles(bp):
+    d = SDL.get_data(h)
+    o = SDL.get_object(d)
+    if (isinstance(o, unreal.StaticMeshComponent) and str(SDL.get_variable_name(d)).startswith("StaticMesh")
+            and o.get_editor_property("static_mesh") and o.get_editor_property("static_mesh").get_path_name().split(".")[0] == SEAT_PARTS[0][1]):
+        stray.append(h)
+if stray:
+    SDS.delete_subobjects(handles(bp)[0], stray, bp)
+    log("removed %d copies of the seat mesh left by earlier runs" % len(stray))
 for name, mesh, loc, rot in SEAT_PARTS:
     part = add_component(bp, unreal.StaticMeshComponent, name, parent_var="seat")
     setp(part, static_mesh=EAL.load_asset(mesh), relative_location=unreal.Vector(*loc),

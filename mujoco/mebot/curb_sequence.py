@@ -209,7 +209,7 @@ class Crossing:
         m, d, dt = self.m, self.d, self.m.opt.timestep
         if self.level:                         # the rear sags as it takes load: trim its lift against the chassis's pitch
             lo, hi = m.actuator_ctrlrange[self.A["rear_lift"]]
-            cap = self.rate["rear_lift"] * dt
+            cap = self.RATE["rear_lift"] * dt   # the lift's speed, not the current move's
             self.trim -= max(-cap, min(cap, LEVEL_GAIN * math.radians(self.pitch_roll()[0]) * dt))
             self.trim = max(lo - self.cmd["rear_lift"], min(hi - self.cmd["rear_lift"], self.trim))
         for k in LIFTS:
