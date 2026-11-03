@@ -39,15 +39,15 @@ runs without it and nothing public references it; with access, run
 `git submodule update --init --checkout Plugins/RammsPrivateAssets` and restart
 the editor. The code (base component, 5-bar linkage, teleop, camera, test game
 mode) is public in `ramms-core` / `ramms-mujoco-support`; the chair
-(`BP_Mebot_Ramms`, `DT_Mebot_ChaosMotors`) stays in `/Game`.
+(`BP_RammpGen1_Ramms`, `DT_RammpGen1_ChaosMotors`) stays in `/Game`.
 
 | Asset | Backend | Components (in the Blueprint) | Tables |
 |---|---|---|---|
-| `/Game/Robots/BP_Mebot_Ramms` (the powered chair pawn) | Chaos — `RobotBase` (Backend=**Chaos**, `ChaosSkeletalMeshComponentName=VehicleMesh`) | `RammsDifferentialDriveController` (`LeftMotorId=left_motor`, `RightMotorId=right_motor`), `MebotController` (elevators / translators / caster arms, routed through the base), `RammsAccessInput`, `KinovaGen3Controller`, … | `DT_Mebot_ChaosMotors` (wheels + 6 constraint Position motors) |
+| `/Game/Robots/BP_RammpGen1_Ramms` (the powered chair pawn) | Chaos — `RobotBase` (Backend=**Chaos**, `ChaosSkeletalMeshComponentName=VehicleMesh`) | `RammsDifferentialDriveController` (`LeftMotorId=left_motor`, `RightMotorId=right_motor`), `RammpGen1Controller` (elevators / translators / caster arms, routed through the base), `RammsAccessInput`, `KinovaGen3Controller`, … | `DT_RammpGen1_ChaosMotors` (wheels + 6 constraint Position motors) |
 | `/RammsPrivateAssets/Robots/BP_LiftDriveLinkage_Ramms` (**pawn**, child of the imported `lift_drive_linkage` articulation, so a reimport doesn't clobber it; `AutoPossessPlayer=Player0`) | MuJoCo — `RobotBase` (Backend=**Mujoco**) | `DifferentialDrive` (centre wheels, radius 12.7 cm, measured track), `LeftCenterLinkage`, `RightCenterLinkage` (`Ramms5BarLinkageController`), `ControlSurface`, `ControlInput`, `SimControl`, `CameraControl`, `FollowArm`+`FollowCamera` on `base_link` | `DT_LiftDriveLinkage_Motors`, `DT_LiftDriveLinkage_5Bar` |
 | `/RammsPrivateAssets/Robots/BP_LiftDriveHolonomic_Ramms` (**pawn**, child of `lift_drive_holonomic`; `AutoPossessPlayer=Player0`) | MuJoCo — `RobotBase` (Backend=**Mujoco**) | `DifferentialDrive` (centre wheels), `ControlSurface`, `ControlInput`, `SimControl`, `CameraControl`, `FollowArm`+`FollowCamera` | `DT_LiftDriveHolonomic_Motors` (all 14 actuators parsed from the MJCF) |
-| `/Game/Robots/BP_Mebot_Mujoco` | *not migrated* — a Chaos chair carrying a MuJoCo arm child actor. If it gets a base component, set Backend=**Chaos** explicitly: `Auto` would find the arm articulation attached under it. | | |
-| `/Game/Robots/MeBot/BP_MebotPoweredFront_Ramms` (**pawn**, child of the imported `mebot_powered_front` articulation from `mujoco/mebot`; `AutoPossessPlayer=Player0`) | MuJoCo — `RobotBase` (Backend=**Mujoco**) | `DifferentialDrive` (drive wheels, velocity control), `MebotController` (elevators / translators / caster arm / rear lift, under the chair's `lift.*` ids), `ControlSurface`, `ControlInput` (`DA_RammsInput_Mebot`), `SimControl` (`home` key), `CurbController` (`RammsMebotCurbController`: the curb crossing), `DriveModeSelector` (`differential`, `curb`), `CameraControl`, `FollowArm`+`FollowCamera` on `chassis`; on the MJCF's `seat` body the chair's seat, rails, mounts and cameras (meshes) and `RammsSeat` (its occupant); the Gen3 arm in the MJCF with `ArmIK` (`RammsMjEndEffectorController`) and `ArmTeleop` (`RammsMjArmTeleopComponent`: `arm.*`, `gripper.*`) | `DT_MebotPoweredFront_Motors` (the MJCF's 10 actuators; translators in cm). Built by `Scripts/mebot_mujoco/`; level `Map_MebotCurb_URL` |
+| `/Game/Robots/BP_RammpGen1_Mujoco` | *not migrated* — a Chaos chair carrying a MuJoCo arm child actor. If it gets a base component, set Backend=**Chaos** explicitly: `Auto` would find the arm articulation attached under it. | | |
+| `/Game/Robots/RammpGen1/BP_RammpGen1PoweredFront_Ramms` (**pawn**, child of the imported `rammp_gen1_powered_front` articulation from `mujoco/rammp_gen1`; `AutoPossessPlayer=Player0`) | MuJoCo — `RobotBase` (Backend=**Mujoco**) | `DifferentialDrive` (drive wheels, velocity control), `RammpGen1Controller` (elevators / translators / caster arm / rear lift, under the chair's `lift.*` ids), `ControlSurface`, `ControlInput` (`DA_RammsInput_RammpGen1`), `SimControl` (`home` key), `CurbController` (`RammsRammpGen1CurbController`: the curb crossing), `DriveModeSelector` (`differential`, `curb`), `CameraControl`, `FollowArm`+`FollowCamera` on `chassis`; on the MJCF's `seat` body the chair's seat, rails, mounts and cameras (meshes) and `RammsSeat` (its occupant); the Gen3 arm in the MJCF with `ArmIK` (`RammsMjEndEffectorController`) and `ArmTeleop` (`RammsMjArmTeleopComponent`: `arm.*`, `gripper.*`) | `DT_RammpGen1PoweredFront_Motors` (the MJCF's 10 actuators; translators in cm). Built by `Scripts/rammp_gen1_mujoco/`; level `Map_RammpGen1Curb_URL` |
 
 All tables live in `/Game/Robots/Data`. `Scripts/pie_tests/base_component/make_assets.py`
 (re)creates the chair setup and the linkage tables; `make_pawns.py` builds both
@@ -77,7 +77,7 @@ exist so the loop can be tuned against a running robot.
 
 ### Motor registries (`FRammsMotorSpec` rows)
 
-`DT_Mebot_ChaosMotors` — the chair's wheels by their physical side (see *Turn
+`DT_RammpGen1_ChaosMotors` — the chair's wheels by their physical side (see *Turn
 mixing and joint signs* below for the swap that used to be here) and the six
 constraint-driven position motors:
 
@@ -90,14 +90,14 @@ constraint-driven position motors:
 | `front_caster_elevator`, `rear_caster_elevator` | Position | `front/rear_caster_swing_arm` (constraint) | caster arm elevation, **rad** | defer | +1 |
 
 On Chaos a **Position** motor's `ChaosName` is a physics-asset *constraint*
-(the same six `UMebotControllerComponent` lists): the backend drives its
+(the same six `URammpGen1ControllerComponent` lists): the backend drives its
 target and infers the degree of freedom from the constraint's first non-locked
 axis — a linear axis → linear actuator in cm, else an angular one (twist = X,
 swing2 = Y, swing1 = Z) in radians; reads come back the same way. Drive
 stiffness / damping / force limit are the base component's
-`ChaosPositionDrive*` settings (defaults match `MebotController`).
+`ChaosPositionDrive*` settings (defaults match `RammpGen1Controller`).
 
-`UMebotControllerComponent` (the chair's rate-limited lift/linkage targets:
+`URammpGen1ControllerComponent` (the chair's rate-limited lift/linkage targets:
 `SetAngularMotorTarget(constraint, degrees)`, `SetLinearMotorTarget(constraint,
 cm)`, the getters) now **routes through the robot base** when the owner has one
 with a backend (`bUseRobotBase`, default on): each entry maps to the registry
@@ -105,7 +105,7 @@ motor whose `ChaosName` is its constraint (or an explicit `MotorId`), the
 interpolated target becomes a `SetMotorCommand` (radians / cm) and the getters
 read the base — so the same API drives a MuJoCo chair's position actuators. An
 entry the registry doesn't list keeps driving its constraint directly, and a
-`MebotController` with `bUseRobotBase` off is disabled per constraint on the
+`RammpGen1Controller` with `bUseRobotBase` off is disabled per constraint on the
 first base command so the two never fight over a drive target.
 
 **Turn mixing and joint signs.** `JoystickToDifferentialDrive` used to mix
@@ -168,7 +168,7 @@ one**: targets above ~12.7 cm are refused as unreachable; lowering the endpoint
 
 Every robot actor carries one `ControlSurface` component. On BeginPlay it
 gathers every sibling component that implements `IRammsControlContributor`
-(differential drive, MeBot lift controller, 5-bar linkages, camera control),
+(differential drive, RAMMP Gen1 lift controller, 5-bar linkages, camera control),
 merges the controls they describe into one `FRammsControlSurface` (the shared
 model from the ramms-ui `RammsControl` module), and appends a raw **Motors**
 group for every RobotBase registry motor no contributor claims — so a freshly
@@ -178,7 +178,7 @@ wired by name: add a contributor to the actor and its controls appear.
 | Control id | Contributor | Kind / units | Notes |
 |---|---|---|---|
 | `drive.forward`, `drive.turn` | `RammsDifferentialDriveController` | Continuous, normalized ±1 | paired (joystick); refused while an external hold is active |
-| `lift.<constraint>` | `MebotControllerComponent` | Position, deg / cm | groups Lift / Casters; range from the registry, else the constraint limits |
+| `lift.<constraint>` | `RammpGen1ControllerComponent` | Position, deg / cm | groups Lift / Casters; range from the registry, else the constraint limits |
 | `linkage.<name>.height` | `Ramms5BarLinkageController` | Position, cm | range derived from the IK + motor ControlRanges (`GetReachableHeightRange`) unless `EndpointHeightRange` is authored |
 | `camera.next`, `camera.reset` | `RammsRobotCameraComponent` | Action | |
 | `camera.orbit_yaw`, `camera.orbit_pitch`, `camera.zoom` | `RammsRobotCameraComponent` | Continuous rate | integrated per tick |
@@ -492,7 +492,7 @@ Remote Control API on a running PIE / `-game` instance:
 ```http
 PUT http://127.0.0.1:30010/remote/object/call
 {
-  "objectPath": "/Game/Maps/UEDPIE_0_Map_Demo.Map_Demo:PersistentLevel.BP_Mebot_Ramms_C_0.RammsDifferentialDriveController",
+  "objectPath": "/Game/Maps/UEDPIE_0_Map_Demo.Map_Demo:PersistentLevel.BP_RammpGen1_Ramms_C_0.RammsDifferentialDriveController",
   "functionName": "SetExternalDriveInput",
   "parameters": { "Input": { "X": 0.0, "Y": 1.0 } }
 }
@@ -512,7 +512,7 @@ cs.describe()["axes"]; cs.set("drive.forward", 1.0); cs.trigger("gripper.toggle"
 ```http
 PUT http://127.0.0.1:30010/remote/object/call
 {
-  "objectPath": "/Game/Maps/UEDPIE_0_Map_Demo.Map_Demo:PersistentLevel.BP_Mebot_Ramms_C_0.ControlSurface",
+  "objectPath": "/Game/Maps/UEDPIE_0_Map_Demo.Map_Demo:PersistentLevel.BP_RammpGen1_Ramms_C_0.ControlSurface",
   "functionName": "SetControl",
   "parameters": { "Id": "drive.forward", "Value": 1.0, "Source": "Remote" }
 }

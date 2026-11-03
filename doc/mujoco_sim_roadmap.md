@@ -33,7 +33,7 @@ Dropped the Chaos-rig framing; kept what serves MuJoCo simulation:
   import~~ **(checked 2026-09-11):** beta's ProtoSpec schema carries
   `Armature`/`Frictionloss` on `MjJoint` and `<inertial>` (`UMjInertial`) as
   generated elements with stock-parity import, so the pre-beta drop is fixed and
-  the old `fixup_mebot_import.py` workaround is obsolete. `bake_inertials` is
+  the old import fix-up script's workaround is obsolete. `bake_inertials` is
   therefore optional-but-useful (explicit/portable masses), not required to
   avoid a drop.
 
@@ -88,7 +88,7 @@ RammsMujocoSupport, registered via the registry (no RammsCore→URLab dep).
 **Build order:** (1) RammsCore foundation — motor spec + `IRammsActuationBackend`
 + base component + Chaos actuation backend; (2) MuJoCo actuation backend
 (RammsMujocoSupport); (3) rework the differential drive controller into a
-consumer; (4) the Mebot/5-bar linkage consumer + its kinematic table; (5)
+consumer; (4) the RAMMP Gen1/5-bar linkage consumer + its kinematic table; (5)
 holonomic controller.
 
 ### Status (2026-09-11)
@@ -110,7 +110,7 @@ holonomic controller.
   Id (velocity read, torque command, braking), backward-compatible via the
   existing wheel-bone fallback when no base component is present. Public API
   unchanged (RammsAccess recompiles clean). See design notes below. Needs PIE/RC
-  validation on both backends (Chaos chair + MeBot-MuJoCo).
+  validation on both backends (Chaos chair + RAMMP Gen1-MuJoCo).
 - **(4) DONE** — rammp-org/ramms-core#22. `FRamms5BarLinkageSpec` (separate
   kinematic table row: pivots, link lengths, angle mapping, elbow branch),
   `URamms5BarKinematics` (stateless IK/FK), and `URamms5BarLinkageController`
@@ -144,8 +144,8 @@ holonomic controller.
   propose upstream. Until then: keep base and arm as separate articulations, or
   disable the arm controller while driving.
 - **Live PIE validation (2026-09-12, via Python remote execution)** — assets:
-  `Content/Robots/Data/DT_Mebot_ChaosMotors`, `DT_LiftDriveLinkage_Motors`,
-  `DT_LiftDriveLinkage_5Bar`; `BP_Mebot_Ramms` gained a `RobotBase`
+  `Content/Robots/Data/DT_RammpGen1_ChaosMotors`, `DT_LiftDriveLinkage_Motors`,
+  `DT_LiftDriveLinkage_5Bar`; `BP_RammpGen1_Ramms` gained a `RobotBase`
   (Chaos, `VehicleMesh`, left→`drive_wheel_r` / right→`drive_wheel_l` as the
   BP was authored); new `BP_LiftDriveLinkage_Ramms` (child of the imported
   articulation) with `RobotBase` (MuJoCo) + diff-drive on the centre wheels +
@@ -200,8 +200,8 @@ holonomic controller.
   and the component orders authored cameras before runtime-added ones.
 - **Chair lift/linkage motors on the base (2026-09-14)** — the Chaos backend
   drives Position motors as physics-asset constraint drives (DOF inferred from
-  the constraint; rad / cm), `DT_Mebot_ChaosMotors` registers the elevators,
-  translators and caster arms, and `UMebotControllerComponent` routes through
+  the constraint; rad / cm), `DT_RammpGen1_ChaosMotors` registers the elevators,
+  translators and caster arms, and `URammpGen1ControllerComponent` routes through
   the base (`bUseRobotBase`) — so both chair controllers are base consumers
   now. Found on the way: the holonomic base's centre-wheel hinges are −Y, so
   its table carries `Direction = −1` (forward was inverted); the diff-drive's
@@ -234,7 +234,7 @@ getters, `SetControlMode`) is preserved verbatim.
 
 Decisions to make it non-breaking + honest:
 - **Content migration.** Reading wheel state / applying torque moves to the base
-  component, so the MeBot chair BP must gain a `URammsRobotBaseComponent` + a
+  component, so the RAMMP Gen1 chair BP must gain a `URammsRobotBaseComponent` + a
   motor DataTable (rows `left_motor`/`right_motor`, Type=Torque, ChaosName =
   the wheel bones). Keep the controller's `Left/RightWheelBoneName` as the
   *fallback* when no base component is present, so existing Chaos BPs keep
@@ -248,13 +248,13 @@ Decisions to make it non-breaking + honest:
   a note. Revisit only if a robot needs them under MuJoCo (MuJoCo resolves
   contact itself).
 - **Validation** needs a running editor: PIE/RC drive of the Chaos chair
-  (no regression) and a MeBot-MuJoCo BP (new path), as done for teleop.
+  (no regression) and a RAMMP Gen1-MuJoCo BP (new path), as done for teleop.
 
 ---
 
 ## Thread 1 (original) — Drive RAMMS bases in MuJoCo simulation
 
-**Goal:** the existing base-drive components drive a URLab MuJoCo-simulated MeBot,
+**Goal:** the existing base-drive components drive a URLab MuJoCo-simulated RAMMP Gen1,
 with their Python/Remote-Control API surface unchanged. Today they drive Chaos.
 
 ### The clean seam
@@ -266,7 +266,7 @@ private leaves touch physics. Preserve verbatim:
   `IsExternalDriveActive`, `GetOdometry`/`ResetOdometry`,
   `GetLeft/RightWheelState`, `SetControlMode` (Torque|Velocity),
   `SetSlipModelingEnabled` — the whole HTTP-RC/BP contract (`RammsAccess` and
-  `control_mebot.py`-style callers keep working unchanged).
+  `control_rammp_gen1.py`-style callers keep working unchanged).
 - Physics-touching leaves to make backend-swappable: `ApplyWheelTorque`,
   `UpdateWheelState`, `UpdateOdometry`, `ApplyBrakes`, `GetBoneBodyInstance`
   (today: skeletal wheel-bone `FBodyInstance::AddTorqueInRadians` + odometry
@@ -279,12 +279,12 @@ private leaves touch physics. Preserve verbatim:
 `ControlSource`. `UMjTwistController` **captures** WASD/gamepad into a twist and
 broadcasts it in the state IR — but **nothing in UE converts twist → wheel
 `ctrl`**; that control law currently lives in an external Python/ROS client.
-The MeBot MJCFs today put `base_link` on a `<freejoint>` with **torque
+The RAMMP Gen1 MJCFs today put `base_link` on a `<freejoint>` with **torque
 `<motor>`** wheel actuators (holonomic 6-wheel / 6-wheel linkage), **no
 `<velocity>` actuators and no simple left/right diff-drive pair.**
 
 ### Plan
-- **Phase 0 (MJCF, needs user decision):** give the MeBot a driveable diff-drive
+- **Phase 0 (MJCF, needs user decision):** give the RAMMP Gen1 a driveable diff-drive
   base — left/right hinge wheels + `<velocity>` actuators (natural target for
   `VelocityControl`; MuJoCo does the wheel PID). Cross-process/URDF-naming
   change → **ask** (see open questions).
@@ -301,7 +301,7 @@ The MeBot MJCFs today put `base_link` on a `<freejoint>` with **torque
 - **Phase 4:** parity test — arbitration, deadzone, RC calls identical on both
   backends; `RammsAccess` unchanged.
 
-Secondary: `UMebotControllerComponent` (lift/linkage joint-position RC surface)
+Secondary: `URammpGen1ControllerComponent` (lift/linkage joint-position RC surface)
 maps cleanly onto the MJCFs' existing `<position>` actuators — the easier second
 target, scope TBD.
 
@@ -324,7 +324,7 @@ target, scope TBD.
     linkages lowered; the 4 omni wheels give holonomic (x, y, yaw) motion. The
     `lift_drive_linkage` base cannot drive holonomically in any configuration.
   - Entering a mode is a **base-configuration** step (the crank/hip `<position>`
-    actuators, i.e. `UMebotControllerComponent`'s domain) done before driving.
+    actuators, i.e. `URammpGen1ControllerComponent`'s domain) done before driving.
 - **Two controllers, therefore:** the existing differential controller (this
   thread) for skid-steer via the center wheels, and a **new holonomic drive
   controller** for the holonomic base in holonomic mode (drives the 4 omni
@@ -344,7 +344,7 @@ its Initialize fails (no articulation resolved).
 ### Remaining decisions (non-blocking for the torque v1)
 - Control-slot ownership (UE internal slot vs honor `ControlSource` for ZMQ/ROS).
 - Odometry under MuJoCo: keep UE wheel-integrated vs read the base `freejoint`.
-- Whether `UMebotControllerComponent` (lift/linkage position actuators, and the
+- Whether `URammpGen1ControllerComponent` (lift/linkage position actuators, and the
   mode-switching it implies) is folded in now or later.
 
 ---
@@ -359,7 +359,7 @@ its Initialize fails (no articulation resolved).
   it to the seat transform with `KeepWorldTransform`, **disables all physics +
   collision** ("decoration riding another physics body"), and applies a static
   seated pose via per-bone local rotation offsets. It is wired only to the
-  **Chaos** MeBot (`BP_Mebot_Ramms`), not the MuJoCo pawn.
+  **Chaos** RAMMP Gen1 (`BP_RammpGen1_Ramms`), not the MuJoCo pawn.
 - The MuJoCo chair (`lift_drive_holonomic`) models **only the mobility base** —
   `base_link` on a freejoint + suspension/wheels/lift + the attached Gen3 arm.
   **No seat body, no occupant, no rider mass/inertia** anywhere in the MJCF.
@@ -392,7 +392,7 @@ its Initialize fails (no articulation resolved).
 
 **(B) Crowd interop**
 - **B1 — chair as an obstacle the crowd flows around** *(nearly free — bridge
-  exists):* wire the MuJoCo MeBot pawn with `URammsPlayerAvatarTrait` (+ nav
+  exists):* wire the MuJoCo RAMMP Gen1 pawn with `URammsPlayerAvatarTrait` (+ nav
   obstacle / look-at traits + stimulus source). One concern: feed the avatar
   entity from the `base_link` `UMjBody` transform if the AActor root doesn't
   itself track the sim.
@@ -416,7 +416,7 @@ its Initialize fails (no articulation resolved).
 4. **Is editing the shared `lift_drive_holonomic` MJCF acceptable** (seat frame /
    rider inertial / occupant tree)? *(ask-first per CLAUDE.md)*
 5. **Crowd goal:** B1 (obstacles), B2 (boarding riders), or both?
-6. **Does `BP_Mebot_Mujoco`'s actor root track the sim base**, or only the
+6. **Does `BP_RammpGen1_Mujoco`'s actor root track the sim base**, or only the
    `UMjBody`? Determines whether the avatar bridge + a component-attached seat
    work as-is. *(Shared with Thread 1.)*
 7. **Should the seat move** from RammsCrowd into RammsCore / RammsHumanPhysics
@@ -502,7 +502,7 @@ its Initialize fails (no articulation resolved).
 ## Cross-cutting decisions — RESOLVED (2026-09-11)
 
 1. **Base engine: MuJoCo and Newton share ONE MJCF configuration.** No
-   per-engine model fork; the same MeBot MJCF drives either stepper. (Simplifies
+   per-engine model fork; the same RAMMP Gen1 MJCF drives either stepper. (Simplifies
    Threads 1 & 2 — one model to author and maintain.)
 2. **Editing the shared MJCF is OK — but the composition target is
    UE/Blueprint, not a monolith.** Compose **base + seat + arm + rider** in
@@ -521,7 +521,7 @@ its Initialize fails (no articulation resolved).
 
 **Implications for the plans:**
 - Thread 1: author the diff-drive wheels + `<velocity>` actuators in the shared
-  MeBot MJCF (serves both engines); the UE controller's diff-drive kinematics
+  RAMMP Gen1 MJCF (serves both engines); the UE controller's diff-drive kinematics
   stay UE-side.
 - Thread 2: the seat becomes a **composable UE element** attached to the base's
   seat frame; rider rides the seat body's transform (visual phase), then gains a

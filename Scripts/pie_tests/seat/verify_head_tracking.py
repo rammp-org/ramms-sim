@@ -1,6 +1,6 @@
 """Does the seat component put a camera on the occupant's actual head?
 
-Builds the whole case in the EDITOR world rather than touching BP_Mebot_Ramms:
+Builds the whole case in the EDITOR world rather than touching BP_RammpGen1_Ramms:
 a bare actor with a RammsSeatComponent and a camera, head tracking configured,
 occupant spawned on demand. Then it MEASURES -- the camera's world location
 against the occupant mesh's head bone -- because "it looks about right" is how a

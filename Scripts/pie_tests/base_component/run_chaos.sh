@@ -93,7 +93,7 @@ acc(){ op access_op "$S/access_check.py" "$@"; }
 python3 "$S/access_send.py" --drive 0 1 --seconds 8.0 --hz 30 & SENDER=$!; sleep 0.7; acc expect_owner drive.forward Autonomy; ci expect drive.forward 0.99 1.01; f "$S/chaos_sample.py"
 wait "$SENDER" || { echo "!! access_send.py (drive stream) failed"; FAIL=1; }; sleep 0.8; ci expect drive.forward -0.01 0.01; f "$S/chaos_sample.py"
 python3 "$S/access_send.py" --event gripper_close --seconds 0.2 --hz 10 || { echo "!! access_send.py (event) failed"; FAIL=1; }; sleep 1; ci expect gripper.closed 0.9 1.1
-echo "--- MebotController API through the base ---"
+echo "--- RammpGen1Controller API through the base ---"
 op mc_op "$S/chaos_mc_api.py" cmd; sleep 3
 op mc_op "$S/chaos_mc_api.py" read; sleep 2
 trap - EXIT; cleanup

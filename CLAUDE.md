@@ -1,6 +1,6 @@
 # RAMMS-Sim - Claude Code guide
 
-Unreal Engine 5.8 C++ simulation for robotic assistive mobility/manipulation: MeBot differential-drive wheelchair base, 7-DOF Kinova Gen3 arm (DLS/FABRIK/CCD IK), GPU-raytraced ToF/Sonar/IMU sensors, multi-camera EXR capture, and RMSS TCP streaming. Requires exactly UE 5.8.
+Unreal Engine 5.8 C++ simulation for robotic assistive mobility/manipulation: RAMMP Gen1 differential-drive wheelchair base (formerly called the MeBot; the lift-drive holonomic base with the seat mechanism is RAMMP Gen2), 7-DOF Kinova Gen3 arm (DLS/FABRIK/CCD IK), GPU-raytraced ToF/Sonar/IMU sensors, multi-camera EXR capture, and RMSS TCP streaming. Requires exactly UE 5.8.
 
 ## Key rules
 - **Plugins are git submodules** (`Plugins/RammsCore`, `CameraCapture`, `RammsStreaming`, `RammsAssets`, `RammsHumanPhysics`, `RammsNewtonPhysics`, `RammsMujocoPhysics`). Edit and commit plugin code in the plugin's own repo, then bump the submodule pointer in this superproject; committing plugin changes only here loses them. Run `git submodule update --init --recursive` before any build. `Plugins/RammsPrivateAssets` (`rammp-org/ramms-private-assets`, private: the lift-drive CAD-derived content, mounted at `/RammsPrivateAssets/`) is **optional** — `update = none` makes the recursive init skip it; with access run `git submodule update --init --checkout Plugins/RammsPrivateAssets`. Nothing public may reference `/RammsPrivateAssets/` content.

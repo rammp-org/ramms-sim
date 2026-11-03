@@ -12,7 +12,7 @@ architecture (`doc/base_component_controls.md`, `doc/mujoco_sim_roadmap.md`).
    (from `RammsRobotBaseComponent`'s motor registry plus the controllers present
    on the actor) and panels, keyboards, gamepads and remote clients drive that
    description.
-3. **Auto-wiring** of the differential drive, MeBot lift/linkage controller,
+3. **Auto-wiring** of the differential drive, RAMMP Gen1 lift/linkage controller,
    5-bar linkage, arm/gripper and camera from the registry — no per-robot glue.
 4. **Enhanced Input** (input mapping contexts / input actions) as the single
    keyboard / gamepad path, replacing the polled `IsInputKeyDown` components.
@@ -32,10 +32,10 @@ architecture (`doc/base_component_controls.md`, `doc/mujoco_sim_roadmap.md`).
   `URammsStreamCameraBridge` as living there). It brings: `URammsUISubsystem`
   (robot-controller registry, event bus, property store, themes), an
   `IRammsRobotController` actor interface with a **fixed vocabulary**
-  (`SendMovementInput`, `RequestMebotMode`, `RequestArmAction`,
+  (`SendMovementInput`, `RequestRammpGen1Mode`, `RequestArmAction`,
   `RequestSeatAdjust`, `SendCommand[WithPayload]`), a widget library
   (`URammsPanel`, `URammsJoystickWidget`, `URammsAxisControl`, buttons,
-  sliders, notifications, `URammsMebotController`, `URammsArmController`,
+  sliders, notifications, `URammsRammpGen1Controller`, `URammsArmController`,
   `URammsStatusPanel`), layouts/presets, a Remote Control bridge and the
   camera/PGM projection pipeline. It depends on RammsStreaming; the symbols
   it uses still exist in ours (both tips are from April 2026), so "up to
@@ -58,7 +58,7 @@ architecture (`doc/base_component_controls.md`, `doc/mujoco_sim_roadmap.md`).
 - **Controller wiring.** Every controller resolves its dependencies the same
   way — optional `FName` override, else `GetComponents<T>()` first match —
   and carries defaults for a specific robot: diff-drive `left_motor` /
-  `right_motor` + bone names; MeBot's six constraint names in its
+  `right_motor` + bone names; RAMMP Gen1's six constraint names in its
   constructor; Kinova `ArmSkMesh` / `end_effector`; gripper `GripperSkMesh`,
   `link_0_r/l`; the MuJoCo EE controller's `pinch` / `fingers_actuator` /
   `base_target`; RammsAccess's controller-name overrides.
@@ -98,7 +98,7 @@ today, generalized to every axis (external sources hold for a timeout, exactly
 as the diff-drive does now).
 
 The existing `IRammsRobotController` calls become **named actions and axes**
-in this model (`RequestMebotMode(CurbAscent)` → `TriggerAction("mebot.mode.curb_ascent")`,
+in this model (`RequestRammpGen1Mode(CurbAscent)` → `TriggerAction("rammp_gen1.mode.curb_ascent")`,
 `SendMovementInput(v)` → `SetAxis("drive.forward"/"drive.turn")`,
 `RequestSeatAdjust(axis, d)` → `SetAxis("seat.<axis>", …)`). The real-robot
 HMI implements the provider/sink over RMSS/ROS; the sim implements them over
@@ -127,7 +127,7 @@ two headers. Not a new repo: overkill.
   - `URammsDifferentialDriveController` → `drive.forward`, `drive.turn`
     (continuous, normalized; a 2-D group the panel renders as a joystick);
     claims its two motor ids.
-  - `UMebotControllerComponent` → one Position axis per configured motor
+  - `URammpGen1ControllerComponent` → one Position axis per configured motor
     (range from the registry `ControlRange`, else the constraint limits;
     units rad/cm), grouped "Lift" / "Casters"; claims them.
   - `URamms5BarLinkageController` → `linkage.<name>.height` (cm) and,
@@ -162,7 +162,7 @@ two headers. Not a new repo: overkill.
   (drive), `URammsButton` for actions; groups collapsible; readback via
   `GetAxisValue` on tick or `OnAxisChanged`. Rendered entirely from the
   description — no robot-specific code.
-- The existing themed panels (`URammsMebotController` modes,
+- The existing themed panels (`URammsRammpGen1Controller` modes,
   `URammsArmController` home/retract, `URammsStatusPanel`) become optional
   **decorations** that target named actions/axes when present (they hide
   otherwise), so the same layout works on the sim and the real robot.
@@ -225,7 +225,7 @@ two headers. Not a new repo: overkill.
 |---|---|---|
 | 0 | **ramms-ui in tree.** Add `Plugins/RammsUI` as a submodule (`rammp-org/ramms-ui`), UE 5.7 build, fix anything stale, `unreal_remote`'s bridge lookup works. The vehicle HUD class `URammsUI` is **not** renamed: the whole vehicle-template layer (HUD, `ARammsPawn`, `Content/VehicleTemplate`, the touch UI assets) is legacy slated for removal once phase 3 replaces it, so nothing new builds on it. | Editor builds with the plugin; `find_ramms_widgets()` returns. |
 | 1 | **Shared model.** `RammsControl` module in ramms-ui (structs + interfaces + input-map asset), `IRammsRobotController` shim. `RobotBase` enumeration API. | ramms-ui PR; ramms-core PR; both compile standalone. |
-| 2 | **Contributions + adapter.** Contributor interface on diff-drive, MeBot, 5-bar, arm/gripper, camera; `URammsRobotControlSurfaceComponent` with claims + raw-motor fallback + source arbitration + subsystem registration; Remote Control JSON. | PIE runners drive the chair and both lift-drive pawns **through the sink** (`SetAxis`), not the controllers; a robot with only a `RobotBase` exposes its motors. |
+| 2 | **Contributions + adapter.** Contributor interface on diff-drive, RAMMP Gen1, 5-bar, arm/gripper, camera; `URammsRobotControlSurfaceComponent` with claims + raw-motor fallback + source arbitration + subsystem registration; Remote Control JSON. | PIE runners drive the chair and both lift-drive pawns **through the sink** (`SetAxis`), not the controllers; a robot with only a `RobotBase` exposes its motors. |
 | 3 | **Panels.** `URammsControlSurfacePanel`, decorations, sim layout preset, joystick, status panel replacing the vehicle HUD; single spawn path in the player controllers. | Pixel Streaming page drives the chair and the lift-drive pawns from touch/mouse; screenshots of the panel per robot. |
 | 4 | **Enhanced Input.** Spike (4.0), then input map + component + IMC/IA assets; retire polled components; INI cleanup; collision fixes incl. URLab hotkeys. | Keyboard + gamepad drive every robot with the same map; no `IsInputKeyDown` left in RammsCore/RammsMujocoSupport. |
 | 5 | **Cleanup.** RammsAccess → sink; docs (`base_component_controls.md` becomes the control-surface guide); delete the retired components after one release. | Docs + runners updated. |
@@ -238,7 +238,7 @@ ramms-access #1 and ramms-private-assets #1 are merged; this superproject
 branch pins their mains, except RammsCore, which is pinned at the head of the
 still-open ramms-core #24 (`ReadTarget`, so panels show a target set directly
 on a controller). #24 merges first, then the gitlink moves to the resulting
-main commit. Phases 0–1 done (ramms-ui #34, ramms-core #23, ramms-sim #43). Phase 2: adapter + diff-drive / MeBot / 5-bar / camera contributors
+main commit. Phases 0–1 done (ramms-ui #34, ramms-core #23, ramms-sim #43). Phase 2: adapter + diff-drive / RAMMP Gen1 / 5-bar / camera contributors
 done and validated — `run_chaos.sh` and `run_mj_full.sh` now drive, turn and
 lift through `SetControl` on the pawns' `ControlSurface`, and the lift-drive
 pawn lists its unclaimed cranks / wheels as `motor.<id>` axes. The 5-bar's
@@ -278,7 +278,7 @@ row closes the gripper, hold row raises the arm, joystick drives) and the
 lift-drive pawn (24 rows: joystick drives, linkage row lowers the leg,
 `sim.pause` row pauses, `camera.next` row switches), with screenshots. Left
 for later: the `URammsStatusPanel` (speed / battery) and the themed
-decorations (MeBot modes, arm home / retract) on the sim layout; per-robot
+decorations (RAMMP Gen1 modes, arm home / retract) on the sim layout; per-robot
 Pixel Streaming screenshots (the page path is unchanged: keys and touch reach
 the same Enhanced Input / sink paths); the time-trial variant keeps its own HUD.
 
@@ -300,8 +300,8 @@ joystick (shown whenever `bUseMouseForTouch` fakes touch in PIE) sat above
 every widget, and the viewport captured the mouse. `URammsControlHUDSubsystem`
 now deactivates the engine touch interface and switches the player to
 Game-and-UI input mode with a visible cursor (`bReplaceEngineTouchInterface`,
-`bGameAndUIInputMode` in the settings). `BP_Mebot_Ramms` still carried direct
-input wiring the export revealed — keys 1–8 / + / − to MeBot motor presets,
+`bGameAndUIInputMode` in the settings). `BP_RammpGen1_Ramms` still carried direct
+input wiring the export revealed — keys 1–8 / + / − to RAMMP Gen1 motor presets,
 `IA_Throttle` / `IA_Steering` reads feeding a per-tick `SetDriveInput` — all
 stripped with `URammsBlueprintCleanupLibrary::RemoveLegacyInputNodes`
 (RammsCoreEditor; `Scripts/pie_tests/base_component/strip_bp_input.py`), so
@@ -310,7 +310,7 @@ the chair is driven only through the surface. Its C++ parent
 straight to the Chaos vehicle movement, and `BP_VehicleAdvPlayerController`
 still adds `IMC_Vehicle_Default` for the real vehicles, so W / S drove both
 that and the surface: `ARammsPawn::bUseLegacyVehicleInput` (default true,
-**false** on `BP_Mebot_Ramms`) skips those bindings, which also frees the
+**false** on `BP_RammpGen1_Ramms`) skips those bindings, which also frees the
 template's R / Tab. The mapping context itself goes with the vehicle layer.
 
 Second try-out: the wheel over the panel didn't scroll it (the collapsible
@@ -343,7 +343,7 @@ the differential drive does) replaces those raw rows when it lands.
 ## Spike: Enhanced Input over Pixel Streaming
 
 **Result (2026-09-15): works.** PIE on `Map_Demo` with the chair
-(`BP_Mebot_Ramms`, whose throttle is an Enhanced Input action `IA_Throttle` in
+(`BP_RammpGen1_Ramms`, whose throttle is an Enhanced Input action `IA_Throttle` in
 `IMC_Vehicle_Default`, bound in `ARammsPawn::SetupPlayerInputComponent`).
 (Since then the vehicle template is gone altogether: the robots derive from
 `ARammsSkeletalRobotPawn`, which binds no input; see `doc/robot_pawn.md`.)

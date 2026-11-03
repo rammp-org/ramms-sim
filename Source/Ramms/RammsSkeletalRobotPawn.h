@@ -11,8 +11,8 @@ class USkeletalMeshComponent;
 class USpringArmComponent;
 
 /**
- * A robot whose body is one skeletal mesh simulating its physics asset in Chaos (BP_Mebot_Ramms,
- * BP_Mebot_Mujoco): the mesh is the root, plus a seat camera and a chase camera on booms.
+ * A robot whose body is one skeletal mesh simulating its physics asset in Chaos (BP_RammpGen1_Ramms,
+ * BP_RammpGen1_Mujoco): the mesh is the root, plus a seat camera and a chase camera on booms.
  *
  * The component and property names are the ones these robots had under the old vehicle-template parent
  * (AWheeledVehiclePawn / ARammsPawn), so their Blueprint overrides and socket attachments carry over:

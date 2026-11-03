@@ -22,9 +22,9 @@ Gamepad (Xbox names; PlayStation in brackets):
                     mode's pairing (RammsControlInputMode.STICK)
   right stick X     turns a holonomic drive (a 3-axis stick's twist); nothing
                     on a differential one yet
-  right stick Y     motor group A (the MeBot's drive-wheel elevators)
-  RT / LT [R2/L2]   motor group B +/- (the MeBot's drive-wheel translators)
-  RB / LB [R1/L1]   motor group C +/- (the MeBot's caster arms)
+  right stick Y     motor group A (the RAMMP Gen1's drive-wheel elevators)
+  RT / LT [R2/L2]   motor group B +/- (the RAMMP Gen1's drive-wheel translators)
+  RB / LB [R1/L1]   motor group C +/- (the RAMMP Gen1's caster arms)
   A [Cross]         cross the curb ahead
   B [Circle] held   stop the curb crossing (held 0.5 s)
   X [Square] held   seat to rest (held 0.5 s)
@@ -310,8 +310,8 @@ input_map("DA_RammsInput_LiftDriveHolonomic", imc, common + sim + [
 # A rider's chair: the drive, its modes, the curb crossing, the seat, the
 # cameras and the simulation; no motor groups (its legs are the stances').
 input_map("DA_RammsInput_Rider", imc, common + sim)
-# MeBot chair (Chaos): Y/H drive elevators (deg/s), T/B translators (cm/s), Z/X caster arms
-input_map("DA_RammsInput_Mebot", imc, common + [
+# RAMMP Gen1 chair (Chaos): Y/H drive elevators (deg/s), T/B translators (cm/s), Z/X caster arms
+input_map("DA_RammsInput_RammpGen1", imc, common + [
     binding(IA["MotorGroupA"], R, "lift.motor_swing_arm_*", rate=30.0),
     binding(IA["MotorGroupB"], R, "lift.dw_main_plate_*", rate=10.0),
     binding(IA["MotorGroupC"], R, "lift.*_caster_swing_arm", rate=30.0),

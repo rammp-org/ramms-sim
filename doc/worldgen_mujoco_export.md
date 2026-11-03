@@ -126,7 +126,7 @@ faces (walls become steep slopes), but it needs no new code.
 
 **Tried 2026-10-20, it works.** The test map lives in the optional private
 assets plugin, because the only MuJoCo-driven bases are the lift-drives; the
-public `BP_Mebot_Mujoco` drives its base on Chaos and only the arm is in
+public `BP_RammpGen1_Mujoco` drives its base on Chaos and only the arm is in
 MuJoCo. It is a copy of `Map_Gen_MainStreet` with an `AMjManager`, the
 lift-drive test game mode, and a
 20 m square `AMjHeightfieldActor` at 512 samples (about 4 cm cells, Z span
@@ -153,7 +153,7 @@ the 15 cm step becomes a slope one cell (3.9 cm) wide, about 75 degrees.
 A wheel meeting that slope is pushed up, which a real vertical face does not
 do, so curb-climbing results on a heightfield will be optimistic.
 
-**Chaos reference.** There is no Chaos lift-drive, so the public MeBot
+**Chaos reference.** There is no Chaos lift-drive, so the public RAMMP Gen1
 (Chaos base) ran the same ramp with the same open-loop commands. It is a
 different robot and goes about twice as fast per unit of input, so compare
 at matched speed:
@@ -161,12 +161,12 @@ at matched speed:
 | Run | Road speed | On the ramp |
 |---|---|---|
 | Lift-drive, MuJoCo, half input | 0.46 m/s | slowed to about 1 cm/s at 40% up, stalled |
-| MeBot, Chaos, quarter input | 0.41 m/s | slowed to about 0.2 m/s, still climbing (14 of 15 cm) when the run ended |
+| RAMMP Gen1, Chaos, quarter input | 0.41 m/s | slowed to about 0.2 m/s, still climbing (14 of 15 cm) when the run ended |
 | Lift-drive, MuJoCo, full input | 1.0 m/s | climbed fully |
-| MeBot, Chaos, half and full input | 0.94 and 1.8 m/s | climbed fully |
+| RAMMP Gen1, Chaos, half and full input | 0.94 and 1.8 m/s | climbed fully |
 
 Both rose the full 15 cm and pitched up by roughly the ramp angle (MuJoCo
-lift-drive +5.5 degrees, Chaos MeBot +4.8). Both lose speed on the slope at
+lift-drive +5.5 degrees, Chaos RAMMP Gen1 +4.8). Both lose speed on the slope at
 low command, but only the lift-drive stalls, for the reason below.
 
 **Why the half-input climb stalls.** The differential controller sends open

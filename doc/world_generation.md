@@ -22,7 +22,7 @@ reference); this page is the workflow.
 Example levels: `/Game/Maps/Gen/Map_Gen_Downtown`, `Map_Gen_Suburban`,
 `Map_Gen_Park`, `Map_Gen_Indoor`, `Map_Gen_Office`, `Map_Gen_MainStreet`,
 `Map_Gen_Store` — each a lit level with a
-`WorldGenerator`, the Mebot game mode and a PlayerStart on the first route.
+`WorldGenerator`, the RAMMP Gen1 game mode and a PlayerStart on the first route.
 
 `NonCompliance` is the dial. At 0 every curb has a compliant ramp, every door
 is 81 cm or wider, every hazard leaves 91 cm; above it, features roll to be

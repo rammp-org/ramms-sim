@@ -1,6 +1,6 @@
 # Robot pawns
 
-The robots RAMMS simulates in Chaos (`BP_Mebot_Ramms`, `BP_Mebot_Mujoco`) are pawns from
+The robots RAMMS simulates in Chaos (`BP_RammpGen1_Ramms`, `BP_RammpGen1_Mujoco`) are pawns from
 `Source/Ramms`, not from the UE vehicle template they started on. Driving, motors, cameras and input
 all live in components (`RobotBase`, the drive controllers, `ControlSurface` / `ControlInput`,
 `RobotCamera`, ...); the pawn classes only hold the robot's body together.
@@ -8,10 +8,10 @@ all live in components (`RobotBase`, the drive controllers, `ControlSurface` / `
 | Class | What it is |
 |---|---|
 | `ARammsRobotPawn` | Body-agnostic base. Creates no components. Gives a view of the robot as one physical thing across its parts: `GetBody()`, `GetSimulatedParts()`, `GetRobotActors()`, `GetRobotMass()`, `TeleportRobot()`, `ApplySelfCollisionChannel()`. |
-| `ARammsSkeletalRobotPawn` | A robot whose body is one skeletal mesh simulating its physics asset: the root `VehicleMesh` plus a seat camera and a chase camera on booms. Parent of `BP_Mebot_Ramms` and `BP_Mebot_Mujoco`. |
-| `ARammsPlayerController` | The controller of `BP_MebotGameMode` / `BP_MebotMujocoGameMode`. Adds optional project-wide input mapping contexts and nothing else: a robot's keys come from its `ControlInput`. |
+| `ARammsSkeletalRobotPawn` | A robot whose body is one skeletal mesh simulating its physics asset: the root `VehicleMesh` plus a seat camera and a chase camera on booms. Parent of `BP_RammpGen1_Ramms` and `BP_RammpGen1_Mujoco`. |
+| `ARammsPlayerController` | The controller of `BP_RammpGen1GameMode` / `BP_RammpGen1MujocoGameMode`. Adds optional project-wide input mapping contexts and nothing else: a robot's keys come from its `ControlInput`. |
 
-`BP_MebotGameMode` is also the project's default game mode, so maps without an override
+`BP_RammpGen1GameMode` is also the project's default game mode, so maps without an override
 (`Map_BaseTest`, `Map_CurbTest`, `Map_StairTest`, `Map_DoorTest`) get the chair too.
 
 ## Names kept for the existing robots
@@ -87,7 +87,7 @@ body while it still overlaps `Interactable` objects.
 
 If the chair needs mass or damping changed, set it on the physics asset (or a `BodyInstance` override
 in the Blueprint) where it can be seen. `Scripts/pie_tests/base_component/run_chaos.sh` (drive, turn,
-constraint motors, control surface, arm, Enhanced Input, HUD, RammsAccess, MebotController) passes on
+constraint motors, control surface, arm, Enhanced Input, HUD, RammsAccess, RammpGen1Controller) passes on
 the new pawn.
 
 Removed with it: `/Game/VehicleTemplate` (and its `VehicleBasic` map), `/Game/Vehicles/SportsCar`,

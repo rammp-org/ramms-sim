@@ -164,7 +164,7 @@ manager.set_actor_label("MjManager")
 
 ws = world.get_world_settings()
 # The property is default_game_type, not default_game_mode. Setting the latter
-# succeeds silently and overrides nothing, which is how the MeBot pawn kept
+# succeeds silently and overrides nothing, which is how the RAMMP Gen1 pawn kept
 # spawning on top of the robot under test long after this looked handled.
 # Normalise to a UClass on both sides: unreal.GameModeBase is the Python type,
 # and the property reads back as the /Script/Engine.GameModeBase UClass, so
@@ -230,7 +230,7 @@ if BUILD_PENDULUM:
     capsule.set_editor_property("size", [0.05, 0.3])      # radius, half-length (m)
     capsule.set_editor_property("pos", [0.3, 0.0, 0.0])   # out along +X, not straight down
 
-    # The project's default game mode spawns the MeBot chair and a crowd character,
+    # The project's default game mode spawns the RAMMP Gen1 chair and a crowd character,
     # which then sit in front of whatever this level is meant to show. A bare
     # GameModeBase with no default pawn keeps the level to its own contents.
 # Lighting. A level made with new_level is unlit, which makes a capture of the

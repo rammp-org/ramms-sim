@@ -19,10 +19,10 @@ MuJoCo exactly is not the goal. The goal is one robot or object definition that 
 2. **Grasping on Chaos uses a grasp assist.** Chaos grasping serves teleop and data collection, not
    controller development or high-fidelity manipulation, so a clearly labelled assist is the right tool.
 3. **Two-way coupling between engines** (a MuJoCo robot with Chaos-only props) is a future item.
-4. **The hand-authored skeletal `BP_Mebot_Ramms` is deprecated** once the generated Chaos robot covers
+4. **The hand-authored skeletal `BP_RammpGen1_Ramms` is deprecated** once the generated Chaos robot covers
    it: first it stops being the default, then it is removed.
 5. **One robot authoring pipeline: USD / MJCF** (2026-10-28, after Phase 2). Every robot is a URLab
-   articulation, and `Backend = Chaos` on its base component runs that articulation on Chaos. The MeBot
+   articulation, and `Backend = Chaos` on its base component runs that articulation on Chaos. The RAMMP Gen1
    gets an MJCF and is renamed RAMMP Gen 1 (follow-up work); the skeletal backend stays only until then.
 
 ## Short answer
@@ -45,10 +45,10 @@ and springs; and grasping. Grasping now gets an assist rather than fidelity work
 ## What exists today
 
 - **Two robots, two physics paths.**
-  - `BP_Mebot_Ramms` runs on Chaos. The chair, arm and gripper are skeletal meshes with hand-authored
+  - `BP_RammpGen1_Ramms` runs on Chaos. The chair, arm and gripper are skeletal meshes with hand-authored
     physics assets, and the URDF importer (`Plugins/RammsCore/Content/Python/urdf/`) writes limits,
     masses and inertia into them.
-  - `BP_Mebot_Mujoco` and the lift-drive bases run on URLab's MuJoCo.
+  - `BP_RammpGen1_Mujoco` and the lift-drive bases run on URLab's MuJoCo.
   - The link masses of the two paths are kept equal by hand (`doc/robot_pawn.md`).
 - **The actuation seam already exists.** Controllers command motors by id through
   `IRammsActuationBackend` (`RammsActuationBackend.h`). `URammsRobotBaseComponent` picks the
@@ -211,7 +211,7 @@ The last three all come from the same missing passive damping and stiffness (got
    up as intended (velocity drive and/or position drive, force mode, read back in the editor), and an
    unlimited max force didn't change it. Apply `damping`, `stiffness` and `frictionloss` as forces in the
    backend's physics-rate callback, which motors need anyway.
-8. **The game mode:** test levels need a neutral game mode, or the project default spawns the MeBot.
+8. **The game mode:** test levels need a neutral game mode, or the project default spawns the RAMMP Gen1.
 
 ## Gaps and risks
 
@@ -364,13 +364,13 @@ while driving "straight", so there is no comparison yet.
 - A Chaos grasp assist: once both pads have had stable contact with one body for N physics steps while
   closing, weld the body to the gripper. Release on open. Labelled in the UI and in recorded data.
 - Arm tuning (the steady-state offsets).
-- Acceptance: teleop pick-and-place of worldgen props on the Chaos MeBot.
+- Acceptance: teleop pick-and-place of worldgen props on the Chaos RAMMP Gen1.
 
-**Phase 4: the MeBot as RAMMP Gen 1, from MJCF** (decision 5):
-- An MJCF (or USD) for the MeBot, renamed RAMMP Gen 1, imported as a URLab articulation with its motor
+**Phase 4: the RAMMP Gen1 as RAMMP Gen 1, from MJCF** (decision 5):
+- An MJCF (or USD) for the RAMMP Gen1, renamed RAMMP Gen 1, imported as a URLab articulation with its motor
   table, and `Backend = Chaos` on its base component.
-- It covers `BP_Mebot_Ramms` once `Scripts/pie_tests/base_component/run_chaos.sh` passes on it.
-- `BP_MebotGameMode` then defaults to it and `BP_Mebot_Ramms` is marked deprecated. It is removed, with
+- It covers `BP_RammpGen1_Ramms` once `Scripts/pie_tests/base_component/run_chaos.sh` passes on it.
+- `BP_RammpGen1GameMode` then defaults to it and `BP_RammpGen1_Ramms` is marked deprecated. It is removed, with
   the skeletal Chaos backend (`FRammsChaosActuationBackend` and the fallback in
   `URammsRobotBaseComponent::EnsureBackend`), in a later release.
 

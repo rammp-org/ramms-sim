@@ -12,7 +12,7 @@ class UPrimitiveComponent;
  * Base pawn for physically simulated robots (wheelchairs, mobile bases, seats).
  *
  * It makes no assumption about how the body is built and creates no components of its own:
- * - a skeletal mesh simulating its physics asset (ARammsSkeletalRobotPawn, BP_Mebot_Ramms today), or
+ * - a skeletal mesh simulating its physics asset (ARammsSkeletalRobotPawn, BP_RammpGen1_Ramms today), or
  * - a Blueprint-built assembly: a simulating root primitive (static mesh, box, ...) with further simulating
  *   parts joined by physics constraints, on this actor or in child actors (ChildActorComponent), so parts
  *   can be shared with the MuJoCo robots.
@@ -45,7 +45,7 @@ public:
 	/** At BeginPlay, put every colliding part of the robot (this actor's and its child actors') on
 	 *  SelfCollisionChannel and make it ignore that channel, so the robot's parts don't collide with each
 	 *  other while the world still collides with all of them. Off: the parts keep the collision set on them
-	 *  (BP_Mebot_Ramms sets it per component). Useful for a robot assembled from child actors, whose parts
+	 *  (BP_RammpGen1_Ramms sets it per component). Useful for a robot assembled from child actors, whose parts
 	 *  are separate bodies that a physics constraint only stops colliding pairwise. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Robot|Body")
 	bool bApplySelfCollisionChannel = false;
