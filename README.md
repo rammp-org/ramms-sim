@@ -446,11 +446,12 @@ using Epic's standard Windows→Linux cross-compilation workflow. This needs a
 
 With the toolchain in place, build and package with the repo scripts (they
 apply the required URLab patches automatically and cross-compile the
-MuJoCo/CoACD/libzmq third-party libraries into `third_party/install-linux/`
-before the UBT build):
+MuJoCo/CoACD/libzmq third-party libraries, plus URLab's own MjShim and
+ProtoSpec libraries, into `third_party/install-linux/` before the UBT build):
 
 ```powershell
-# 1. Cross-compile URLab third-party deps (once, and after submodule bumps)
+# 1. Cross-compile URLab's native libraries (once, and after any
+#    unreal-robotics-lab submodule bump)
 powershell -ExecutionPolicy Bypass -File Scripts\build_all_linux_cross.ps1
 
 # 2. Build the Linux game target; add -Package to cook/stage/pak

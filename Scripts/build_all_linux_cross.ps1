@@ -1,6 +1,7 @@
 # Cross-compiles URLab's third-party dependencies (MuJoCo, CoACD, libzmq)
-# for LINUX from a WINDOWS machine, using the same UE Linux cross-toolchain
-# that UBT uses for Windows->Linux game builds.
+# and URLab's own native libraries (MjShim, ProtoSpec) for LINUX from a
+# WINDOWS machine, using the same UE Linux cross-toolchain that UBT uses for
+# Windows->Linux game builds.
 #
 # Output goes to Plugins/unreal-robotics-lab/third_party/install-linux/ -
 # deliberately separate from install/ (the Windows-native libs your local
@@ -179,5 +180,77 @@ Build-Dep -Name "MuJoCo" -SrcDir "MuJoCo" `
 Build-Dep -Name "libzmq" -SrcDir "libzmq" `
     -ExtraCMake @("-DBUILD_STATIC=OFF", "-DBUILD_TESTS=OFF", "-DWITH_PERF_TOOL=OFF", "-DENABLE_DRAFTS=OFF") `
     -BuildTargetArgs @()
+
+# --- URLab's own libraries: MjShim and ProtoSpec ---
+# Both build against the Linux MuJoCo installed above. Neither is a submodule,
+# so neither gets an INSTALLED_SHA stamp (URLab.Build.cs drift-checks only
+# MuJoCo/CoACD/libzmq). Their build trees live under this project's
+# Intermediate\ so the plugin checkout stays clean.
+$MujocoLinux = Join-Path $InstallRoot "MuJoCo"
+$CrossBuildRoot = Join-Path $RepoRoot "Intermediate\URLabLinuxCross"
+
+# MjShim (mirrors third_party/MjShim/build.sh). MUJOCO_LIBRARY is given
+# rather than found: CMAKE_FIND_ROOT_PATH confines find_library to the
+# sysroot, and the MuJoCo install is outside it.
+$MjShimInstall = Join-Path $InstallRoot "MjShim"
+$MjShimBuild = Join-Path $CrossBuildRoot "MjShim"
+if (Test-Path $MjShimInstall) {
+    Log "MjShim - wiping previous install-linux artifacts"
+    Remove-Item -Recurse -Force $MjShimInstall
+}
+Log "MjShim - configuring"
+& cmake -S (Join-Path $ThirdParty "MjShim") -B $MjShimBuild "-DCMAKE_INSTALL_PREFIX=$MjShimInstall" `
+    "-DMUJOCO_INSTALL_DIR=$MujocoLinux" "-DMUJOCO_LIBRARY=$(Join-Path $MujocoLinux 'lib\libmujoco.so')" @CommonCMake
+if ($LASTEXITCODE -ne 0) { throw "MjShim configure failed" }
+Log "MjShim - building"
+& cmake --build $MjShimBuild --config $BuildType
+if ($LASTEXITCODE -ne 0) { throw "MjShim build failed" }
+Log "MjShim - installing"
+& cmake --install $MjShimBuild --config $BuildType
+if ($LASTEXITCODE -ne 0) { throw "MjShim install failed" }
+
+# ProtoSpec (mirrors protospec/build.ps1, which stages the Windows install;
+# keep the two in step). Without it URLab's generated MuJoCo profile
+# (Source/URLab/*/MuJoCo/Gen) fails to compile with "'types.h' file not found".
+# Only the libraries URLab.Build.cs links are built, and the lib/ header
+# layout is mirrored rather than flattened, because the umbrella headers reach
+# the generated tables through relative paths.
+$PsSrc = Join-Path $RepoRoot "Plugins\unreal-robotics-lab\protospec\lib"
+$PsBuild = Join-Path $CrossBuildRoot "protospec"
+$PsInstall = Join-Path $InstallRoot "protospec"
+Log "ProtoSpec - configuring"
+& cmake -S $PsSrc -B $PsBuild "-DMUJOCO_ROOT=$MujocoLinux" @CommonCMake
+if ($LASTEXITCODE -ne 0) { throw "ProtoSpec configure failed" }
+Log "ProtoSpec - building"
+& cmake --build $PsBuild --config $BuildType --target protospec protospec_core protospec_mjcf protospec_harness
+if ($LASTEXITCODE -ne 0) { throw "ProtoSpec build failed" }
+
+# Every archive is found before the previous install is removed, so a failure
+# leaves what was there. The harness is its own CMake subdirectory and
+# archives one level down.
+$PsLibs = foreach ($Name in "protospec", "protospec_core", "protospec_mjcf", "tinyxml2", "protospec_harness") {
+    $Found = @((Join-Path $PsBuild "lib$Name.a"), (Join-Path $PsBuild "harness\lib$Name.a")) |
+        Where-Object { Test-Path $_ } | Select-Object -First 1
+    if (-not $Found) { throw "ProtoSpec did not build lib$Name.a under $PsBuild" }
+    $Found
+}
+Log "ProtoSpec - staging"
+if (Test-Path $PsInstall) { Remove-Item -Recurse -Force $PsInstall }
+New-Item -ItemType Directory -Force -Path (Join-Path $PsInstall "lib") | Out-Null
+foreach ($Dir in "include", "sdk", "generated", "core", "io", "harness") {
+    $From = Join-Path $PsSrc $Dir
+    if (-not (Test-Path $From)) { continue }
+    $FromFull = [System.IO.Path]::GetFullPath($From)
+    Get-ChildItem -Path $From -Include "*.h", "*.inc" -File -Recurse | ForEach-Object {
+        $Dest = Join-Path (Join-Path $PsInstall $Dir) $_.FullName.Substring($FromFull.Length).TrimStart('\', '/')
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $Dest) | Out-Null
+        Copy-Item -Force $_.FullName $Dest
+    }
+}
+$TinyXml = Join-Path $PsInstall "third_party\tinyxml2"
+New-Item -ItemType Directory -Force -Path $TinyXml | Out-Null
+Copy-Item -Force (Join-Path $PsSrc "third_party\tinyxml2\tinyxml2.h") $TinyXml
+$PsLibs | ForEach-Object { Copy-Item -Force $_ (Join-Path $PsInstall "lib") }
+Log "ProtoSpec - staged $(@($PsLibs).Count) libraries in $PsInstall"
 
 Log "done - Linux third-party artifacts in $InstallRoot"
