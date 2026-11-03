@@ -87,6 +87,9 @@ cross-toolchain / `LINUX_MULTIARCH_ROOT`):
   patch).
 - `Scripts/build_linux_cross.ps1 [-Package]` — UBT Linux build + optional
   `BuildCookRun -platform=Linux` (cooking runs the Windows editor).
+- Both take `-Platform LinuxArm64` for aarch64 targets; its libraries go to
+  `third_party/install-linuxarm64/`, which `URLab.Build.cs` reads for a
+  LinuxArm64 target on a Windows host.
 
 Both routes produce the same `Packaged/Linux` output.
 

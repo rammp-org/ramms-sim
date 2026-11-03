@@ -463,6 +463,17 @@ The packaged output lands in `Packaged\Linux` — copy it to a Linux machine
 `Scripts/run_headless.sh`. Both scripts check for the toolchain and fail
 with install instructions if `LINUX_MULTIARCH_ROOT` is missing.
 
+**ARM64 Linux (`LinuxArm64`, e.g. a Jetson):** pass `-Platform LinuxArm64` to
+both scripts. The same toolchain covers it (its installer puts the aarch64
+target next to x86_64). The libraries go to `third_party/install-linuxarm64/`
+and the package to `Packaged\LinuxArm64`. Pixel Streaming doesn't ship for
+LinuxArm64, so that build leaves it out.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File Scripts\build_all_linux_cross.ps1 -Platform LinuxArm64
+powershell -ExecutionPolicy Bypass -File Scripts\build_linux_cross.ps1 -Platform LinuxArm64 -Package
+```
+
 #### Regenerate IDE project files (optional)
 
 Only needed for IDE/IntelliSense (Visual Studio, Rider, VS Code, Xcode) or after
