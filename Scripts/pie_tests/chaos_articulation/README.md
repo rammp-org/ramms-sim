@@ -12,6 +12,14 @@ chaos_run.py   editor: PIE; switch every articulation to Chaos and run a generic
 robot_run.py   editor: PIE; drive the robot pawn through its control surface (5-bar heights,
                drive.forward, drive.turn) on whichever engine simulates it, and record it;
                Saved/ChaosArticulation/<run>.json and <run>_summary.txt
+simready_showroom.py
+               editor: a showroom level of the articulated SimReady assets, with an
+               ARammsPhysicsSettings and a camera (/Game/Maps/SimReady/Map_SimReady_Showroom;
+               not committed, like the assets)
+simready_open.py
+               editor: PIE; open and close every door, drawer and lid in the open level with one
+               PD controller, on whichever engine the level runs; <run>.json, <run>_summary.txt
+               and, with SO_FRAMES, <run>_frames/
 ```
 
 ## Run
@@ -61,6 +69,31 @@ checkout has them. Pass `CA_ACTORS` to choose your own.
 **The comparison.** The same schedule run in MuJoCo gives the comparison below. Those runs used
 `mujoco` on the host on the same MJCFs, with no floor except where the model has one.
 
+**One level, either engine.** `simready_showroom.py` places the ten ForgeCAD conversions (RammsWorldGen's
+`Tools/simready_mjcf.py`, imported with `SR.import_mjcf`) in a row each; `simready_open.py` then runs the same
+controller on whichever engine the level is on, which a run picks with the console variable:
+
+```python
+exec(open(D + "simready_showroom.py").read())                                       # the level is on Chaos
+unreal.SystemLibrary.execute_console_command(None, "ramms.Physics.Engine MuJoCo")   # or Chaos; "" for the level's own
+SO_OUT = "open_mj"; SO_FRAMES = True
+SO_MJCF = r"D:/simready/mjcf"   # the folder Tools/simready_mjcf.py wrote (or set RAMMS_SIMREADY_MJCF)
+exec(open(D + "simready_open.py").read())
+```
+
+The run waits (up to `SO_READY`, 15 s) until every articulation is built on Chaos or the MuJoCo manager runs, and
+ends with an `ERROR` line in the summary when a Chaos build failed, the level has no engine for an articulation, or
+no articulation has an MJCF in the folder.
+
+Every limited hinge of 30° or more and slide of 8 cm or more (not knobs, dials, buttons, levers, pedals or
+wheels) is driven by a PD force (hinges kp 30, kd 6, at most 20 N·m; slides kp 400, kd 80, at most 80 N) toward
+80 % of its range over 1.5 s, then back: drawers from 4 s, doors from 5.5 s, so a closing door does not meet a
+drawer still out. On MuJoCo the force goes through `UMjBody::ApplyForce`, on Chaos through
+`SetJointForce`. With `SO_FRAMES` the run slows the game clock and MuJoCo's sim speed to a quarter
+(`SO_SLOMO`), so saving frames does not slow the controller's ticks. `Scripts/worldgen/simready_level.py` generates
+a furnished home on the SimReady palette whose cabinets, drawers and range are the same articulations; the same
+script runs there.
+
 ## Videos
 
 Recorded on Chaos at game time, so they play at real-time speed.
@@ -69,6 +102,36 @@ Recorded on Chaos at game time, so they play at real-time speed.
 |---|---|
 | ![SimReady fridge and microwave on Chaos](../../../doc/images/chaos_backend/chaos_simready_objects.webp) | ![Gen3 arm on Chaos](../../../doc/images/chaos_backend/chaos_gen3_arm.webp) |
 | Each joint is pushed open in turn (fridge doors, freezer drawer, microwave door, turntable, release button), then pushed closed; the joints' damping and the button's spring come from the MJCF | Joint-space move to a reach pose, gripper close and open, then back |
+
+| The showroom: the same controller on MuJoCo (left) and Chaos (right) |
+|---|
+| ![SimReady showroom on MuJoCo and Chaos](../../../doc/images/chaos_backend/simready_showroom_mujoco_vs_chaos.webp) |
+| A generated home's kitchen (`simready_level.py`), MuJoCo (left) and Chaos (right) |
+| ![Generated home kitchen on MuJoCo and Chaos](../../../doc/images/chaos_backend/simready_home_mujoco_vs_chaos.webp) |
+
+## Results: the showroom (2026-11-02)
+
+Each cell is the joint's maximum, then its value at the end; the target is 80 % of the range.
+
+| asset: joint | MuJoCo | Chaos |
+|---|---|---|
+| refrigerator: `door_1`, `door_2` (target 1.68 rad) | 1.68 → 0.00 | 1.68 → 0.00 |
+| refrigerator: `freezer` / crispers (0.36 / 0.24 m) | 0.361 / 0.240 → 0 | 0.360 / 0.240 → 0 |
+| kitchen base cabinet: `drawer_1` / `door_1` | 0.378 m / 1.54 rad → 0 | 0.378 m / 1.54 rad → 0 |
+| range: `oven_door` (1.26 rad, spring toward closed) | 1.42 → 0.05 | 1.49 → 0.05 |
+| range: racks / drawer | 0.240 / 0.320 m → 0 | 0.240 / 0.320 m → 0 |
+| washer: `door` (2.51 rad) / `drawer` (0.20 m) | 2.51 → 0 / 0.200 → 0 | 2.51 → 0 / 0.248 → 0.046 |
+| chest of drawers: four drawers (0.36 m) | 0.360 → 0 | 0.359 → 0 |
+| vanity: `door_1`; microwave: `door`; wheelie bin: lid | 1.54 / 1.40 / 1.54 → 0 | 1.54 / 1.40 / 1.54 → 0 |
+| pedal bin: `lid` (1.19 rad) | 1.18 → 0 | 1.08 → 0.20 |
+
+- 18 of the 21 joints agree to within 1 % at their peak and close fully on both. The range door, which a spring
+  pulls shut, overshoots its target more on Chaos (1.49 against 1.42 rad); the washer's light detergent drawer
+  overshoots to its stop on Chaos; the pedal bin's lid comes to rest ajar there (not yet investigated).
+- Getting there took three fixes: `UMjBody::ApplyForce` wrote the torque where MuJoCo reads the force (URLab),
+  and held the wrench for one MuJoCo step of the several a frame runs; and a hinged part of a base welded to
+  the world (a bin's lid, a washer's door) collided with the base on MuJoCo, which `simready_mjcf.py` now
+  `<exclude>`s.
 
 ## Results (2026-10-28, Phase 2 defaults)
 

@@ -94,6 +94,10 @@ Content/SimReady/
 # URLab puts an imported model's meshes and textures in /Game/MuJoCoImports/<name>_Assets; the SimReady
 # models (sr_*, Tools/simready_mjcf.py) are local imports like the rest of SimReady.
 Content/MuJoCoImports/sr_*
+# Levels built from those local imports (Scripts/worldgen/simready_level.py,
+# Scripts/pie_tests/chaos_articulation/simready_showroom.py), and the Chaos backend's scratch levels.
+Content/Maps/SimReady/
+Content/ChaosProto/
 __pycache__
 Packaged/
 

@@ -21,7 +21,10 @@ if _w.get("handle") is not None:
 
 
 def _ramms_watch_tick(dt):
-    if time.time() < _w["next"]:
+    # A script that pumps Slate (a slow task, a level load, an asset delete) ticks this callback again
+    # from inside itself; starting the next script there interleaves the two (and crashed the editor
+    # when an import ran inside a delete), so wait for the running one to return.
+    if _w.get("busy") or time.time() < _w["next"]:
         return
     _w["next"] = time.time() + 2.0
     for path in sorted(glob.glob(os.path.join(_CMD, "*.py")), key=os.path.getmtime):
@@ -30,7 +33,11 @@ def _ramms_watch_tick(dt):
             src = open(path, encoding="utf-8").read()
             os.replace(path, base + ".running")
             unreal.log("[watch] running %s" % os.path.basename(path))
-            exec(compile(src, path, "exec"), globals())
+            _w["busy"] = True
+            try:
+                exec(compile(src, path, "exec"), globals())
+            finally:
+                _w["busy"] = False
             os.replace(base + ".running", base + ".done")
         except Exception:
             tb = traceback.format_exc()
