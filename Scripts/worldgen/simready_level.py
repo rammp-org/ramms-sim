@@ -9,7 +9,10 @@ generated levels"). Options (consumed): SL_MAP (default /Game/Maps/SimReady/Map_
 (PRE_Indoor_Home), SL_SEED (19: a furnished home with eight articulations), SL_PALETTE (PAL_SimReady), SL_ENGINE
 ("Chaos", "MuJoCo" or "Auto": the level's ARammsPhysicsSettings; a run can still override it with -RammsPhysics= or
 ramms.Physics.Engine), SL_SUN ((pitch, yaw) of the sun, default (-60, 200): high enough to light the roofless rooms
-from above), SL_TIMEOUT (600 s of generation before giving up). Writes Saved/WorldGen/simready_level.json: the
+from above), SL_TIMEOUT (600 s of generation before giving up), SL_DOORS (False; True replaces the door leaves the
+generator stands open beside each opening with closed, hinged doors that open and close: ramms_worldgen.doors
+articulations, on the level's engine), SL_CEILING (False; True puts a ceiling with ceiling lights over every room of
+an indoor level, so a robot's cameras see a closed room). Writes Saved/WorldGen/simready_level.json: the
 level's articulations when it is saved, else {"error": ...}. It stops before touching any level when the target
 cannot be opened or created (a cancelled save prompt), and without saving when the palette does not load, the
 editor leaves the level or generation does not finish.
@@ -98,7 +101,12 @@ def _simready_level(opts):
                 raise RuntimeError("generation still running after %.0f s; not saved" % timeout)
             unreal.unregister_slate_post_tick_callback(state["h"])
             gen.place_player_start()
-            arts = gen.get_articulated_actors()
+            if opts.get("SL_DOORS") or (opts.get("SL_CEILING") and indoor):
+                import ramms_worldgen.doors as DR
+            doors = DR.articulate_level_doors(gen) if opts.get("SL_DOORS") else []
+            if opts.get("SL_CEILING") and indoor:
+                DR.add_ceiling(gen, palette=H.PALETTES + "/" + pal_name)
+            arts = list(gen.get_articulated_actors()) + list(doors)
             unreal.EditorLoadingAndSavingUtils.save_current_level()
             report({"map": path, "seed": seed, "engine": engine, "features": len(H.manifest_to_dict(gen).get("features", [])),
                     "articulated": sorted(["%s %s" % (a.get_class().get_name(), [str(t) for t in a.tags if str(t).startswith("RammsSlot:")]),

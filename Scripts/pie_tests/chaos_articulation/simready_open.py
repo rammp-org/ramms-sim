@@ -12,7 +12,12 @@ slides of 8 cm or more, not knobs, dials, buttons, levers, pedals or wheels). Op
 SO_MJCF (the folder Tools/simready_mjcf.py wrote the models to, <name>/<name>.xml; else the env var
 RAMMS_SIMREADY_MJCF, else C:/Users/waemf/data/simready/mjcf), SO_CAM ((location, look-at) for frames), SO_FPS (20),
 SO_FRAMES (False), SO_SLOMO (game time dilation, and MuJoCo's sim speed with it; 0.25 with frames, so saving them
-does not slow the controller's ticks, else 1), SO_READY (15: seconds to wait for every articulation's engine).
+does not slow the controller's ticks, else 1), SO_READY (15: seconds to wait for every articulation's engine),
+SO_RES ((1280, 720)), SO_FOV (60), SO_CAMPATH (a camera move for the frames instead of SO_CAM: [(t, location,
+look-at, fov), ...], a Catmull-Rom path through them), SO_ONLY (move only the articulations whose class or actor
+name contains one of these), SO_ORDER (class names, or tuples of them for one rank) and SO_STAGGER (seconds between
+one articulation's start and the next's, in SO_ORDER and then west to east; 0, the default, moves them all at once),
+SO_END (when to stop; by default 8 s after the last one starts). GameModeBase's DefaultPawn (a sphere) is hidden.
 Writes Saved/ChaosArticulation/<run>.json and <run>_summary.txt (and <run>_frames/). The schedule starts once every
 articulation is built on Chaos or the MuJoCo manager runs; a Chaos build that failed, no MuJoCo manager, or no
 articulation with an MJCF in the folder ends the run with an ERROR line instead.
@@ -26,7 +31,8 @@ SKIP = re.compile(r"knob|dial|button|lever|pedal|rod|stopper|release|roller|roll
 
 
 def _mjcf_joints(path):
-    """[(name, kind, lo, hi)] of the MJCF's limited hinges / slides, in rad / m."""
+    """[(name, kind, lo, hi, mass)] of the MJCF's limited hinges / slides, in rad / m, with the mass (kg) of the
+    body each moves (None when the body has no <inertial>)."""
     root = ET.parse(path).getroot()
     comp = root.find("compiler")
     deg = comp is None or comp.get("angle", "degree") == "degree"
@@ -36,6 +42,7 @@ def _mjcf_joints(path):
         if j is not None and d.get("class"):
             defaults[d.get("class")] = j.attrib
     out = []
+    owner = {j: b for b in root.iter("body") for j in b.findall("joint")}
     for j in root.iter("joint"):
         name = j.get("name")
         if not name:
@@ -49,7 +56,9 @@ def _mjcf_joints(path):
         lo, hi = (float(v) for v in rng.split())
         if kind == "hinge" and deg:
             lo, hi = math.radians(lo), math.radians(hi)
-        out.append((name, kind, lo, hi))
+        inertial = owner[j].find("inertial") if j in owner else None
+        mass = float(inertial.get("mass")) if inertial is not None and inertial.get("mass") else None
+        out.append((name, kind, lo, hi, mass))
     return out
 
 
@@ -129,7 +138,7 @@ def _simready_open(opts):
                 engine = "MuJoCo"
             handles = {}
             if engine == "MuJoCo":
-                for n, _k, _lo, _hi in joints:
+                for n, _k, _lo, _hi, _m in joints:
                     jc = actor.get_joint(n)
                     handles[n] = (jc, jc.get_attach_parent() if jc else None)
             arts[actor.get_name()] = {"actor": actor, "c": c, "engine": engine, "joints": joints, "h": handles, "prev": {}}
@@ -140,6 +149,23 @@ def _simready_open(opts):
         if not any(a["joints"] for a in arts.values()):
             return None, "no articulation with a door, drawer or lid to move (MJCF folder %s; set SO_MJCF or RAMMS_SIMREADY_MJCF)" % mjcf_dir
         return arts, None
+
+    def campath(path, t):
+        """(location, look-at, fov) at time t on a Catmull-Rom path through [(t, loc, at, fov), ...]."""
+        if t <= path[0][0]:
+            k = path[0]
+            return k[1], k[2], k[3]
+        if t >= path[-1][0]:
+            k = path[-1]
+            return k[1], k[2], k[3]
+        i = max(j for j in range(len(path) - 1) if path[j][0] <= t)
+        p0, p1, p2, p3 = path[max(i - 1, 0)], path[i], path[i + 1], path[min(i + 2, len(path) - 1)]
+        u = (t - p1[0]) / (p2[0] - p1[0])
+        u = u * u * (3.0 - 2.0 * u) if len(path) == 2 else u
+
+        def cr(a, b, c, d):
+            return tuple(0.5 * ((2 * b[k]) + (-a[k] + c[k]) * u + (2 * a[k] - 5 * b[k] + 4 * c[k] - d[k]) * u * u + (-a[k] + 3 * b[k] - 3 * c[k] + d[k]) * u * u * u) for k in range(3))
+        return cr(p0[1], p1[1], p2[1], p3[1]), cr(p0[2], p1[2], p2[2], p3[2]), p1[3] + (p2[3] - p1[3]) * u
 
     def target(t, lo, hi, hinge):
         closed, far = (lo, hi) if abs(lo) <= abs(hi) else (hi, lo)
@@ -174,10 +200,34 @@ def _simready_open(opts):
                     else:
                         st["until"] = now + 0.25
                     return
-                st["log"].append("articulations: %s" % {k: (v["engine"], len(v["joints"])) for k, v in arts.items()})
+                for pawn in unreal.GameplayStatics.get_all_actors_of_class(gw, unreal.DefaultPawn):
+                    # GameModeBase's default pawn, a sphere, would be in the frames; only that exact class is
+                    # hidden, so a robot that possesses player 0 stays visible
+                    if pawn.get_class() == unreal.DefaultPawn.static_class():
+                        pawn.set_actor_hidden_in_game(True)
+                only = opts.get("SO_ONLY")
+                if only:
+                    for k, v in arts.items():
+                        if not any(o in k or o in v["actor"].get_class().get_name() for o in only):
+                            v["joints"] = []   # left closed: not driven
+                order = list(opts.get("SO_ORDER", []))
+                stagger = float(opts.get("SO_STAGGER", 0.0))
+
+                def rank(item):
+                    cls = item[1]["actor"].get_class().get_name()
+                    i = next((n for n, o in enumerate(order) if any(sub in cls for sub in ((o,) if isinstance(o, str) else o))), len(order))
+                    return (i, item[1]["actor"].get_actor_location().x)
+                moving = sorted([kv for kv in arts.items() if kv[1]["joints"]], key=rank)
+                for n, (k, v) in enumerate(moving):
+                    v["off"] = n * stagger
+                for v in arts.values():
+                    v.setdefault("off", 0.0)
+                st["end"] = float(opts.get("SO_END", 8.0 + (len(moving) - 1) * stagger if moving else 8.0))
+                st["log"].append("articulations: %s" % {k: (v["engine"], len(v["joints"]), round(v["off"], 2)) for k, v in arts.items()})
                 cap = None
                 if opts.get("SO_FRAMES"):
-                    cam = opts.get("SO_CAM", ((0.0, -950.0, 280.0), (0.0, -150.0, 60.0)))
+                    path = opts.get("SO_CAMPATH")
+                    cam = (path[0][1], path[0][2]) if path else opts.get("SO_CAM", ((0.0, -950.0, 280.0), (0.0, -150.0, 60.0)))
                     L = unreal.Vector(*cam[0])
                     scs = unreal.GameplayStatics.get_all_actors_of_class(gw, unreal.SceneCapture2D)
                     sc = scs[0] if scs else None
@@ -185,11 +235,13 @@ def _simready_open(opts):
                         sc.set_actor_location_and_rotation(L, unreal.MathLibrary.find_look_at_rotation(L, unreal.Vector(*cam[1])), False, False)
                     if sc:
                         cap = sc.capture_component2d
-                        rt = unreal.RenderingLibrary.create_render_target2d(gw, 1280, 720, unreal.TextureRenderTargetFormat.RTF_RGBA8, unreal.LinearColor(0, 0, 0, 1), False)
+                        res = opts.get("SO_RES", (1280, 720))
+                        rt = unreal.RenderingLibrary.create_render_target2d(gw, int(res[0]), int(res[1]), unreal.TextureRenderTargetFormat.RTF_RGBA8, unreal.LinearColor(0, 0, 0, 1), False)
                         cap.set_editor_property("texture_target", rt)
                         cap.set_editor_property("capture_every_frame", True)
                         cap.set_editor_property("always_persist_rendering_state", True)
-                        cap.set_editor_property("fov_angle", 60.0)
+                        cap.set_editor_property("fov_angle", float(path[0][3]) if path else float(opts.get("SO_FOV", 60.0)))
+                        st["sc"] = sc
                         cap.set_editor_property("capture_source", unreal.SceneCaptureSource.SCS_FINAL_COLOR_LDR)
                         st["rt"] = rt
                     else:
@@ -208,7 +260,7 @@ def _simready_open(opts):
             sample = {"t": t}
             for label, a in st["arts"].items():
                 rec = {}
-                for n, kind, lo, hi in a["joints"]:
+                for n, kind, lo, hi, mass in a["joints"]:
                     hinge = kind == "hinge"
                     if a["engine"] == "Chaos":
                         q = a["c"].get_joint_position(n)
@@ -220,7 +272,12 @@ def _simready_open(opts):
                         q = unreal.MjJointRuntime.get_position(jc)
                         qd = unreal.MjJointRuntime.get_velocity(jc)
                     kp, kd, most = (30.0, 6.0, 20.0) if hinge else (400.0, 80.0, 80.0)
-                    f = max(-most, min(most, kp * (target(t, lo, hi, hinge) - q) - kd * qd))
+                    if not hinge and mass and mass < 3.0:
+                        # a light slide (a detergent drawer, 0.3 kg) chatters against its stops under the
+                        # gains a 3 kg drawer needs: scale them with its mass
+                        k = mass / 3.0
+                        kp, kd, most = kp * k, kd * k, most * k
+                    f = max(-most, min(most, kp * (target(t - a["off"], lo, hi, hinge) - q) - kd * qd))
                     if a["engine"] == "Chaos":
                         a["c"].set_joint_force(n, f)
                     elif body is not None:
@@ -237,11 +294,16 @@ def _simready_open(opts):
                     rec[n] = q
                 sample[label] = rec
             st["samples"].append(sample)
+            if st.get("cap") and opts.get("SO_CAMPATH"):
+                loc, at, fov = campath(opts["SO_CAMPATH"], t)
+                L = unreal.Vector(*loc)
+                st["sc"].set_actor_location_and_rotation(L, unreal.MathLibrary.find_look_at_rotation(L, unreal.Vector(*at)), False, False)
+                st["cap"].set_editor_property("fov_angle", float(fov))
             if st.get("cap") and t >= st["next"]:
                 unreal.RenderingLibrary.export_render_target(gw, st["rt"], fdir, "f_%04d" % st["frame"])
                 st["frame"] += 1
                 st["next"] += 1.0 / fps
-            if t >= 8.0:
+            if t >= st["end"]:
                 finish("done: %d samples, %d frames, %.1f s" % (len(st["samples"]), st["frame"], t))
         except Exception:
             import traceback

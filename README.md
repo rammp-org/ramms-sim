@@ -1004,6 +1004,19 @@ generated levels" in `Plugins/RammsWorldGen/README.md`):
 
 <p align="center"><img src="doc/images/chaos_backend/simready_home_overview.jpg" width="400" alt="A generated home on the SimReady palette, from above"> <img src="doc/images/chaos_backend/simready_home_mujoco_vs_chaos.webp" width="420" alt="The generated home's kitchen cabinets and range opening and closing, on MuJoCo (left) and Chaos (right)"></p>
 
+A hand-dressed showcase level (`Scripts/pie_tests/chaos_articulation/simready_showcase.py`) furnishes a whole
+home around 20 of these articulations: an L-shaped kitchen with an island, a breakfast nook, living room, bedroom,
+bath, laundry and a porch. Here it is on Chaos with `simready_open.py`'s camera paths:
+
+<p align="center"><img src="doc/images/chaos_backend/simready_showcase_overview.webp" width="420" alt="The SimReady showcase home from above, its fridge, cabinets, range, microwave, washer, vanity, chest of drawers and bins opening in turn on Chaos"> <img src="doc/images/chaos_backend/simready_showcase_kitchen.webp" width="420" alt="The showcase kitchen: fridge, range, microwave, wall cabinets and the island's drawers and doors opening on Chaos"></p>
+
+For a robot's sensors, `SC_ENCLOSED` closes the showcase up: a front wall with a front door and windows, a ceiling
+with lights, and hinged doors that open and close. The doors come from `ramms_worldgen.doors`, door-leaf meshes
+turned into URLab articulations. For generated levels, `simready_level.py`'s `SL_DOORS` and `SL_CEILING` do the
+same:
+
+<p align="center"><img src="doc/images/chaos_backend/simready_showcase_doors.webp" width="420" alt="Inside the closed-up showcase home: the front, bathroom and bedroom doors opening and closing on Chaos"></p>
+
 ## URDF Interoperability
 
 RammsCore ships bidirectional URDF (Unified Robot Description Format)
