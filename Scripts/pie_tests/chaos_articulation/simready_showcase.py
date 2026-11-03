@@ -29,7 +29,7 @@ HP = "/Game/HousePropsFurniture/Meshes/Meshes_props/"
 
 # Yaw (degrees) that turns each asset's front to +X, as the worldgen palettes measure it (palettes.FACING_FIX,
 # simready.FACING_FIX). The ForgeCAD SimReady packages face +Y as authored.
-FRONT = {"sr_fc": -90.0, "SM_SR_FC_dining_chair": -90.0, "SM_SR_NV_table_bedside_b01": 90.0, "SM_Bathtub": -90.0,
+FRONT = {"sr_fc": -90.0, "SM_SR_FC_dining_chair": -90.0, "SM_SR_FC_kitchen_base_cabinet": -90.0, "SM_SR_NV_table_bedside_b01": 90.0, "SM_Bathtub": -90.0,
          "SM_SR_NV_container_recycle_blue_wheeled_a01": -90.0}
 FACE = {"E": 0.0, "N": 90.0, "W": 180.0, "S": -90.0}
 
@@ -189,7 +189,12 @@ def _showcase(opts):
         world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
         if not ok or not world or world.get_outermost().get_name() != level:
             raise RuntimeError("could not open or create %s (a save prompt cancelled?); nothing changed" % level)
-        world.get_world_settings().set_editor_property("default_game_mode", unreal.GameModeBase)
+        # default_game_type, not default_game_mode: setting the latter succeeds and overrides nothing (as in
+        # newton/make_newton_map.py), letting the project's game mode spawn its robot and crowd here.
+        ws, gm = world.get_world_settings(), unreal.GameModeBase.static_class()
+        ws.set_editor_property("default_game_type", gm)
+        if ws.get_editor_property("default_game_type") != gm:
+            raise RuntimeError("game mode override did not take")
         for a in acs.get_all_level_actors():
             folder = str(a.get_folder_path())
             if folder.startswith("Showcase") or a.get_class().get_name() in ("StaticMeshActor",) and a.get_actor_label() == "Floor":
