@@ -339,6 +339,38 @@ while driving "straight", so there is no comparison yet.
   robot base component now switches a URLab robot's articulation to Chaos (ramms-core #40,
   ramms-mujoco-support #11); a robot with no articulation still falls back to the skeletal backend
 
+## One asset, either engine, per level (2026-11-02)
+
+**The level picks the engine.** RammsMujocoSupport's `ARammsPhysicsSettings` (Auto, MuJoCo, Chaos) and
+`URammsPhysicsEngineSubsystem`: on Chaos every articulation is switched before any actor begins play and the
+level's `AAMjManager` is removed before it compiles; on MuJoCo a manager is spawned when the level has none,
+Chaos components stay off, and a hidden static slab gives MuJoCo a floor when the level has no static MuJoCo
+geometry. `-RammsPhysics=` or `ramms.Physics.Engine` overrides it for a run. Checked on
+`Map_ChaosArticulation` and the lift-drive test level (`Map_BaseTest_URL`, unchanged Phase 2 numbers on
+Chaos; the base stands on MuJoCo), the SimReady showroom and a generated home.
+
+**Generated levels place articulations.** A palette entry's `ArticulatedClass` / `ArticulatedTransform`
+replaces its mesh's instances with a URLab articulation after generation (RammsWorldGen). `PAL_SimReady`'s
+cabinets, chests of drawers, ranges, vanities, washers and bins get the ten ForgeCAD conversions;
+`Scripts/worldgen/simready_level.py` (seed 19) gives a home with eight.
+
+**Open and close, the same controller on both engines** (`simready_open.py`; the table is in
+`Scripts/pie_tests/chaos_articulation/README.md`): 18 of 21 doors, drawers and lids agree to within 1 %.
+Fixed on the way:
+- Chaos: undriven joint damping and springs are implicit drives (explicit forces at 10 ms rang and blew up on
+  a 35 g knob and a 6 g button); Chaos' 1.5× angular drive scale is divided out; linear drive targets had the
+  wrong sign (the microwave's release button sat at its stop); hinges are measured about mid-range (a washer
+  door read ±π).
+- URLab: `UMjBody::ApplyForce` wrote the torque into the force half of `xfrc_applied`, and the wrench lasted one
+  MuJoCo step: the perturbation pre-step zeroes `xfrc_applied`, so a per-frame call gave about 1/8 of the force
+  at 500 Hz. The engine now holds a wrench until the next one or `ClearForce`.
+- The SimReady MJCFs: a part hinged to a base welded to the world collided with the base on MuJoCo (its parent
+  filter skips a world-welded parent), so a bin's lid and a washer's door could not move. `simready_mjcf.py`
+  writes `<exclude>` pairs, as USD keeps a joint's bodies apart.
+
+**Open:** the pedal bin's lid rests ajar on Chaos; only ForgeCAD's packages are converted (the LG and NVIDIA ones
+want `--decompose`, which needs CoACD).
+
 ## Plan, in the decided order
 
 **Phase 1: a Chaos build of a URLab articulation** (C++, RammsMujocoSupport):

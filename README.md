@@ -592,9 +592,22 @@ linkage controller then commands motors by id. The same controllers run on:
 
 <p align="center"><img src="doc/images/newton_gen3_unreal.gif" width="420" alt="A Kinova Gen3 stepped by the Newton worker inside Unreal"></p>
 
+A URLab articulation (a robot or an articulated SimReady object) is one asset for
+MuJoCo and Chaos: RammsMujocoSupport builds Chaos bodies and joints from its
+compiled MJCF. A level picks the engine with an `ARammsPhysicsSettings` actor
+(**Auto**, **MuJoCo** or **Chaos**), and a run can override it with
+`-RammsPhysics=MuJoCo|Chaos` or `ramms.Physics.Engine`, so the same level runs
+on either without changing its assets. Below, the same doors and drawers under
+the same controller on both engines
+(`Scripts/pie_tests/chaos_articulation/simready_open.py`):
+
+<p align="center"><img src="doc/images/chaos_backend/simready_showroom_mujoco_vs_chaos.webp" width="820" alt="Ten articulated SimReady assets opening and closing their doors, drawers and lids, on MuJoCo (left) and Chaos (right)"></p>
+
 See [doc/base_component_controls.md](doc/base_component_controls.md),
-[doc/mujoco_sim_roadmap.md](doc/mujoco_sim_roadmap.md) and
-[doc/robot_pawn.md](doc/robot_pawn.md).
+[doc/mujoco_sim_roadmap.md](doc/mujoco_sim_roadmap.md),
+[doc/robot_pawn.md](doc/robot_pawn.md),
+[doc/chaos_physics_backend_plan.md](doc/chaos_physics_backend_plan.md) and
+`Plugins/RammsMujocoSupport/README.md`.
 
 ### Accessible Van with Ramp
 
@@ -982,6 +995,14 @@ generate --preset PRE_Downtown --seed 42`, `ramms-worldgen manifest --issues`,
 `ramms-worldgen batch --preset PRE_Park --seeds 1-50 --out data/park`).
 See [doc/world_generation.md](doc/world_generation.md) and
 `Plugins/RammsWorldGen/README.md`.
+
+On the SimReady palette, articulated assets (cabinets, chests of drawers, ranges,
+vanities, washers, bins) are placed as URLab articulations whose doors and
+drawers open, on MuJoCo or Chaos as the level's `ARammsPhysicsSettings` says
+(`Scripts/worldgen/simready_level.py`; see "Articulated SimReady assets in
+generated levels" in `Plugins/RammsWorldGen/README.md`):
+
+<p align="center"><img src="doc/images/chaos_backend/simready_home_overview.jpg" width="400" alt="A generated home on the SimReady palette, from above"> <img src="doc/images/chaos_backend/simready_home_mujoco_vs_chaos.webp" width="420" alt="The generated home's kitchen cabinets and range opening and closing, on MuJoCo (left) and Chaos (right)"></p>
 
 ## URDF Interoperability
 
