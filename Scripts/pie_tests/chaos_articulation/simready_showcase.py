@@ -252,7 +252,7 @@ def _showcase(opts):
         b1 = place(MJ + "sr_fc_kitchen_base_cabinet", "Kitchen", x=-484.0, back=back, z=0.4)
         b2 = place(MJ + "sr_fc_kitchen_base_cabinet", "Kitchen", x=-424.0, back=back, z=0.4)
         place(MJ + "sr_fc_kitchen_base_cabinet", "Kitchen", x=-364.0, back=back, z=0.4)
-        sink = place(HP + "Cabinets_kitchen/SM_Kitchen_counter_sink", "Kitchen", x=-277.0, back=back, z=0.4, scale=(1.0, 1.0, 0.9))
+        place(HP + "Cabinets_kitchen/SM_Kitchen_counter_sink", "Kitchen", x=-277.0, back=back, z=0.4, scale=(1.0, 1.0, 0.9))
         place(SR + "SM_SR_LG_dishwasher_ldfc2423v/SM_SR_LG_dishwasher_ldfc2423v", "Kitchen", x=-194.0, back=back, z=0.4)
         place(MJ + "sr_fc_pedal_trash_can", "Kitchen", x=-139.0, back=back, z=0.4)
         for wx in (-544.0, -484.0, -424.0):   # not over the corner: their doors would meet the west leg's
@@ -325,7 +325,7 @@ def _showcase(opts):
         light(5.0, 280.0, candela=30.0, radius=380.0)
 
         # --- bathroom -------------------------------------------------------------------------------------------
-        van = place(MJ + "sr_fc_vanity_sink_faucet", "Bathroom", x=190.0, back=back, z=0.4)
+        place(MJ + "sr_fc_vanity_sink_faucet", "Bathroom", x=190.0, back=back, z=0.4)
         place(DP + "SM_Mirror_bathroom", "Bathroom", x=190.0, back=back, z=108.0, scale=0.55)
         props("Bathroom", 85.5, [(BA + "SM_Toothbrush_mug", 168.0, 402.0), (BA + "SM_Handsoap", 212.0, 404.0)])
         place(SR + "SM_SR_NV_toilet_a01/SM_SR_NV_toilet_a01", "Bathroom", x=270.0, back=back, z=0.4)
