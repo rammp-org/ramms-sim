@@ -1004,6 +1004,12 @@ generated levels" in `Plugins/RammsWorldGen/README.md`):
 
 <p align="center"><img src="doc/images/chaos_backend/simready_home_overview.jpg" width="400" alt="A generated home on the SimReady palette, from above"> <img src="doc/images/chaos_backend/simready_home_mujoco_vs_chaos.webp" width="420" alt="The generated home's kitchen cabinets and range opening and closing, on MuJoCo (left) and Chaos (right)"></p>
 
+A hand-dressed showcase level (`Scripts/pie_tests/chaos_articulation/simready_showcase.py`) furnishes a whole
+home around 18 of these articulations: an L-shaped kitchen with an island, a breakfast nook, living room, bedroom,
+bath, laundry and a porch, here on Chaos with `simready_open.py`'s camera paths:
+
+<p align="center"><img src="doc/images/chaos_backend/simready_showcase_overview.webp" width="420" alt="The SimReady showcase home from above, its fridge, cabinets, range, microwave, washer, vanity, chest of drawers and bins opening in turn on Chaos"> <img src="doc/images/chaos_backend/simready_showcase_kitchen.webp" width="420" alt="The showcase kitchen: fridge, range, microwave, wall cabinets and the island's drawers and doors opening on Chaos"></p>
+
 ## URDF Interoperability
 
 RammsCore ships bidirectional URDF (Unified Robot Description Format)

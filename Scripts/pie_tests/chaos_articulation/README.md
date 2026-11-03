@@ -94,6 +94,27 @@ drawer still out. On MuJoCo the force goes through `UMjBody::ApplyForce`, on Cha
 a furnished home on the SimReady palette whose cabinets, drawers and range are the same articulations; the same
 script runs there.
 
+**A showcase level.** `simready_showcase.py` builds `Map_SimReady_Showcase`: a furnished, roofless home open at
+the front (an L-shaped kitchen with an island, a breakfast nook, dining and living room, laundry, bath, bedroom and
+a porch) with 18 articulations among static SimReady, FreeFurniturePack and HousePropsFurniture props. The level
+references uncommitted content, so it is not committed; the script rebuilds it. `simready_open.py` records it with
+a moving camera and one articulation after another:
+
+```python
+exec(open(D + "simready_showcase.py").read())                  # SC_ENGINE = "MuJoCo" for the other engine
+SO_OUT = "sc_kitchen"; SO_FRAMES = True; SO_SLOMO = 0.1; SO_RES = (1920, 1080)
+SO_ONLY = ["refrigerator", "kitchen", "range", "microwave", "pedal"]   # class or actor name contains one of these
+SO_STAGGER = 0.35                                              # s between starts; SO_ORDER ranks them, then west to east
+SO_CAMPATH = [(0.0, (-110, -170, 360), (-470, 250, 70), 68.0),    # (t, location, look-at, fov), Catmull-Rom
+              (12.6, (-210, 30, 300), (-520, 300, 80), 66.0)]
+exec(open(D + "simready_open.py").read())
+```
+
+The run ends 8 s after the last articulation starts (`SO_END`). At 1080p, `SO_SLOMO` 0.1 keeps the controller's
+ticks ahead of the frame export. In the kitchen the corner cabinets are static (their doors would hit the other
+leg), the fridge stands 20 cm from its neighbour so its doors pass 90°, and the island faces the back run across a
+120 cm aisle so facing doors clear each other; every joint reaches its 80 % target on Chaos.
+
 ## Videos
 
 Recorded on Chaos at game time, so they play at real-time speed.
@@ -108,6 +129,10 @@ Recorded on Chaos at game time, so they play at real-time speed.
 | ![SimReady showroom on MuJoCo and Chaos](../../../doc/images/chaos_backend/simready_showroom_mujoco_vs_chaos.webp) |
 | A generated home's kitchen (`simready_level.py`), MuJoCo (left) and Chaos (right) |
 | ![Generated home kitchen on MuJoCo and Chaos](../../../doc/images/chaos_backend/simready_home_mujoco_vs_chaos.webp) |
+
+| The showcase home (`simready_showcase.py`) on Chaos | Its kitchen |
+|---|---|
+| ![SimReady showcase home on Chaos](../../../doc/images/chaos_backend/simready_showcase_overview.webp) | ![SimReady showcase kitchen on Chaos](../../../doc/images/chaos_backend/simready_showcase_kitchen.webp) |
 
 ## Results: the showroom (2026-11-02)
 
