@@ -96,7 +96,7 @@ script runs there.
 
 **A showcase level.** `simready_showcase.py` builds `Map_SimReady_Showcase`: a furnished, roofless home open at
 the front (an L-shaped kitchen with an island, a breakfast nook, dining and living room, laundry, bath, bedroom and
-a porch) with 18 articulations among static SimReady, FreeFurniturePack and HousePropsFurniture props. The level
+a porch) with 20 articulations among static SimReady, FreeFurniturePack and HousePropsFurniture props. The level
 references uncommitted content, so it is not committed; the script rebuilds it. `simready_open.py` records it with
 a moving camera and one articulation after another:
 
@@ -113,7 +113,27 @@ exec(open(D + "simready_open.py").read())
 The run ends 8 s after the last articulation starts (`SO_END`). At 1080p, `SO_SLOMO` 0.1 keeps the controller's
 ticks ahead of the frame export. In the kitchen the corner cabinets are static (their doors would hit the other
 leg), the fridge stands 20 cm from its neighbour so its doors pass 90°, and the island faces the back run across a
-120 cm aisle so facing doors clear each other; every joint reaches its 80 % target on Chaos.
+120 cm aisle so facing doors clear each other. The uppers stop short of the corner, where their doors would meet
+the west leg's. Every joint reaches its 80 % target on Chaos. Small props are stood on whatever is under them:
+a trace down, or, where the surface has no editor collision (Interchange and URLab meshes), the highest
+bounding box under them.
+
+`SC_ENCLOSED = True` (with its own `SC_MAP`) closes the house up for a robot's sensors:
+
+- a front wall with a front door and three windows;
+- a ceiling with ceiling lights;
+- hinged doors (`SC_DOORS`, on by default when enclosed) in the front, bathroom and bedroom doorways.
+
+The doors are `ramms_worldgen.doors` articulations made from the packs' door-leaf meshes. They open 0 to 100
+degrees and close on Chaos and MuJoCo, and `SO_ONLY = ["door"]` drives them.
+
+```python
+SC_MAP = "/Game/Maps/SimReady/Map_SimReady_Showcase_Enclosed"; SC_ENCLOSED = True
+exec(open(D + "simready_showcase.py").read())
+```
+
+Slides lighter than 3 kg get their gains scaled by mass / 3. The washer's 0.32 kg detergent drawer chattered
+against its stops under a 3 kg drawer's gains.
 
 ## Videos
 
@@ -133,6 +153,8 @@ Recorded on Chaos at game time, so they play at real-time speed.
 | The showcase home (`simready_showcase.py`) on Chaos | Its kitchen |
 |---|---|
 | ![SimReady showcase home on Chaos](../../../doc/images/chaos_backend/simready_showcase_overview.webp) | ![SimReady showcase kitchen on Chaos](../../../doc/images/chaos_backend/simready_showcase_kitchen.webp) |
+| The closed-up showcase (`SC_ENCLOSED`): hinged doors on Chaos | |
+| ![Hinged doors in the closed-up showcase on Chaos](../../../doc/images/chaos_backend/simready_showcase_doors.webp) | |
 
 ## Results: the showroom (2026-11-02)
 

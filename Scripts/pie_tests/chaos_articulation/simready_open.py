@@ -31,7 +31,8 @@ SKIP = re.compile(r"knob|dial|button|lever|pedal|rod|stopper|release|roller|roll
 
 
 def _mjcf_joints(path):
-    """[(name, kind, lo, hi)] of the MJCF's limited hinges / slides, in rad / m."""
+    """[(name, kind, lo, hi, mass)] of the MJCF's limited hinges / slides, in rad / m, with the mass (kg) of the
+    body each moves (None when the body has no <inertial>)."""
     root = ET.parse(path).getroot()
     comp = root.find("compiler")
     deg = comp is None or comp.get("angle", "degree") == "degree"
@@ -41,6 +42,7 @@ def _mjcf_joints(path):
         if j is not None and d.get("class"):
             defaults[d.get("class")] = j.attrib
     out = []
+    owner = {j: b for b in root.iter("body") for j in b.findall("joint")}
     for j in root.iter("joint"):
         name = j.get("name")
         if not name:
@@ -54,7 +56,9 @@ def _mjcf_joints(path):
         lo, hi = (float(v) for v in rng.split())
         if kind == "hinge" and deg:
             lo, hi = math.radians(lo), math.radians(hi)
-        out.append((name, kind, lo, hi))
+        inertial = owner[j].find("inertial") if j in owner else None
+        mass = float(inertial.get("mass")) if inertial is not None and inertial.get("mass") else None
+        out.append((name, kind, lo, hi, mass))
     return out
 
 
@@ -134,7 +138,7 @@ def _simready_open(opts):
                 engine = "MuJoCo"
             handles = {}
             if engine == "MuJoCo":
-                for n, _k, _lo, _hi in joints:
+                for n, _k, _lo, _hi, _m in joints:
                     jc = actor.get_joint(n)
                     handles[n] = (jc, jc.get_attach_parent() if jc else None)
             arts[actor.get_name()] = {"actor": actor, "c": c, "engine": engine, "joints": joints, "h": handles, "prev": {}}
@@ -255,7 +259,7 @@ def _simready_open(opts):
             sample = {"t": t}
             for label, a in st["arts"].items():
                 rec = {}
-                for n, kind, lo, hi in a["joints"]:
+                for n, kind, lo, hi, mass in a["joints"]:
                     hinge = kind == "hinge"
                     if a["engine"] == "Chaos":
                         q = a["c"].get_joint_position(n)
@@ -267,6 +271,11 @@ def _simready_open(opts):
                         q = unreal.MjJointRuntime.get_position(jc)
                         qd = unreal.MjJointRuntime.get_velocity(jc)
                     kp, kd, most = (30.0, 6.0, 20.0) if hinge else (400.0, 80.0, 80.0)
+                    if not hinge and mass and mass < 3.0:
+                        # a light slide (a detergent drawer, 0.3 kg) chatters against its stops under the
+                        # gains a 3 kg drawer needs: scale them with its mass
+                        k = mass / 3.0
+                        kp, kd, most = kp * k, kd * k, most * k
                     f = max(-most, min(most, kp * (target(t - a["off"], lo, hi, hinge) - q) - kd * qd))
                     if a["engine"] == "Chaos":
                         a["c"].set_joint_force(n, f)

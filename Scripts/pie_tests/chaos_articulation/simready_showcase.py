@@ -9,7 +9,10 @@ references /Game/SimReady and Fab content, which is not committed, so neither is
     exec(open(D + "simready_showcase.py").read())
 
 Then record it with simready_open.py (SO_STAGGER, SO_CAMPATH; see the README). Options (consumed): SC_MAP (default
-/Game/Maps/SimReady/Map_SimReady_Showcase), SC_ENGINE ("Chaos", the default, "MuJoCo" or "Auto"). Missing props are
+/Game/Maps/SimReady/Map_SimReady_Showcase), SC_ENGINE ("Chaos", the default, "MuJoCo" or "Auto"), SC_ENCLOSED (False:
+the open dollhouse; True closes it for a robot's sensors with a front wall, a front door and windows, and a ceiling
+with ceiling lights), SC_DOORS (hinged doors that open and close, ramms_worldgen.doors articulations, in the bathroom
+and bedroom doorways and, enclosed, the front door; on by default when enclosed). Missing props are
 skipped and listed in Saved/ChaosArticulation/showcase.log; when the level cannot be opened or created it stops before
 touching any level.
 
@@ -130,10 +133,53 @@ def _showcase(opts):
         o, e = a.get_actor_bounds(False, False)
         return o.z + e.z
 
+    world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
+
+    def settle(a, reach=25.0):
+        """Stand a placed prop on whatever is under it: trace down from just above its bottom (past its own
+        geometry) and move it to the first surface within `reach` cm. Returns the actor."""
+        if a is None:
+            return a
+        o, e = a.get_actor_bounds(False, False)
+        bottom = o.z - e.z
+        start, end = unreal.Vector(o.x, o.y, bottom + 6.0), unreal.Vector(o.x, o.y, bottom - reach)
+        r = unreal.SystemLibrary.line_trace_single(world, start, end, unreal.TraceTypeQuery.TRACE_TYPE_QUERY1, True, [a], unreal.DrawDebugTrace.NONE, True)
+        hit = r[1] if isinstance(r, tuple) else r
+        ok = r[0] if isinstance(r, tuple) else hit is not None
+        if ok and hit is not None:
+            t = hit.to_tuple()
+            z = t[5].z if hasattr(t[5], "z") else hit.impact_point.z   # impact point
+            ha = t[9] if len(t) > 9 else None
+            if abs(z - bottom) > 0.2:
+                loc = a.get_actor_location()
+                a.set_actor_location(unreal.Vector(loc.x, loc.y, loc.z + z - bottom), False, False)
+            log.append("settle %s %+.1f cm onto %s" % (_name(a), z - bottom, ha.get_actor_label() if ha else "?"))
+        else:
+            # no collision under it (Interchange and URLab meshes have none in the editor): stand it on the
+            # highest bounding box under its centre that is not above its bottom
+            best = None
+            for s_ in acs.get_all_level_actors():
+                if s_ == a or not str(s_.get_folder_path()).startswith("Showcase") or isinstance(s_, (unreal.Light, unreal.RammsProcPiece)):
+                    continue
+                so, se = s_.get_actor_bounds(False, False)
+                top_ = so.z + se.z
+                if abs(o.x - so.x) <= se.x and abs(o.y - so.y) <= se.y and bottom - reach <= top_ <= bottom + 0.5 and se.x * se.y > e.x * e.y:
+                    if best is None or top_ > best[0]:
+                        best = (top_, s_)
+            if best and abs(best[0] - bottom) > 0.2:
+                loc = a.get_actor_location()
+                a.set_actor_location(unreal.Vector(loc.x, loc.y, loc.z + best[0] - bottom), False, False)
+            log.append("settle %s %s" % (_name(a), ("%+.1f cm onto %s (bounds)" % (best[0] - bottom, _name(best[1]))) if best else "kept: nothing under it"))
+        return a
+
+    def _name(a):
+        c = a.get_component_by_class(unreal.StaticMeshComponent)
+        return c.static_mesh.get_name() if c and c.static_mesh else a.get_actor_label()
+
     def props(folder, z, items):
-        """Small static props standing at height z: [(path, x, y[, face[, scale]]), ...]."""
+        """Small static props stood on the surface at about height z: [(path, x, y[, face[, scale]]), ...]."""
         for it in items:
-            place(it[0], folder, face=it[3] if len(it) > 3 else "S", x=it[1], y=it[2], z=z, scale=it[4] if len(it) > 4 else 1.0)
+            settle(place(it[0], folder, face=it[3] if len(it) > 3 else "S", x=it[1], y=it[2], z=z, scale=it[4] if len(it) > 4 else 1.0))
 
     try:
         if eal.does_asset_exist(level):
@@ -172,13 +218,17 @@ def _showcase(opts):
         floor(-104.0, 119.0, 130.0, 414.0, 0.4, mat("Mat.Floor.Tile"), uv=60.0)             # laundry
         floor(131.0, 409.0, 136.0, 414.0, 0.4, mat("Mat.Floor.Tile"), uv=60.0)              # bathroom
         # back wall: kitchen, bathroom and bedroom windows
-        wall(-706.0, 420.0, 706.0, 420.0, windows="329,200,135,222;986,70,165,222;1306,130,110,222")
-        wall(-700.0, -426.0, -700.0, 426.0, windows="276,170,85,222")                         # west: dining window
-        wall(700.0, -426.0, 700.0, 426.0, windows="576,120,90,222")                           # east: bedroom window
+        wall(-706.0, 420.0, 706.0, 420.0, windows="429,140,135,222;986,70,165,222;1306,130,110,222")   # x -277, 280, 600
+        wall(-700.0, -426.0, -700.0, 426.0, windows="276,170,85,222")                         # west: nook window, y -150
+        wall(700.0, -426.0, 700.0, 426.0, windows="576,120,90,222")                           # east: bedroom window, y 150
         wall(-110.0, 150.0, -110.0, 414.0)                                                    # kitchen | laundry
         wall(125.0, 130.0, 125.0, 414.0)                                                      # laundry | bathroom
-        wall(125.0, 130.0, 415.0, 130.0, height=105.0)                                        # bathroom: a low front wall
-        wall(415.0, -426.0, 415.0, 414.0, door=(466.0, 90.0))                                 # bedroom, door
+        wall(125.0, 130.0, 415.0, 130.0, door=(235.0, 80.0))                                  # bathroom, door at x 360
+        wall(415.0, -426.0, 415.0, 414.0, door=(466.0, 90.0))                                 # bedroom, door at y 40
+        enclosed = bool(opts.get("SC_ENCLOSED", False))
+        if enclosed:
+            # front: the front door at x -150, windows in the dining room, living room and bedroom
+            wall(-706.0, -426.0, 706.0, -426.0, door=(556.0, 95.0), windows="286,160,85,222;976,140,85,222;1266,120,90,222")
 
         back = 414.0
         SM = HP + "Small_kitchen_props/"
@@ -205,11 +255,13 @@ def _showcase(opts):
         sink = place(HP + "Cabinets_kitchen/SM_Kitchen_counter_sink", "Kitchen", x=-277.0, back=back, z=0.4, scale=(1.0, 1.0, 0.9))
         place(SR + "SM_SR_LG_dishwasher_ldfc2423v/SM_SR_LG_dishwasher_ldfc2423v", "Kitchen", x=-194.0, back=back, z=0.4)
         place(MJ + "sr_fc_pedal_trash_can", "Kitchen", x=-139.0, back=back, z=0.4)
-        for wx in (-604.0, -484.0, -424.0):
+        for wx in (-544.0, -484.0, -424.0):   # not over the corner: their doors would meet the west leg's
             place(MJ + "sr_fc_kitchen_wall_cabinet", "Kitchen", x=wx, back=back, z=0.4)
         place(MJ + "sr_fc_microwave_oven", "Kitchen", x=-484.0, back=back - 4.0, z=top(b1, 91.2))
         leg = place(SRC, "Kitchen", face="E", back=-694.0, y=322.0, z=0.4)
         place(MJ + "sr_fc_kitchen_base_cabinet", "Kitchen", face="E", back=-694.0, y=261.0, z=0.4)
+        for wy in (322.0, 261.0):   # uppers over the west leg, beside the fridge
+            place(MJ + "sr_fc_kitchen_wall_cabinet", "Kitchen", face="E", back=-694.0, y=wy, z=0.4)
         place(MJ + "sr_fc_refrigerator", "Kitchen", face="E", back=-694.0, y=165.5, z=0.4)
         isl = None
         for ix in (-510.0, -450.0, -390.0):
@@ -219,10 +271,10 @@ def _showcase(opts):
         ct, it = top(corner, 91.2), top(isl, 91.2)
         props("Kitchen", ct, [(HP + "Electronics/SM_Coffeemaker_body", -592.0, 400.0), (SM + "SM_Coffee_mug", -625.0, 380.0)])
         props("Kitchen", top(leg, 91.2), [(SM + "SM_Kitchen_items_set_A", -680.0, 322.0, "E"), (SM + "SM_Teapot", -660.0, 262.0, "E")])
-        props("Kitchen", ct + 1.3, [(SM + "SM_Cooking_pot", -556.0, 392.0), (SM + "SM_Frying_pan", -540.0, 370.0)])
+        props("Kitchen", ct + 0.1, [(SM + "SM_Cooking_pot", -556.0, 392.0), (SM + "SM_Frying_pan", -540.0, 370.0)])   # on the elements, 91.3 cm
         props("Kitchen", top(b2, 91.2), [(SM + "SM_Plate_pile", -430.0, 395.0), (SM + "SM_Jar_A", -403.0, 402.0), (SM + "SM_Jar_B", -388.0, 402.0)])
         props("Kitchen", ct, [(SM + "SM_Utensil_holder_full", -350.0, 400.0), (SM + "SM_Pepper_mill", -372.0, 404.0), (SM + "SM_Bottle_A", -380.0, 404.0)])
-        props("Kitchen", ct, [(SM + "SM_Glass_drinking_pile", -217.0, 402.0), (SM + "SM_Macaroni_package", -330.0, 405.0)])
+        props("Kitchen", ct, [(SM + "SM_Glass_drinking_pile", -238.0, 402.0), (SM + "SM_Macaroni_package", -447.0, 405.0)])
         props("Kitchen", it, [(DP + "SM_Decorative_bowl", -450.0, 170.0), (DP + "SM_Tulips_A", -515.0, 170.0), (SM + "SM_Bowl_cereal", -405.0, 130.0),
                               (SM + "SM_Coffee_mug", -380.0, 150.0), (SM + "SM_Coffee_mug", -470.0, 125.0), (BK + "SM_Book_single_A", -500.0, 125.0)])
         place(HP + "Electronics/SM_Clock_wall_analog", "Kitchen", back=back, x=-145.0, z=180.0)
@@ -230,20 +282,21 @@ def _showcase(opts):
         light(-450.0, 120.0, candela=20.0, radius=380.0)
 
         # --- breakfast nook by the west window, dining table, sideboard -----------------------------------------
-        place(FF + "SM_Classic_Round_Table", "Dining", x=-575.0, y=-75.0)
-        place(FU + "SM_Chair_dining", "Dining", face="N", x=-575.0, y=-162.0)
-        place(FU + "SM_Chair_dining", "Dining", face="S", x=-575.0, y=12.0)
-        place(FU + "SM_Chair_dining", "Dining", face="W", x=-488.0, y=-75.0)
-        props("Dining", 76.5, [(SM + "SM_Coffee_mug", -560.0, -45.0), (SM + "SM_Bowl_cereal", -590.0, -100.0), (SM + "SM_Teapot", -600.0, -60.0),
-                               (BK + "SM_Book_single_B", -540.0, -95.0)])
-        place(CU + "SM_Curtain_A_rod_singlewindow", "Dining", face="E", back=-694.0, y=-65.0, z=230.0)
-        place(CU + "SM_Curtain_A_L", "Dining", face="E", back=-694.0, y=-172.0, z=0.4)
-        place(CU + "SM_Curtain_A_R", "Dining", face="E", back=-694.0, y=42.0, z=0.4)
-        place(PA + "SM_Painting_small_A", "Dining", face="E", back=-694.0, y=78.0, z=135.0)
+        place(FF + "SM_Classic_Round_Table", "Dining", x=-575.0, y=-150.0)
+        place(FU + "SM_Chair_dining", "Dining", face="N", x=-575.0, y=-237.0)
+        place(FU + "SM_Chair_dining", "Dining", face="S", x=-575.0, y=-63.0)
+        place(FU + "SM_Chair_dining", "Dining", face="W", x=-488.0, y=-150.0)
+        props("Dining", 76.5, [(SM + "SM_Coffee_mug", -560.0, -120.0), (SM + "SM_Bowl_cereal", -590.0, -175.0), (SM + "SM_Teapot", -600.0, -135.0),
+                               (BK + "SM_Book_single_B", -540.0, -170.0)])
+        # window y -235..-65: the rod spans it, a curtain hangs either side
+        place(CU + "SM_Curtain_A_rod_doublewindow", "Dining", face="E", back=-694.0, y=-150.0, z=230.0)
+        place(CU + "SM_Curtain_A_L", "Dining", face="E", back=-694.0, y=-258.0, z=0.4)
+        place(CU + "SM_Curtain_A_R", "Dining", face="E", back=-694.0, y=-42.0, z=0.4)
+        place(PA + "SM_Painting_small_A", "Dining", face="E", back=-694.0, y=60.0, z=135.0)
         light(-575.0, -75.0, candela=22.0, radius=380.0)
 
         place(DP + "SM_Carpet_C", "Dining", x=-330.0, y=-262.0, z=0.2)
-        place(FF + "SM_Modern_Table", "Dining", x=-330.0, y=-262.0)
+        place(FF + "SM_Modern_Table", "Dining", face="E", x=-330.0, y=-262.0)   # long side along x, a chair pair each side
         for cx in (-380.0, -280.0):
             place(SR + "SM_SR_FC_dining_chair/SM_SR_FC_dining_chair", "Dining", face="S", x=cx, y=-187.0)
             place(SR + "SM_SR_FC_dining_chair/SM_SR_FC_dining_chair", "Dining", face="N", x=cx, y=-337.0)
@@ -251,11 +304,11 @@ def _showcase(opts):
                                    (SM + "SM_Glass_wine", cx + 22.0, -226.0), (SM + "SM_Glass_wine", cx - 22.0, -298.0)])
         props("Dining", 78.0, [(DP + "SM_Vase_A", -330.0, -262.0), (DP + "SM_Tulips_B", -330.0, -262.0), (DP + "SM_Candle_holder_A", -405.0, -262.0),
                                (DP + "SM_Candle_holder_B", -255.0, -262.0)])
-        sb = place(FU + "SM_Sidetable_A", "Dining", face="E", back=-694.0, y=-300.0)
-        props("Dining", top(sb, 83.6), [(DP + "SM_Vase_B_sticks", -680.0, -335.0, "E"), (DP + "SM_Decorative_plate", -688.0, -300.0, "E"),
-                                        (DP + "SM_Candle_holder_A", -678.0, -265.0, "E")])
-        place(PA + "SM_Painting_large_B", "Dining", face="E", back=-694.0, y=-300.0, z=140.0)
-        place(DP + "SM_Plant_A", "Dining", x=-655.0, y=-395.0)
+        sb = place(FU + "SM_Sidetable_A", "Dining", face="E", back=-694.0, y=-348.0)
+        props("Dining", top(sb, 83.6), [(DP + "SM_Vase_B_sticks", -680.0, -383.0, "E"), (DP + "SM_Decorative_plate", -688.0, -348.0, "E"),
+                                        (DP + "SM_Candle_holder_A", -678.0, -313.0, "E")])
+        place(PA + "SM_Painting_large_B", "Dining", face="E", back=-694.0, y=-348.0, z=140.0)
+        place(DP + "SM_Plant_A", "Dining", x=-228.0, y=-392.0)
         light(-330.0, -262.0)
 
         # --- laundry --------------------------------------------------------------------------------------------
@@ -273,7 +326,7 @@ def _showcase(opts):
 
         # --- bathroom -------------------------------------------------------------------------------------------
         van = place(MJ + "sr_fc_vanity_sink_faucet", "Bathroom", x=190.0, back=back, z=0.4)
-        place(DP + "SM_Mirror_bathroom", "Bathroom", x=190.0, back=back, z=118.0, scale=0.55)
+        place(DP + "SM_Mirror_bathroom", "Bathroom", x=190.0, back=back, z=108.0, scale=0.55)
         props("Bathroom", 85.5, [(BA + "SM_Toothbrush_mug", 168.0, 402.0), (BA + "SM_Handsoap", 212.0, 404.0)])
         place(SR + "SM_SR_NV_toilet_a01/SM_SR_NV_toilet_a01", "Bathroom", x=270.0, back=back, z=0.4)
         place(BA + "SM_Toiletpaper_set", "Bathroom", x=236.0, y=398.0, z=0.4)
@@ -282,40 +335,37 @@ def _showcase(opts):
         bsh = place(BA + "SM_Bathroom_shelf_unit_A", "Bathroom", face="E", back=131.0, y=195.0, z=0.4)
         props("Bathroom", top(bsh, 110.0), [(BA + "SM_Towel_pile", 143.0, 195.0, "E", 0.55)])
         place(DP + "SM_Carpet_D", "Bathroom", x=225.0, y=262.0, z=0.6, scale=0.6)
-        place(DP + "SM_Plant_B", "Bathroom", x=395.0, y=160.0, z=0.4)
+        place(DP + "SM_Plant_B", "Bathroom", x=306.0, y=396.0, z=0.4)   # clear of the door's swing
         light(270.0, 280.0, candela=30.0, radius=380.0)
         tag(acs.spawn_actor_from_class(unreal.SphereReflectionCapture, unreal.Vector(250.0, 200.0, 150.0)), "Lights")  # the mirror
 
         # --- bedroom --------------------------------------------------------------------------------------------
-        ch = place(MJ + "sr_fc_chest_of_drawers", "Bedroom", x=555.0, back=back)
-        props("Bedroom", top(ch, 99.4), [(PA + "SM_Painting_table_A", 530.0, 402.0, "S"), (DP + "SM_Vase_A", 580.0, 400.0)])
-        place(PA + "SM_Painting_medium_A", "Bedroom", face="S", back=back, x=548.0, z=140.0)
+        ch = place(MJ + "sr_fc_chest_of_drawers", "Bedroom", x=600.0, back=back)      # under the window, x 535..665
+        props("Bedroom", top(ch, 99.4), [(PA + "SM_Painting_table_A", 575.0, 402.0, "S"), (DP + "SM_Vase_A", 625.0, 400.0)])
+        place(PA + "SM_Painting_small_B", "Bedroom", face="S", back=back, x=478.0, z=140.0)
         place(HP + "Furniture/SM_Bed_king", "Bedroom", face="W", back=694.0, y=-170.0)
         for ny in (-322.0, -18.0):
             place(SR + "SM_SR_NV_table_bedside_b01/SM_SR_NV_table_bedside_b01", "Bedroom", face="W", back=694.0, y=ny)
-            place(SR + "SM_SR_NV_lamp_table_bedside_a01/SM_SR_NV_lamp_table_bedside_a01", "Bedroom", x=670.0, y=ny, z=89.0)
-        place(HP + "Electronics/SM_Clock_table_digital", "Bedroom", face="W", x=662.0, y=-346.0, z=89.0)
+            settle(place(SR + "SM_SR_NV_lamp_table_bedside_a01/SM_SR_NV_lamp_table_bedside_a01", "Bedroom", x=670.0, y=ny, z=89.0))
+        settle(place(HP + "Electronics/SM_Clock_table_digital", "Bedroom", face="W", x=650.0, y=-302.0, z=89.0))
         place(PA + "SM_Painting_large_A", "Bedroom", face="W", back=694.0, y=-170.0, z=135.0)
         place(PA + "SM_Painting_large_C", "Bedroom", face="E", back=421.0, y=-200.0, z=135.0)
         place(DP + "SM_Carpet_D", "Bedroom", x=560.0, y=262.0, z=0.2)
         dk = place(FU + "SM_Workdesk", "Bedroom", face="E", back=421.0, y=250.0)
         place(FU + "SM_Chair_workdesk", "Bedroom", face="W", x=520.0, y=250.0)
         dz = top(dk, 72.5)
-        place(SR + "SM_SR_LG_monitor_27gx790a/SM_SR_LG_monitor_27gx790a", "Bedroom", face="E", x=440.0, y=255.0, z=dz)
-        place(SR + "SM_SR_FC_desk_lamp/SM_SR_FC_desk_lamp", "Bedroom", face="E", x=445.0, y=190.0, z=dz)
+        settle(place(SR + "SM_SR_LG_monitor_27gx790a/SM_SR_LG_monitor_27gx790a", "Bedroom", face="E", x=440.0, y=255.0, z=dz))
+        settle(place(SR + "SM_SR_FC_desk_lamp/SM_SR_FC_desk_lamp", "Bedroom", face="E", x=445.0, y=190.0, z=dz))
         props("Bedroom", dz, [(BK + "SM_Book_pile_A", 450.0, 312.0, "E"), (HP + "Office_props/SM_Pen_holder_with_pens", 445.0, 220.0, "E"),
                               (HP + "Office_props/SM_Papers_pile_A", 470.0, 290.0, "E"), (SM + "SM_Coffee_mug", 470.0, 205.0)])
-        place(CU + "SM_Curtain_D_rod_singlewindow", "Bedroom", face="W", back=694.0, y=210.0, z=230.0)
-        place(CU + "SM_Curtain_D_L", "Bedroom", face="W", back=694.0, y=128.0, z=56.0)
-        place(CU + "SM_Curtain_D_R", "Bedroom", face="W", back=694.0, y=292.0, z=56.0)
+        # window y 90..210
+        place(CU + "SM_Curtain_D_rod_singlewindow", "Bedroom", face="W", back=694.0, y=150.0, z=230.0)
+        place(CU + "SM_Curtain_D_L", "Bedroom", face="W", back=694.0, y=228.0, z=56.0)
+        place(CU + "SM_Curtain_D_R", "Bedroom", face="W", back=694.0, y=72.0, z=56.0)
         place(DP + "SM_Plant_B", "Bedroom", x=450.0, y=385.0)
-        dr = place(FU + "SM_Dresser_B", "Bedroom", face="E", back=421.0, y=-5.0)
-        drz = top(dr, 72.5)
-        place(LA + "SM_Lamp_table_B", "Bedroom", x=442.0, y=-25.0, z=drz)
-        place(LA + "SM_Lamp_table_B_shade", "Bedroom", x=442.0, y=-25.0, z=drz + 26.0)
-        props("Bedroom", drz, [(BK + "SM_Book_pile_A", 445.0, 20.0, "E"), (DP + "SM_Candle_holder_B", 450.0, -2.0)])
-        place(FU + "SM_Chair_arm", "Bedroom", face="W", x=625.0, y=70.0)
-        place(FU + "SM_Pillow_B", "Bedroom", face="W", x=640.0, y=70.0, z=50.0)
+        place(PA + "SM_Painting_medium_A", "Bedroom", face="E", back=421.0, y=250.0, z=145.0)    # over the desk
+        place(FU + "SM_Chair_arm", "Bedroom", face="W", x=600.0, y=40.0)
+        place(FU + "SM_Pillow_B", "Bedroom", face="W", x=615.0, y=40.0, z=50.0)
         light(560.0, -120.0)
         light(560.0, 260.0, candela=25.0, radius=380.0)
 
@@ -329,11 +379,11 @@ def _showcase(opts):
         tvs = place(FU + "SM_Tv_stand", "Living", face="W", back=409.0, y=-230.0)
         props("Living", top(tvs, 50.9), [(PA + "SM_Painting_table_B", 392.0, -160.0, "W"), (DP + "SM_Vase_B_sticks", 390.0, -300.0, "W"),
                                          (BK + "SM_Books_C", 390.0, -275.0, "W")])
-        place(FU + "SM_Bookshelf", "Living", face="W", back=409.0, y=-30.0)
-        for bz in (45.0, 90.0, 135.0, 180.0):
-            props("Living", bz, [(BK + "SM_Books_C", 388.0, -55.0, "W"), (BK + "SM_Books_D", 388.0, -5.0, "W")])
+        place(FU + "SM_Bookshelf", "Living", face="W", back=409.0, y=-75.0)          # clear of the bedroom door, y -5..85
+        for bz in (22.0, 60.0, 99.0, 137.0, 176.0):   # just above each shelf, settled down onto it
+            props("Living", bz, [(BK + "SM_Books_C", 388.0, -100.0, "W"), (BK + "SM_Books_D", 388.0, -50.0, "W")])
         place(PA + "SM_Painting_medium_C", "Living", face="W", back=409.0, y=-372.0, z=110.0)
-        place(FF + "SM_Modern_Armchair", "Living", face="N", x=300.0, y=-380.0)
+        place(FF + "SM_Modern_Armchair", "Living", face="N", x=300.0, y=-368.0)
         place(HP + "Lamps/SM_Lamp_floor_A", "Living", x=60.0, y=-370.0)
         place(HP + "Lamps/SM_Lamp_floor_A_shade", "Living", x=60.0, y=-370.0, z=118.0)
         st_ = place(FU + "SM_Sidetable_C", "Living", x=140.0, y=-345.0)
@@ -348,12 +398,12 @@ def _showcase(opts):
         place(DP + "SM_Plant_A", "Living", x=-60.0, y=90.0)
         light(200.0, -200.0)
         # a play corner between the living and dining rooms
-        place(KP + "SM_Toy_racetrack", "Living", x=-20.0, y=-330.0, z=0.2)
-        place(KP + "SM_Toy_box_A", "Living", x=-75.0, y=-255.0)
-        place(KP + "SM_Toy_block_set_A", "Living", x=10.0, y=-270.0)
+        place(KP + "SM_Toy_racetrack", "Living", x=5.0, y=-330.0, z=0.2)
+        place(KP + "SM_Toy_box_A", "Living", x=-50.0, y=-255.0)
+        place(KP + "SM_Toy_block_set_A", "Living", x=35.0, y=-270.0)
         place(KP + "SM_Toy_teddy", "Living", face="S", x=55.0, y=-250.0)
-        place(KP + "SM_Toy_truck", "Living", face="E", x=-40.0, y=-370.0)
-        place(KP + "SM_Toy_car_A", "Living", face="E", x=20.0, y=-345.0)
+        place(KP + "SM_Toy_truck", "Living", face="E", x=-15.0, y=-370.0)
+        place(KP + "SM_Toy_car_A", "Living", face="E", x=45.0, y=-345.0)
 
         # --- porch ----------------------------------------------------------------------------------------------
         place(MJ + "sr_fc_wheelie_bin", "Porch", x=-590.0, y=-520.0)
@@ -361,8 +411,29 @@ def _showcase(opts):
         place(SR + "SM_SR_FC_shipping_box/SM_SR_FC_shipping_box", "Porch", x=-370.0, y=-485.0, yaw_extra=8.0)
         bx = place(SR + "SM_SR_NV_box_cardboard_a01/SM_SR_NV_box_cardboard_a01", "Porch", x=-285.0, y=-495.0)
         place(SR + "SM_SR_FC_shipping_box/SM_SR_FC_shipping_box", "Porch", x=-290.0, y=-495.0, z=top(bx, 51.0), yaw_extra=-12.0)
-        for px in (-160.0, 300.0, 700.0):
+        for px in (-40.0, 300.0, 700.0):
             place(DP + "SM_Plant_A", "Porch", x=px, y=-520.0)
+
+        # --- closing it up: ceiling, doors -------------------------------------------------------------------
+        if enclosed or opts.get("SC_DOORS"):
+            import ramms_worldgen.doors as DR
+        if enclosed:
+            DR.ceiling_slab(-706.0, 706.0, -432.0, 426.0, WALL_H, mat("Mat.Wall.Interior"), folder="Showcase/Ceiling")
+        if opts.get("SC_DOORS", enclosed):
+            # each opening's jamb, the direction across it, and the room the door opens into
+            for opening, jamb, along, into in ((90.0, (415.0, -5.0, 0.0), (0.0, 1.0), (1.0, 0.0)),        # bedroom
+                                               (80.0, (320.0, 130.0, 0.0), (1.0, 0.0), (0.0, 1.0))):      # bathroom
+                bp = DR.build_door(DR.DOOR_INTERIOR, opening)
+                if bp:
+                    DR.place_door(bp, jamb, along, into, WALL_T, folder="Showcase/Doors")
+                else:
+                    log.append("skip door %.0f cm (no Blueprint)" % opening)
+            if enclosed:
+                bp = DR.build_door(DR.DOOR_EXTERIOR, 95.0)
+                if bp:
+                    DR.place_door(bp, (-197.5, -426.0, 0.0), (1.0, 0.0), (0.0, 1.0), WALL_T, folder="Showcase/Doors")
+                else:
+                    log.append("skip front door (no Blueprint)")
 
         les.save_current_level()
         log.append("saved %s" % level)
