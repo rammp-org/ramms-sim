@@ -17,7 +17,7 @@ SO_RES ((1280, 720)), SO_FOV (60), SO_CAMPATH (a camera move for the frames inst
 look-at, fov), ...], a Catmull-Rom path through them), SO_ONLY (move only the articulations whose class or actor
 name contains one of these), SO_ORDER (class names, or tuples of them for one rank) and SO_STAGGER (seconds between
 one articulation's start and the next's, in SO_ORDER and then west to east; 0, the default, moves them all at once),
-SO_END (when to stop; by default 8 s after the last one starts). GameModeBase's default pawn (a sphere) is hidden.
+SO_END (when to stop; by default 8 s after the last one starts). GameModeBase's DefaultPawn (a sphere) is hidden.
 Writes Saved/ChaosArticulation/<run>.json and <run>_summary.txt (and <run>_frames/). The schedule starts once every
 articulation is built on Chaos or the MuJoCo manager runs; a Chaos build that failed, no MuJoCo manager, or no
 articulation with an MJCF in the folder ends the run with an ERROR line instead.
@@ -200,10 +200,11 @@ def _simready_open(opts):
                     else:
                         st["until"] = now + 0.25
                     return
-                pawn = unreal.GameplayStatics.get_player_pawn(gw, 0)
-                if pawn:
-                    # GameModeBase's default pawn, a sphere, would be in the frames (articulations are pawns too)
-                    pawn.set_actor_hidden_in_game(True)
+                for pawn in unreal.GameplayStatics.get_all_actors_of_class(gw, unreal.DefaultPawn):
+                    # GameModeBase's default pawn, a sphere, would be in the frames; only that exact class is
+                    # hidden, so a robot that possesses player 0 stays visible
+                    if pawn.get_class() == unreal.DefaultPawn.static_class():
+                        pawn.set_actor_hidden_in_game(True)
                 only = opts.get("SO_ONLY")
                 if only:
                     for k, v in arts.items():
