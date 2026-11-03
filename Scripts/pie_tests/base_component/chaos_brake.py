@@ -13,7 +13,12 @@ pitched nose-down and how high it rose (a tip onto the front casters shows as bo
 unreal._ramms_brake_cases may name the cases ("flat100 flat50 down50", the
 default); unreal._ramms_brake_out the JSON written (Saved/RammsTests/brake.json);
 unreal._ramms_brake_decel a BrakeDeceleration (cm/s^2) to run them with instead of the
-chair's own.
+chair's own (0: the brakes stop the wheels as hard as BrakeTorque can, as before the ramp);
+unreal._ramms_brake_frames a folder to record each case into, from the side, as PNG frames
+(<folder>/<case>/f_0000.png ..., FRAME_FPS of game time; the frame it was let go at is in the
+JSON). The game is paused for each frame's capture and export, so recording does not change what
+the chair does: the drive's brakes act once a game tick, and a slowed or hitching game would
+tick them at another rate.
 """
 import json
 import math
@@ -35,6 +40,13 @@ SETTLE = 1.5             # s after a teleport before driving
 DECEL_WINDOW = 0.1       # s over which deceleration is measured
 REST_CMS = 1.0           # at rest below this speed
 CASES = {"flat100": ("flat", 1.0), "flat50": ("flat", 0.5), "down50": ("down", 0.5)}
+FRAME_FPS = 30.0
+FRAME_RES = (1280, 720)
+FRAME_FOV = 55.0
+FRAME_EXPOSURE_BIAS = 1.0
+CAM_SIDE = 360.0         # cm to the side of the lane the camera stands (+Y)
+CAM_UP = 30.0            # cm above what it looks at
+CAM_LOOK_UP = 75.0       # what it looks at: this far above the chair's origin (the seated operator's chest)
 
 
 def _gt(w):
@@ -88,7 +100,52 @@ def summarise(name, kind, speed, s):
             "brake_at_end": s["rows"][-1][4], "i_release": i0}
 
 
-def run(cases=None, out=None, decel=None, on_done=None):
+def _set_decel(dd, value):
+    """BrakeDeceleration on the chair's controller, without an edit notification: one reruns the
+    pawn's construction script mid-PIE, which drops its seated operator and replaces the
+    controller. Through Python where its wrapper knows the property, else the engine's `set`
+    command (every RammsDifferentialDriveController)."""
+    for prop in ("brake_deceleration", "BrakeDeceleration"):
+        try:
+            dd.set_editor_property(prop, float(value), unreal.PropertyAccessChangeNotifyMode.NEVER)
+            return "property"
+        except Exception:  # noqa: BLE001 -- a wrapper generated before the property existed
+            pass
+    unreal.SystemLibrary.execute_console_command(dd, "set RammsDifferentialDriveController BrakeDeceleration %g" % float(value))
+    return "console set"
+
+
+CAM_TAG = "ramms_brake_cam"
+
+
+def _place_capture():
+    """A SceneCapture2D in the editor's level for PIE to copy (Python cannot spawn into the PIE
+    world). run() takes it out again once PIE has ended and reloads the level, unsaved."""
+    eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
+    sc = eas.spawn_actor_from_class(unreal.SceneCapture2D, unreal.Vector(0, 0, 300), unreal.Rotator())
+    sc.set_editor_property("tags", [unreal.Name(CAM_TAG)])
+    sc.capture_component2d.set_editor_property("capture_every_frame", False)
+    return sc
+
+
+def _setup_capture(w):
+    sc = [a for a in unreal.GameplayStatics.get_all_actors_of_class(w, unreal.SceneCapture2D) if unreal.Name(CAM_TAG) in a.tags][0]
+    rt = unreal.RenderingLibrary.create_render_target2d(w, FRAME_RES[0], FRAME_RES[1], unreal.TextureRenderTargetFormat.RTF_RGBA8,
+                                                        unreal.LinearColor(0, 0, 0, 1), False)
+    cap = sc.capture_component2d
+    cap.set_editor_property("texture_target", rt)
+    cap.set_editor_property("capture_source", unreal.SceneCaptureSource.SCS_FINAL_COLOR_LDR)
+    cap.set_editor_property("capture_every_frame", False)
+    cap.set_editor_property("always_persist_rendering_state", True)
+    cap.set_editor_property("fov_angle", FRAME_FOV)
+    pp = cap.get_editor_property("post_process_settings")
+    pp.set_editor_property("override_auto_exposure_bias", True)
+    pp.set_editor_property("auto_exposure_bias", FRAME_EXPOSURE_BIAS)   # the chair's side to the camera is in its own shade
+    cap.set_editor_property("post_process_settings", pp)
+    return sc, rt
+
+
+def run(cases=None, out=None, decel=None, frames=None, fps=FRAME_FPS, on_done=None):
     les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
     ues = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem)
     cases = (cases or getattr(unreal, "_ramms_brake_cases", "") or "flat100 flat50 down50").split()
@@ -96,8 +153,23 @@ def run(cases=None, out=None, decel=None, on_done=None):
     if ues.get_game_world() is None and unreal.EditorLevelLibrary.get_editor_world().get_path_name() != MAP + "." + MAP.rsplit("/", 1)[1]:
         les.load_level(MAP)
     decel = decel if decel is not None else getattr(unreal, "_ramms_brake_decel", None)
+    frames = frames or getattr(unreal, "_ramms_brake_frames", "") or None
     x_min, x_max, _ = _floor_x_range()
     S = {"i": 0, "phase": "pie", "h": None, "results": [], "t_wall": 0.0}
+    if frames and ues.get_game_world() is None:
+        S["editor_cam"] = _place_capture()
+
+    def after_pie(_dt):
+        # Once PIE has ended (so on_done may start another run): the editor's level as it was
+        # (a capture placed for frames out, the level reloaded rather than left dirty), then on_done.
+        if ues.get_game_world() is not None:
+            return
+        unreal.unregister_slate_post_tick_callback(S["h_after"])
+        if S.get("editor_cam"):
+            unreal.get_editor_subsystem(unreal.EditorActorSubsystem).destroy_actor(S["editor_cam"])
+            les.load_level(MAP)
+        if on_done:
+            on_done(S["results"])
 
     def finish():
         unreal.unregister_slate_post_tick_callback(S["h"])
@@ -106,11 +178,12 @@ def run(cases=None, out=None, decel=None, on_done=None):
         for r in S["results"]:
             unreal.log("[brake] %s" % json.dumps(r))
         les.editor_request_end_play()
-        if on_done:
-            on_done(S["results"])
+        S["h_after"] = unreal.register_slate_post_tick_callback(after_pie)
 
     def begin_case(w, p):
         name = cases[S["i"]]
+        S["w"], p = cs_common.find_chaos_pawn()
+        S["p"], S["dd"] = p, p.get_component_by_class(unreal.RammsDifferentialDriveController)
         kind, speed = CASES[name]
         cs = cs_common.surface_of(p)
         cs_common.quiet_local_input(p)
@@ -120,10 +193,23 @@ def run(cases=None, out=None, decel=None, on_done=None):
             start = unreal.Vector(x_min + 200.0, FLAT_Y, z + 2.0)
             p.teleport_robot(unreal.Transform(start, unreal.Rotator(roll=0.0, pitch=0.0, yaw=0.0)), True)
             S["release_at"] = (start.x + DRIVE_CM, 1.0)
+            # from the lit side, between where it is let go and where it stops at 150 cm/s^2
+            look = unreal.Vector(start.x + DRIVE_CM + 75.0, FLAT_Y, z + CAM_LOOK_UP)
+            cam = unreal.Vector(look.x, FLAT_Y + CAM_SIDE, look.z + CAM_UP)
         else:   # from lane B's landing, facing down the ramp, let go halfway down
             p.teleport_robot(unreal.Transform(unreal.Vector(LANE_B["run"] + 150.0, LANE_B["y"], z + LANE_B["rise"] + 2.0),
                                               unreal.Rotator(roll=0.0, pitch=0.0, yaw=180.0)), True)
             S["release_at"] = (0.5 * LANE_B["run"], -1.0)
+            look = unreal.Vector(0.31 * LANE_B["run"], LANE_B["y"], z + 0.3 * LANE_B["rise"] + CAM_LOOK_UP)
+            cam = unreal.Vector(look.x, LANE_B["y"] + CAM_SIDE, look.z + CAM_UP)
+        if S.get("sc"):
+            S["sc"].set_actor_location_and_rotation(cam, unreal.MathLibrary.find_look_at_rotation(cam, look), False, False)
+            S["fdir"] = os.path.join(frames, name)
+            os.makedirs(S["fdir"], exist_ok=True)
+            for f in os.listdir(S["fdir"]):
+                if f.startswith("f_"):
+                    os.remove(os.path.join(S["fdir"], f))
+            S.update(frame=0, next_frame=None, release_frame=None)
         S.update({"name": name, "kind": kind, "speed": speed, "cs": cs, "phase": "settle", "t0": _gt(w), "rows": [], "i_release": None})
 
     def tick(dt):
@@ -141,17 +227,25 @@ def run(cases=None, out=None, decel=None, on_done=None):
                     return
                 S["w"], S["p"] = cs_common.find_chaos_pawn()
                 S["dd"] = dd = S["p"].get_component_by_class(unreal.RammsDifferentialDriveController)
-                if decel is not None:
-                    dd.set_editor_property("brake_deceleration", float(decel))
+                how = _set_decel(dd, decel) if decel is not None else None
                 S["config"] = {k: (round(float(dd.get_editor_property(k)), 3) if dd and _has(dd, k) else None)
                                for k in ("brake_deceleration", "brake_ramp_in_seconds", "brake_torque", "parking_brake_speed", "wheel_radius")}
                 S["config"]["control_mode"] = str(dd.get_editor_property("control_mode")) if dd else None
+                if decel is not None:
+                    S["config"].update(brake_deceleration_set=float(decel), set_by=how)
+                if frames:
+                    S["sc"], S["rt"] = _setup_capture(w)
                 S["z_rest"] = S["p"].get_actor_location().z
                 begin_case(w, S["p"])
                 return
             if w is None:
                 S["results"].append({"case": S.get("name"), "error": "PIE ended"})
                 return finish()
+            if S.get("paused"):
+                # Paused over the last frame's export (the hitch went by without game time): go on.
+                unreal.GameplayStatics.set_game_paused(w, False)
+                S["paused"] = False
+                return
             p, t = S["p"], _gt(w) - S["t0"]
             loc, rot = p.get_actor_location(), p.get_actor_rotation()
             fwd = p.get_actor_forward_vector()
@@ -167,15 +261,28 @@ def run(cases=None, out=None, decel=None, on_done=None):
             dd = S["dd"]
             w_rate = 0.5 * (dd.get_left_wheel_state().get_editor_property("angular_velocity") + dd.get_right_wheel_state().get_editor_property("angular_velocity")) if dd else 0.0
             S["rows"].append((t, v, rot.pitch, loc.z, bool(dd.is_parking_brake_engaged()) if dd else None, w_rate))
+            if S.get("sc"):
+                if S["next_frame"] is None:
+                    S["next_frame"] = t
+                if t >= S["next_frame"]:
+                    unreal.GameplayStatics.set_game_paused(w, True)
+                    S["paused"] = True
+                    S["sc"].capture_component2d.capture_scene()
+                    unreal.RenderingLibrary.export_render_target(w, S["rt"], S["fdir"], "f_%04d" % S["frame"])
+                    S["frame"] += 1
+                    S["next_frame"] += 1.0 / fps
             if S["phase"] == "drive":
                 x_rel, sgn = S["release_at"]
                 if sgn * (loc.x - x_rel) >= 0.0:
                     cs_common.release(S["cs"], "drive.forward")
                     S["i_release"] = len(S["rows"]) - 1; S["t_rel"] = t; S["phase"] = "watch"
+                    S["release_frame"] = S.get("frame")
                 elif t - S["t_drive"] > 20.0:
                     raise RuntimeError("%s: never reached x=%.0f (at %.0f)" % (S["name"], x_rel, loc.x))
             elif S["phase"] == "watch" and t - S["t_rel"] >= WATCH:
                 r = summarise(S["name"], S["kind"], S["speed"], S)
+                if S.get("sc"):
+                    r["frames"] = {"dir": S["fdir"], "count": S["frame"], "release_frame": S["release_frame"], "fps": fps}
                 S["results"].append(r)
                 S.setdefault("series", {})[S["name"]] = [[round(x, 4) for x in row[:4]] + [row[4], round(row[5], 3)] for row in S["rows"]]
                 unreal.log("[brake] %s" % json.dumps(r))

@@ -66,7 +66,17 @@ doesn't. `move_private_assets.py` is the one-shot migration that put them there.
   the peak deceleration (over 100 ms), the time and distance to rest, and how
   far the chassis pitched, and writes the series to `Saved/RammsTests/brake.json`.
   `python Scripts/editor_remote_exec.py --file Scripts/pie_tests/base_component/chaos_brake.py`;
-  `unreal._ramms_brake_cases` picks the cases.
+  `unreal._ramms_brake_cases` picks the cases, `unreal._ramms_brake_decel` runs
+  them with another `BrakeDeceleration` (0: the wheels stopped outright, as
+  before the brake ramp), and `unreal._ramms_brake_frames` records each case
+  from the side as PNG frames (the game paused over each capture, so recording
+  does not change the stop). Before (left) and after (right), at full stick on
+  the flat, the same at quarter speed, and down the 1:8 ramp:
+
+  <img src="../../../doc/images/chaos_backend/brake_flat100_before_after.webp" width="820" alt="The Chaos chair let go at 1.8 m/s on the flat: on the left its wheels stop outright and it lurches and rocks, on the right it slows down a 150 cm/s² ramp">
+  <img src="../../../doc/images/chaos_backend/brake_flat100_before_after_slow.webp" width="820" alt="The same stop at quarter speed">
+  <img src="../../../doc/images/chaos_backend/brake_down50_before_after.webp" width="820" alt="The chair let go halfway down the 1:8 ramp: stopped outright on the left, braked down the ramp on the right">
+  <img src="../../../doc/images/chaos_backend/brake_speed_pitch.png" width="820" alt="Speed and chassis pitch against time for the same takes">
 - `run_mj_full.sh` — PIE on Map_BaseTest_URL with `BP_LiftDriveLinkage_Ramms`:
   points `BP_LiftDriveTestGameMode.DefaultPawnClass` at the linkage pawn for the
   run (unsaved; `mj_restore.py` reloads the game mode from disk afterwards), lets
