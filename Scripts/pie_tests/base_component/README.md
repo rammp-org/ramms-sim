@@ -59,6 +59,14 @@ doesn't. `move_private_assets.py` is the one-shot migration that put them there.
   next 6 s (`chaos_ramp.py go|check A|B`); then the same driving *down* from
   the landing (`Ad`, `Bd`). It reports the parking brakes' state; on Chaos
   they are what holds it.
+- `chaos_brake.py` — how hard the Chaos chair stops when let go. It starts PIE on
+  Map_RampTest itself, drives the chair through the control surface (on the flat
+  at full and half stick, and down the 1:8 ramp), lets go, and logs its speed,
+  chassis pitch and height and the parking brakes each editor tick. It reports
+  the peak deceleration (over 100 ms), the time and distance to rest, and how
+  far the chassis pitched, and writes the series to `Saved/RammsTests/brake.json`.
+  `python Scripts/editor_remote_exec.py --file Scripts/pie_tests/base_component/chaos_brake.py`;
+  `unreal._ramms_brake_cases` picks the cases.
 - `run_mj_full.sh` — PIE on Map_BaseTest_URL with `BP_LiftDriveLinkage_Ramms`:
   points `BP_LiftDriveTestGameMode.DefaultPawnClass` at the linkage pawn for the
   run (unsaved; `mj_restore.py` reloads the game mode from disk afterwards), lets
