@@ -70,6 +70,16 @@ def _floor_x_range():
     return -1000.0, 1000.0, 0.0
 
 
+def _speed_at(t, v, at):
+    """The speed at time `at`, interpolated between the samples either side of it: every window is
+    a whole DECEL_WINDOW long, however the editor's ticks fall."""
+    k = next((i for i in range(1, len(t)) if t[i] >= at), len(t) - 1)
+    if t[k] <= t[k - 1]:
+        return v[k]
+    f = min(1.0, max(0.0, (at - t[k - 1]) / (t[k] - t[k - 1])))
+    return v[k - 1] + f * (v[k] - v[k - 1])
+
+
 def summarise(name, kind, speed, s):
     t = [r[0] for r in s["rows"]]
     v = [r[1] for r in s["rows"]]
@@ -81,12 +91,10 @@ def summarise(name, kind, speed, s):
     pre = [k for k in range(i0) if t[i0] - t[k] <= 0.3] or [i0]
     p_ref = sum(pitch[k] for k in pre) / len(pre)
     z_ref = sum(z[k] for k in pre) / len(pre)
-    peak_decel, j = 0.0, i0
+    peak_decel = 0.0
     for k in range(i0, len(t)):
-        while t[k] - t[j] > DECEL_WINDOW:
-            j += 1
-        if k > j and t[k] > t[j]:
-            peak_decel = max(peak_decel, (abs(v[j]) - abs(v[k])) / (t[k] - t[j]))
+        if t[k] - t[i0] >= DECEL_WINDOW:
+            peak_decel = max(peak_decel, (abs(_speed_at(t, v, t[k] - DECEL_WINDOW)) - abs(v[k])) / DECEL_WINDOW)
     rest = next((k for k in range(i0, len(t)) if abs(v[k]) < REST_CMS), None)
     sgn = 1.0 if v0 >= 0 else -1.0
     dist = sum(0.5 * (v[k] + v[k - 1]) * (t[k] - t[k - 1]) for k in range(i0 + 1, (rest or len(t) - 1) + 1)) * sgn
@@ -97,7 +105,8 @@ def summarise(name, kind, speed, s):
             "stop_cm": round(dist, 1),
             "pitch_min_deg": round(min(dips), 2), "pitch_max_deg": round(max(dips), 2),
             "rise_cm": round(max(z[k] for k in range(i0, len(t))) - z_ref, 2),
-            "brake_at_end": s["rows"][-1][4], "i_release": i0}
+            "brake_at_end": s["rows"][-1][4], "i_release": i0,
+            "tick_hz": round((len(t) - 1) / (t[-1] - t[0]), 1) if len(t) > 1 and t[-1] > t[0] else None}
 
 
 def _set_decel(dd, value):
@@ -145,15 +154,29 @@ def _setup_capture(w):
     return sc, rt
 
 
-def run(cases=None, out=None, decel=None, frames=None, fps=FRAME_FPS, on_done=None):
+def run(cases=None, out=None, decel=None, frames=None, fps=FRAME_FPS, max_fps=None, on_done=None):
     les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
     ues = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem)
     cases = (cases or getattr(unreal, "_ramms_brake_cases", "") or "flat100 flat50 down50").split()
-    out = out or getattr(unreal, "_ramms_brake_out", "") or os.path.join(unreal.Paths.project_saved_dir(), "RammsTests", "brake.json")
-    if ues.get_game_world() is None and unreal.EditorLevelLibrary.get_editor_world().get_path_name() != MAP + "." + MAP.rsplit("/", 1)[1]:
+    # A bare file name goes in Saved/RammsTests; a path with a folder in it is taken as given.
+    tests_dir = os.path.join(os.path.abspath(unreal.Paths.project_saved_dir()), "RammsTests")
+
+    def resolve(path):
+        return os.path.abspath(path) if os.path.dirname(path) else os.path.join(tests_dir, path)
+
+    out = resolve(out or getattr(unreal, "_ramms_brake_out", "") or "brake.json")
+    map_name = MAP.rsplit("/", 1)[1]
+    pie = ues.get_game_world()
+    if pie is not None and unreal.GameplayStatics.get_current_level_name(pie) != map_name:
+        # The cases' coordinates are Map_RampTest's: on another map the downhill case would
+        # drop the chair onto whatever is there and report an ordinary-looking stop.
+        raise RuntimeError("[brake] PIE is running %s, not %s: end it first" % (unreal.GameplayStatics.get_current_level_name(pie), map_name))
+    if pie is None and unreal.EditorLevelLibrary.get_editor_world().get_path_name() != MAP + "." + map_name:
         les.load_level(MAP)
     decel = decel if decel is not None else getattr(unreal, "_ramms_brake_decel", None)
     frames = frames or getattr(unreal, "_ramms_brake_frames", "") or None
+    if frames:
+        frames = resolve(frames)
     x_min, x_max, _ = _floor_x_range()
     S = {"i": 0, "phase": "pie", "h": None, "results": [], "t_wall": 0.0}
     if frames and ues.get_game_world() is None:
@@ -173,10 +196,12 @@ def run(cases=None, out=None, decel=None, frames=None, fps=FRAME_FPS, on_done=No
 
     def finish():
         unreal.unregister_slate_post_tick_callback(S["h"])
-        os.makedirs(os.path.dirname(out), exist_ok=True)
+        os.makedirs(os.path.dirname(out), exist_ok=True)   # absolute (resolve): always has a folder
         json.dump({"config": S.get("config"), "results": S["results"], "series": S.get("series", {})}, open(out, "w"), indent=1)
         for r in S["results"]:
             unreal.log("[brake] %s" % json.dumps(r))
+        if max_fps:
+            unreal.SystemLibrary.execute_console_command(None, "t.MaxFPS 0")
         les.editor_request_end_play()
         S["h_after"] = unreal.register_slate_post_tick_callback(after_pie)
 
@@ -225,9 +250,13 @@ def run(cases=None, out=None, decel=None, frames=None, fps=FRAME_FPS, on_done=No
                     return
                 if _gt(w) < 3.0:      # the chair is put down as it spawns
                     return
+                if unreal.GameplayStatics.get_current_level_name(w) != map_name:
+                    raise RuntimeError("PIE started on %s, not %s" % (unreal.GameplayStatics.get_current_level_name(w), map_name))
                 S["w"], S["p"] = cs_common.find_chaos_pawn()
                 S["dd"] = dd = S["p"].get_component_by_class(unreal.RammsDifferentialDriveController)
                 how = _set_decel(dd, decel) if decel is not None else None
+                if max_fps:
+                    unreal.SystemLibrary.execute_console_command(w, "t.MaxFPS %d" % int(max_fps))
                 S["config"] = {k: (round(float(dd.get_editor_property(k)), 3) if dd and _has(dd, k) else None)
                                for k in ("brake_deceleration", "brake_ramp_in_seconds", "brake_torque", "parking_brake_speed", "wheel_radius")}
                 S["config"]["control_mode"] = str(dd.get_editor_property("control_mode")) if dd else None
