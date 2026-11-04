@@ -70,8 +70,12 @@ doesn't. `move_private_assets.py` is the one-shot migration that put them there.
   them with another `BrakeDeceleration` (0: the wheels stopped outright, as
   before the brake ramp), and `unreal._ramms_brake_frames` records each case
   from the side as PNG frames (the game paused over each capture, so recording
-  does not change the stop). Before (left) and after (right), at full stick on
-  the flat, the same at quarter speed, and down the 1:8 ramp:
+  does not change the stop). The front casters are raised to -30 deg first and
+  held there (`unreal._ramms_brake_front_caster`; `None` leaves them down):
+  left down, as the chair spawns, they leave it little room to pitch forward,
+  and a hard stop looks gentler than it is. Before (left) and after (right),
+  casters at -30 deg, at full stick on the flat, the same at quarter speed,
+  and down the 1:8 ramp:
 
   <img src="../../../doc/images/chaos_backend/brake_flat100_before_after.webp" width="820" alt="The Chaos chair let go at 1.8 m/s on the flat: on the left its wheels stop outright and it lurches and rocks, on the right it slows down a 750 cm/s² ramp">
   <img src="../../../doc/images/chaos_backend/brake_flat100_before_after_slow.webp" width="820" alt="The same stop at quarter speed">

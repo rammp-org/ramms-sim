@@ -14,6 +14,10 @@ unreal._ramms_brake_cases may name the cases ("flat100 flat50 down50", the
 default); unreal._ramms_brake_out the JSON written (Saved/RammsTests/brake.json);
 unreal._ramms_brake_decel a BrakeDeceleration (cm/s^2) to run them with instead of the
 chair's own (0: the brakes stop the wheels as hard as BrakeTorque can, as before the ramp);
+unreal._ramms_brake_front_caster the angle (deg) the front casters are raised to and held at
+through the cases (FRONT_CASTER_DEG, -30, unless set; None leaves them where the chair has
+them). Left down, as the chair spawns, they leave it little room to pitch forward when it stops,
+and a hard stop looks gentler than it is;
 unreal._ramms_brake_frames a folder to record each case into, from the side, as PNG frames
 (<folder>/<case>/f_0000.png ..., FRAME_FPS of game time; the frame it was let go at is in the
 JSON). The game is paused for each frame's capture and export, so recording does not change what
@@ -130,6 +134,10 @@ def _set_decel(dd, value):
 
 
 CAM_TAG = "ramms_brake_cam"
+FRONT_CASTER = "lift.front_caster_swing_arm"
+FRONT_CASTER_DEG = -30.0
+CASTER_TOLERANCE = 2.0   # deg: how near the commanded angle the casters must be before a case drives
+CASTER_TIMEOUT = 8.0     # s to wait for them
 
 
 def _place_capture():
@@ -159,7 +167,7 @@ def _setup_capture(w):
     return sc, rt
 
 
-def run(cases=None, out=None, decel=None, frames=None, fps=FRAME_FPS, max_fps=None, props=None, on_done=None):
+def run(cases=None, out=None, decel=None, frames=None, fps=FRAME_FPS, max_fps=None, props=None, front_caster=FRONT_CASTER_DEG, on_done=None):
     les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
     ues = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem)
     cases = (cases or getattr(unreal, "_ramms_brake_cases", "") or "flat100 flat50 down50").split()
@@ -180,6 +188,7 @@ def run(cases=None, out=None, decel=None, frames=None, fps=FRAME_FPS, max_fps=No
         les.load_level(MAP)
     decel = decel if decel is not None else getattr(unreal, "_ramms_brake_decel", None)
     frames = frames or getattr(unreal, "_ramms_brake_frames", "") or None
+    front_caster = getattr(unreal, "_ramms_brake_front_caster", front_caster)
     if frames:
         frames = resolve(frames)
     x_min, x_max, _ = _floor_x_range()
@@ -271,6 +280,11 @@ def run(cases=None, out=None, decel=None, frames=None, fps=FRAME_FPS, max_fps=No
                     S["config"].update(brake_deceleration_set=float(decel), set_by=how)
                 if props:
                     S["config"]["props_set"] = dict(props)
+                if front_caster is not None:
+                    # Held by the Script source through every case: releasing the drive axes
+                    # between cases leaves it alone.
+                    cs_common.set_control(cs_common.surface_of(S["p"]), FRONT_CASTER, float(front_caster))
+                    S["config"]["front_caster_cmd"] = float(front_caster)
                 if frames:
                     S["sc"], S["rt"] = _setup_capture(w)
                 S["z_rest"] = S["p"].get_actor_location().z
@@ -292,7 +306,11 @@ def run(cases=None, out=None, decel=None, frames=None, fps=FRAME_FPS, max_fps=No
             vel = p.get_velocity()
             v = (vel.x * fwd_h.x + vel.y * fwd_h.y) / n
             if S["phase"] == "settle":
-                if t >= SETTLE:
+                caster = S["cs"].get_control_value(FRONT_CASTER) if front_caster is not None else None
+                caster_ready = front_caster is None or abs(caster - float(front_caster)) <= CASTER_TOLERANCE
+                if t >= SETTLE and not caster_ready and t >= SETTLE + CASTER_TIMEOUT:
+                    raise RuntimeError("%s: the front casters reached %.1f deg, not %.1f" % (S["name"], caster, float(front_caster)))
+                if t >= SETTLE and caster_ready:
                     cs_common.set_control(S["cs"], "drive.forward", S["speed"])
                     S["phase"] = "drive"; S["t_drive"] = t
                 return
@@ -314,15 +332,19 @@ def run(cases=None, out=None, decel=None, frames=None, fps=FRAME_FPS, max_fps=No
                 if sgn * (loc.x - x_rel) >= 0.0:
                     cs_common.release(S["cs"], "drive.forward")
                     S["i_release"] = len(S["rows"]) - 1; S["t_rel"] = t; S["phase"] = "watch"
+                    if front_caster is not None:
+                        S["caster_at_release"] = S["cs"].get_control_value(FRONT_CASTER)
                     S["release_frame"] = S.get("frame")
                 elif t - S["t_drive"] > 20.0:
                     raise RuntimeError("%s: never reached x=%.0f (at %.0f)" % (S["name"], x_rel, loc.x))
             elif S["phase"] == "watch" and t - S["t_rel"] >= WATCH:
                 r = summarise(S["name"], S["kind"], S["speed"], S)
+                if front_caster is not None:
+                    r["front_caster_deg"] = round(S.get("caster_at_release", float("nan")), 1)
                 if S.get("sc"):
                     r["frames"] = {"dir": S["fdir"], "count": S["frame"], "release_frame": S["release_frame"], "fps": fps}
                 S["results"].append(r)
-                S.setdefault("series", {})[S["name"]] = [[round(x, 4) for x in row[:4]] + [row[4], round(row[5], 3)] for row in S["rows"]]
+                S.setdefault("series", {})["%s#%d" % (S["name"], S["i"])] = [[round(x, 4) for x in row[:4]] + [row[4], round(row[5], 3)] for row in S["rows"]]
                 unreal.log("[brake] %s" % json.dumps(r))
                 S["i"] += 1
                 if S["i"] >= len(cases):
