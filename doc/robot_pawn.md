@@ -85,6 +85,13 @@ Centres of mass and inertia still come from the bodies' boxes. Before this the b
 if it were solid) added 411 kg to that link. The trigger is now query-only, which keeps it out of the
 body while it still overlaps `Interactable` objects.
 
+The chair Blueprint uses the trigger for a reach: when an actor tagged `Target` (Map_Demo's two buttons)
+comes into it, arm teleop goes off and the end effector goes to the button's pose (`SetArmTargetActor`).
+The arm comes back to teleop through `Retract Arm` (then `On Joint Targets Reached` runs `EnableArmTeleop`)
+1 s after the reach lands, or as soon as the button leaves the trigger, or 8 s after it came into range
+if the reach still has not landed (a pose the arm cannot match). While teleop is off the control surface
+refuses `arm.*` and `gripper.*`.
+
 If the chair needs mass or damping changed, set it on the physics asset (or a `BodyInstance` override
 in the Blueprint) where it can be seen. `Scripts/pie_tests/base_component/run_chaos.sh` (drive, turn,
 constraint motors, control surface, arm, Enhanced Input, HUD, RammsAccess, RammpGen1Controller) passes on
