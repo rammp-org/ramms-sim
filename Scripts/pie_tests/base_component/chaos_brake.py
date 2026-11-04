@@ -193,7 +193,11 @@ def run(cases=None, out=None, decel=None, frames=None, fps=FRAME_FPS, max_fps=No
         frames = resolve(frames)
     x_min, x_max, _ = _floor_x_range()
     S = {"i": 0, "phase": "pie", "h": None, "results": [], "t_wall": 0.0}
-    if frames and ues.get_game_world() is None:
+    if frames:
+        if pie is not None:
+            # The capture is placed in the editor's level for PIE to copy; a session already
+            # running has none.
+            raise RuntimeError("[brake] recording needs PIE started by run(): end the running session first")
         S["editor_cam"] = _place_capture()
 
     def after_pie(_dt):
@@ -243,7 +247,8 @@ def run(cases=None, out=None, decel=None, frames=None, fps=FRAME_FPS, max_fps=No
             cam = unreal.Vector(look.x, LANE_B["y"] + CAM_SIDE, look.z + CAM_UP)
         if S.get("sc"):
             S["sc"].set_actor_location_and_rotation(cam, unreal.MathLibrary.find_look_at_rotation(cam, look), False, False)
-            S["fdir"] = os.path.join(frames, name)
+            # A case run more than once records each take into its own folder (<case>_<index>).
+            S["fdir"] = os.path.join(frames, name if cases.count(name) == 1 else "%s_%d" % (name, S["i"]))
             os.makedirs(S["fdir"], exist_ok=True)
             for f in os.listdir(S["fdir"]):
                 if f.startswith("f_"):
@@ -317,6 +322,7 @@ def run(cases=None, out=None, decel=None, frames=None, fps=FRAME_FPS, max_fps=No
             dd = S["dd"]
             w_rate = 0.5 * (dd.get_left_wheel_state().get_editor_property("angular_velocity") + dd.get_right_wheel_state().get_editor_property("angular_velocity")) if dd else 0.0
             S["rows"].append((t, v, rot.pitch, loc.z, bool(dd.is_parking_brake_engaged()) if dd else None, w_rate))
+            S["captured"] = False
             if S.get("sc"):
                 if S["next_frame"] is None:
                     S["next_frame"] = t
@@ -327,6 +333,7 @@ def run(cases=None, out=None, decel=None, frames=None, fps=FRAME_FPS, max_fps=No
                     unreal.RenderingLibrary.export_render_target(w, S["rt"], S["fdir"], "f_%04d" % S["frame"])
                     S["frame"] += 1
                     S["next_frame"] += 1.0 / fps
+                    S["captured"] = True
             if S["phase"] == "drive":
                 x_rel, sgn = S["release_at"]
                 if sgn * (loc.x - x_rel) >= 0.0:
@@ -334,7 +341,9 @@ def run(cases=None, out=None, decel=None, frames=None, fps=FRAME_FPS, max_fps=No
                     S["i_release"] = len(S["rows"]) - 1; S["t_rel"] = t; S["phase"] = "watch"
                     if front_caster is not None:
                         S["caster_at_release"] = S["cs"].get_control_value(FRONT_CASTER)
-                    S["release_frame"] = S.get("frame")
+                    # The frame of this tick's pose: the one just captured, else the next.
+                    if S.get("sc"):
+                        S["release_frame"] = S["frame"] - 1 if S["captured"] else S["frame"]
                 elif t - S["t_drive"] > 20.0:
                     raise RuntimeError("%s: never reached x=%.0f (at %.0f)" % (S["name"], x_rel, loc.x))
             elif S["phase"] == "watch" and t - S["t_rel"] >= WATCH:
