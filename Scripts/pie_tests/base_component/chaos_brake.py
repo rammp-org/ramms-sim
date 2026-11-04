@@ -109,19 +109,24 @@ def summarise(name, kind, speed, s):
             "tick_hz": round((len(t) - 1) / (t[-1] - t[0]), 1) if len(t) > 1 and t[-1] > t[0] else None}
 
 
-def _set_decel(dd, value):
-    """BrakeDeceleration on the chair's controller, without an edit notification: one reruns the
-    pawn's construction script mid-PIE, which drops its seated operator and replaces the
-    controller. Through Python where its wrapper knows the property, else the engine's `set`
-    command (every RammsDifferentialDriveController)."""
-    for prop in ("brake_deceleration", "BrakeDeceleration"):
+def _set_prop(dd, name, value):
+    """A float property of the chair's controller (its C++ name), without an edit notification:
+    one reruns the pawn's construction script mid-PIE, which drops its seated operator and
+    replaces the controller. Through Python where its wrapper knows the property, else the
+    engine's `set` command (every RammsDifferentialDriveController)."""
+    snake = "".join("_" + c.lower() if c.isupper() else c for c in name).lstrip("_")
+    for prop in (snake, name):
         try:
             dd.set_editor_property(prop, float(value), unreal.PropertyAccessChangeNotifyMode.NEVER)
             return "property"
         except Exception:  # noqa: BLE001 -- a wrapper generated before the property existed
             pass
-    unreal.SystemLibrary.execute_console_command(dd, "set RammsDifferentialDriveController BrakeDeceleration %g" % float(value))
+    unreal.SystemLibrary.execute_console_command(dd, "set RammsDifferentialDriveController %s %g" % (name, float(value)))
     return "console set"
+
+
+def _set_decel(dd, value):
+    return _set_prop(dd, "BrakeDeceleration", value)
 
 
 CAM_TAG = "ramms_brake_cam"
@@ -154,7 +159,7 @@ def _setup_capture(w):
     return sc, rt
 
 
-def run(cases=None, out=None, decel=None, frames=None, fps=FRAME_FPS, max_fps=None, on_done=None):
+def run(cases=None, out=None, decel=None, frames=None, fps=FRAME_FPS, max_fps=None, props=None, on_done=None):
     les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
     ues = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem)
     cases = (cases or getattr(unreal, "_ramms_brake_cases", "") or "flat100 flat50 down50").split()
@@ -255,6 +260,8 @@ def run(cases=None, out=None, decel=None, frames=None, fps=FRAME_FPS, max_fps=No
                 S["w"], S["p"] = cs_common.find_chaos_pawn()
                 S["dd"] = dd = S["p"].get_component_by_class(unreal.RammsDifferentialDriveController)
                 how = _set_decel(dd, decel) if decel is not None else None
+                for k, val in (props or {}).items():   # other controller settings, by C++ name
+                    _set_prop(dd, k, val)
                 if max_fps:
                     unreal.SystemLibrary.execute_console_command(w, "t.MaxFPS %d" % int(max_fps))
                 S["config"] = {k: (round(float(dd.get_editor_property(k)), 3) if dd and _has(dd, k) else None)
@@ -262,6 +269,8 @@ def run(cases=None, out=None, decel=None, frames=None, fps=FRAME_FPS, max_fps=No
                 S["config"]["control_mode"] = str(dd.get_editor_property("control_mode")) if dd else None
                 if decel is not None:
                     S["config"].update(brake_deceleration_set=float(decel), set_by=how)
+                if props:
+                    S["config"]["props_set"] = dict(props)
                 if frames:
                     S["sc"], S["rt"] = _setup_capture(w)
                 S["z_rest"] = S["p"].get_actor_location().z

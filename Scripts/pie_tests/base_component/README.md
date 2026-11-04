@@ -73,7 +73,7 @@ doesn't. `move_private_assets.py` is the one-shot migration that put them there.
   does not change the stop). Before (left) and after (right), at full stick on
   the flat, the same at quarter speed, and down the 1:8 ramp:
 
-  <img src="../../../doc/images/chaos_backend/brake_flat100_before_after.webp" width="820" alt="The Chaos chair let go at 1.8 m/s on the flat: on the left its wheels stop outright and it lurches and rocks, on the right it slows down a 150 cm/s² ramp">
+  <img src="../../../doc/images/chaos_backend/brake_flat100_before_after.webp" width="820" alt="The Chaos chair let go at 1.8 m/s on the flat: on the left its wheels stop outright and it lurches and rocks, on the right it slows down a 750 cm/s² ramp">
   <img src="../../../doc/images/chaos_backend/brake_flat100_before_after_slow.webp" width="820" alt="The same stop at quarter speed">
   <img src="../../../doc/images/chaos_backend/brake_down50_before_after.webp" width="820" alt="The chair let go halfway down the 1:8 ramp: stopped outright on the left, braked down the ramp on the right">
   <img src="../../../doc/images/chaos_backend/brake_speed_pitch.png" width="820" alt="Speed and chassis pitch against time for the same takes">
