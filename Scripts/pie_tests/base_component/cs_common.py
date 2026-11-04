@@ -35,12 +35,11 @@ def quiet_local_input(actor):
 def quiet_arm_workspace(actor):
     """Keep the chair Blueprint from taking the arm. Its ArmWorkspaceTrigger (a
     sphere on the arm base) reacts to an actor tagged Target (Map_Demo's two
-    buttons) entering it: teleop off, reach for the button, and teleop back only
-    after the reach lands within the controller's pose tolerance and the arm has
-    retracted. Until then the surface refuses arm.* / gripper.*, and a reach that
-    never lands (the chair teleported away first) never gives the arm back. A run
-    that drives the chair to a button would race that sequence, so the trigger's
-    collision goes off: no query, no overlaps."""
+    buttons) entering it: teleop off, reach for the button, and teleop back after
+    the arm retracts (the reach landed, the button left, or 8 s passed). Until
+    then the surface refuses arm.* / gripper.*. A run that drives the chair to a
+    button would race that sequence, so the trigger's collision goes off: no
+    query, no overlaps."""
     for c in actor.get_components_by_class(unreal.PrimitiveComponent):
         if c.get_name() == "ArmWorkspaceTrigger":
             c.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
