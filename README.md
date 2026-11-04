@@ -118,7 +118,7 @@
 - **Calibrated cameras**: pixel intrinsics (fx, fy, cx, cy) and reusable sensor
   presets (e.g. RealSense D435) on cameras mounted where the real Orbbec Gemini,
   LUCI and wrist cameras sit, writing 32-bit EXR RGB + depth + motion vectors
-  with per-frame JSON metadata.
+  with per-frame JSON metadata, and fine and coarse class segmentation masks.
 - **GPU ray-traced range sensors**: time-of-flight (single point like the
   VL53L0X or an NxM grid like the VL53L5CX) and sonar cones traced inline on RT cores, plus an IMU with
   noise, bias and filtering.
@@ -181,9 +181,17 @@ cd Plugins/unreal-robotics-lab/third_party; ./build_all.ps1
 cd ../protospec; ./build.ps1
 ```
 
-On macOS or Linux, run `Scripts/setup_urlab.sh` from the repository root
-instead. Then claim the free Fab packs the crowd and example maps use (City
-Sample Crowds at least), and open `Ramms.uproject` in UE 5.8.
+On macOS or Linux, run the setup script from the repository root instead,
+with `UE_ROOT` pointing at your engine. It defaults to the macOS install path,
+so on Linux it has to be set:
+
+```bash
+UE_ROOT="/Users/Shared/Epic Games/UE_5.8" Scripts/setup_urlab.sh   # macOS
+UE_ROOT="$HOME/UnrealEngine" Scripts/setup_urlab.sh                # Linux: your UE 5.8 root
+```
+
+Then claim the free Fab packs the crowd and example maps use (City Sample
+Crowds at least), and open `Ramms.uproject` in UE 5.8.
 
 [Getting started](doc/getting_started.md) has each step in full, plus
 command-line builds, packaging, Linux cross-compiles and configuration.
@@ -245,25 +253,30 @@ and CLIs that drive the sim from outside the editor
 Work in progress and planned, with the design notes in [`doc/`](doc):
 
 - **Parallel headless simulation** on SLURM GPU clusters for policy training
+  and dataset collection. Linux builds (x86_64 and ARM64) cross-compile from
+  Windows and launch headless with `Scripts/run_headless.sh`. Next: a packaged
+  instance verified end to end, several instances per node, SLURM templates
   and dataset collection ([plan](doc/PARALLEL_SIM_PLAN.md)).
-- **MuJoCo-first robots**: driving the bases in MuJoCo, seating a person in the
-  simulated chair alongside the crowd, and Python scene generation
-  ([roadmap](doc/mujoco_sim_roadmap.md)).
 - **Generated worlds in MuJoCo**: exporting RammsWorldGen curbs, ramps, steps
   and walls into the MuJoCo spec so MuJoCo-driven robots collide with them
-  ([design](doc/worldgen_mujoco_export.md)).
-- **Semantic segmentation** as a third CameraCapture plane next to depth and
-  motion ([plan](doc/camera_segmentation_plan.md)).
-- **Controllers as their own plugin**, `ramms-controllers`
-  ([plan](doc/controllers_extraction.md)), and a **holonomic drive** with a
-  positional pad for the 5-bar linkage robots
-  ([scope](doc/holonomic_drive_and_position_pad.md)).
-- **Articulated household assets** (cabinets, drawers, fridges, microwaves)
-  from Blender to Unreal, MuJoCo, Newton and Isaac
-  ([pipeline](doc/dojo_asset_pipeline.md)).
+  ([design](doc/worldgen_mujoco_export.md)), and Python scene generation for
+  MuJoCo episodes ([roadmap](doc/mujoco_sim_roadmap.md), thread 3).
+- **Instance segmentation**, and class masks streamed over RMSS, next to the
+  class masks CameraCapture writes today
+  ([plan](doc/camera_segmentation_plan.md)).
+- **Controllers as their own plugin**, `ramms-controllers`; the first step,
+  decoupling input from the concrete controllers, is under way
+  ([plan](doc/controllers_extraction.md)).
 - **Remote HMI over Pixel Streaming** for the rammp-ui operator interface
   ([plan](doc/PIXEL_STREAMING_PLAN.md)), and RammsAccess intents driving the
   physical robot as well as the simulated one.
+
+Recently landed and covered in [Features](doc/features.md): the bases driven
+in MuJoCo, a seated occupant in the chair, the RAMMP Gen1 on its own MJCF,
+robots and articulated assets on Chaos from the same MJCF, class
+segmentation, the holonomic drive and the 5-bar position pad, and
+articulated SimReady cabinets, drawers and appliances in generated and
+hand-built homes.
 
 ## License
 

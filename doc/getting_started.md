@@ -84,8 +84,12 @@ one nested patch that can't live on our fork, builds the third-party
 dependencies, and regenerates project files:
 
 ```bash
-UE_ROOT="/Users/Shared/Epic Games/UE_5.8" Scripts/setup_urlab.sh
+UE_ROOT="/Users/Shared/Epic Games/UE_5.8" Scripts/setup_urlab.sh   # macOS
+UE_ROOT="$HOME/UnrealEngine" Scripts/setup_urlab.sh                # Linux: your UE 5.8 root
 ```
+
+On Linux `UE_ROOT` has to be set: the script builds the dependencies and
+ProtoSpec with the engine's bundled clang, found under `UE_ROOT`.
 
 Our fixes to unreal-robotics-lab (the `nil` macro clash between Apple's
 `MacTypes.h` and rpclib/msgpack, the Mac dylib link branch in `URLab.Build.cs`,
@@ -288,11 +292,12 @@ using Epic's standard Windows→Linux cross-compilation workflow. This needs a
 
 With the toolchain in place, build and package with the repo scripts (they
 apply the required URLab patches automatically and cross-compile the
-MuJoCo/CoACD/libzmq third-party libraries into `third_party/install-linux/`
-before the UBT build):
+MuJoCo/CoACD/libzmq third-party libraries, plus URLab's own MjShim and
+ProtoSpec libraries, into `third_party/install-linux/` before the UBT build):
 
 ```powershell
-# 1. Cross-compile URLab third-party deps (once, and after submodule bumps)
+# 1. Cross-compile URLab's native libraries (once, and after any
+#    unreal-robotics-lab submodule bump)
 powershell -ExecutionPolicy Bypass -File Scripts\build_all_linux_cross.ps1
 
 # 2. Build the Linux game target; add -Package to cook/stage/pak
@@ -303,6 +308,17 @@ The packaged output lands in `Packaged\Linux` — copy it to a Linux machine
 (or bundle it with `containers/ramms.def`) and launch via
 `Scripts/run_headless.sh`. Both scripts check for the toolchain and fail
 with install instructions if `LINUX_MULTIARCH_ROOT` is missing.
+
+**ARM64 Linux (`LinuxArm64`, e.g. a Jetson):** pass `-Platform LinuxArm64` to
+both scripts. The same toolchain covers it (its installer puts the aarch64
+target next to x86_64). The libraries go to `third_party/install-linuxarm64/`
+and the package to `Packaged\LinuxArm64`. Pixel Streaming doesn't ship for
+LinuxArm64, so that build leaves it out.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File Scripts\build_all_linux_cross.ps1 -Platform LinuxArm64
+powershell -ExecutionPolicy Bypass -File Scripts\build_linux_cross.ps1 -Platform LinuxArm64 -Package
+```
 
 ### Regenerate IDE project files (optional)
 
