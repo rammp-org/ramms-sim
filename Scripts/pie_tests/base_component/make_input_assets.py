@@ -12,7 +12,7 @@ Keys (see IMC below): W/S A/D drive (A/D strafe on a holonomic drive), Q/E turn 
 holonomic drive; E/Q linkage height; Y/H T/B Z/X C/V four
 motor groups; N / Home camera; I/K J/L U/O arm move, arrows + M/. arm rotate,
 R resync; [ ] G gripper; Backspace / P / Slash sim reset / pause / step; 1-7
-sim debug toggles; Tab drive mode; Enter cross the curb ahead, End held stop
+sim debug toggles; Tab drive mode; Enter curb assist on/off, End held stop
 the crossing. Mouse orbit / wheel zoom stay on the camera component.
 
 Gamepad (Xbox names; PlayStation in brackets):
@@ -26,7 +26,7 @@ Gamepad (Xbox names; PlayStation in brackets):
   right stick Y     motor group A (the RAMMP Gen1's drive-wheel elevators)
   RT / LT [R2/L2]   motor group B +/- (the RAMMP Gen1's drive-wheel translators)
   RB / LB [R1/L1]   motor group C +/- (the RAMMP Gen1's caster arms)
-  A [Cross]         cross the curb ahead
+  A [Cross]         curb assist on/off (with it on, drive at a curb to cross it)
   B [Circle] held   stop the curb crossing (held 0.5 s)
   X [Square] held   seat to rest (held 0.5 s)
   Y [Triangle]      next camera
@@ -280,7 +280,7 @@ common = [
     # turns only where X does not.
     binding(IA["DriveStick"], ST, "drive.turn", cid_y="drive.forward", cid_z="drive.turn"),
     binding(IA["DriveMode"], X, "drive.mode"),
-    binding(IA["CurbCross"], X, "curb.negotiate"),
+    binding(IA["CurbCross"], X, "curb.assist"),   # a button on the switch flips it
     binding(IA["CurbStop"], X, "curb.abort"),
     binding(IA["SeatJog"], A, "seat.jog_fore_aft", cid_y="seat.jog_up"),
     binding(IA["SeatReset"], X, "seat.reset"),
