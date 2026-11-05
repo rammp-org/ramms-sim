@@ -25,8 +25,10 @@
   expect_body_moved <body> <lo> <hi>  the body moved lo..hi cm (any direction) since mark_body
   mark_lifts                 remember every lift motor's value (for expect_lifts_back)
   expect_lifts_back <deg> <cm>     each lift is within deg (the angles) or cm (the translators) of its mark_lifts value
-  hold_stick <forward> [turn]      hold the rider's stick there every frame (source Script: whichever drive mode has
-                             the robot, a curb crossing included), until release_stick or end
+  hold_stick <forward> [turn] [crossing] [back_in PHASE]
+                             hold the rider's stick there every frame (source Script: whichever drive mode has
+                             the robot, a curb crossing included), until release_stick or end; `crossing`: let go as
+                             the crossing ends; `back_in PHASE`: pulled back from the frame the crossing reaches PHASE
   release_stick              let the stick go
 """
 import math
@@ -231,35 +233,41 @@ else:
         # Every frame, as a rider holds a stick: through the surface to whichever drive mode has the robot (a curb
         # crossing takes drive.* while it runs), at the lowest source, so a person's keyboard or gamepad takes over.
         # With `crossing`, only through the curb crossing under way (or about to begin): let go the frame it ends, as a
-        # rider would, so the drive mode it hands back to does not drive on.
+        # rider would, so the drive mode it hands back to does not drive on. With `back_in PHASE`, pulled back (-0.6)
+        # from the frame the crossing reaches that phase (curb.get_phase().name): a rider cancelling at once.
         stop_stick()
-        fwd = float(op[1])
-        turn = float(op[2]) if len(op) > 2 and op[2] != "crossing" else 0.0
-        through_crossing = "crossing" in op[2:]
-        script = unreal.RammsControlSource.SCRIPT
+        words = op[2:]
+        back_in = words[words.index("back_in") + 1] if "back_in" in words and words.index("back_in") + 1 < len(words) else None
+        numbers = [w for w in words if w not in ("crossing", "back_in", back_in)]
+        fwd, turn = float(op[1]), float(numbers[0]) if numbers else 0.0
         curb = pawn.get_component_by_class(unreal.RammsRammpGen1CurbController)
         ended = (unreal.RammsRammpGen1CurbPhase.IDLE, unreal.RammsRammpGen1CurbPhase.DONE, unreal.RammsRammpGen1CurbPhase.ABORTED)
-        state = {"seen": False}
 
-        def hold(dt, cs=cs, curb=curb, fwd=fwd, turn=turn, state=state):
+        # Everything it reads bound here: remote execution reuses one namespace, so later ops reassign its globals.
+        def hold(dt, cs=cs, curb=curb, fwd=fwd, turn=turn, state={"seen": False, "back": False}, ended=ended,
+                 through_crossing="crossing" in words, back_in=back_in, script=unreal.RammsControlSource.SCRIPT,
+                 ues=ues, stop=stop_stick):
             try:
                 if ues.get_game_world() is None:
-                    stop_stick()
+                    stop()
                     return
+                phase = curb.get_phase()
                 if through_crossing:
-                    running = curb.get_phase() not in ended
+                    running = phase not in ended
                     state["seen"] |= running
                     if state["seen"] and not running:
-                        stop_stick()
+                        stop()
                         for i in ("drive.forward", "drive.turn"):
                             cs.release_control(i, script)
                         return
-                cs.set_control("drive.forward", fwd, script)
-                cs.set_control("drive.turn", turn, script)
+                state["back"] |= back_in is not None and phase.name == back_in
+                cs.set_control("drive.forward", -0.6 if state["back"] else fwd, script)
+                cs.set_control("drive.turn", 0.0 if state["back"] else turn, script)
             except Exception:  # noqa: BLE001  (PIE ended under it)
-                stop_stick()
+                stop()
         unreal._ramms_rammp_gen1_stick = unreal.register_slate_post_tick_callback(hold)
-        log("holding the stick at forward %+.2f, turn %+.2f%s" % (fwd, turn, " through the crossing" if through_crossing else ""))
+        log("holding the stick at forward %+.2f, turn %+.2f%s%s" % (fwd, turn, " through the crossing" if "crossing" in words else "",
+                                                                     ", back from %s" % back_in if back_in else ""))
     elif op[0] == "release_stick":
         stop_stick()
         for i in ("drive.forward", "drive.turn"):

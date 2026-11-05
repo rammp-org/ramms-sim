@@ -38,10 +38,8 @@ press_a; op expect_control curb.assist 0.9 1.1
 
 echo "--- held forward toward the curb (its face at x 300), a crossing starts; held back as it approaches, it cancels ---"
 op mark_lifts
-op hold_stick 0.4
-wait_curb "*APPROACH*" 30
-op hold_stick -0.6
-wait_curb "*ABORTED*cancelled*" 15
+op hold_stick 0.4 back_in APPROACH   # pulled back the frame it reaches the approach, before the front reaches the edge
+wait_curb "*ABORTED*cancelled*" 40
 op release_stick; sleep 2
 op expect_lifts_back 0.5 0.5
 

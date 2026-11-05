@@ -60,6 +60,8 @@ With it on, holding the stick forward at a curb the controller can cross starts 
 
 To start a crossing by hand, drive to within 1.5 m of a curb, square to it, then use the panel's curb group "Cross the curb ahead", the curb drive mode, or `curb.negotiate` through the control surface (Remote). Then hold the stick forward.
 
+A script or autonomy client that starts a crossing must hold `drive.forward` through it, as a rider would (`rammp_gen1_op.py hold_stick 0.6 crossing` does), or set the controller's `Stick.bRequired` false to have it run to the end once begun. Otherwise the crossing waits paused.
+
 The controller finds the edge and its height with line traces ahead of the front omni wheels. An edge is ground that rises or falls steeply (a ramp is not a step), and the far side must stay level for 10 cm past it. A narrow strip, a second step or missing ground refuses the start. It picks the crossing height from each support's height table, then runs `curb_sequence.py`'s phases:
 1. Raise or lower the chassis, level, to the crossing height.
 2. Front omni wheels over the edge and down. If they start off the ground, as in the outdoor stance (front arm about -14 deg, elevators about 9 deg for ground clearance), they stay up: they are kept where they are, or raised if the crossing needs them higher. They are not set down only to be lifted again at the curb.
