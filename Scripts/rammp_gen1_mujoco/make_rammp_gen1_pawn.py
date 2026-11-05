@@ -190,6 +190,11 @@ if removed:
 # The curb crossing, configured from the model (export_curb_config.py), and the drive modes it switches between.
 with open(os.path.join(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_dir()), CURB_CONFIG_REL), encoding="utf-8") as fh:
     curb_fields = json.load(fh)["config"]
+# The differential drive's VehicleMass: the robot's whole mass (the curb config's mass model, fixed
+# plus both drive assemblies), which its torque hold brakes and holds. Left at the 100 kg default, the
+# hold braked the 246 kg robot short of its target and pulled it back some 6 cm once it had stopped.
+setp(diff, vehicle_mass=curb_fields["fixed_mass_kg"] + 2.0 * curb_fields["drive_assembly_mass_kg"])
+log("differential drive: vehicle mass %.1f kg" % diff.get_editor_property("vehicle_mass"))
 curb_cfg = unreal.RammsRammpGen1CurbConfig()
 for key, value in curb_fields.items():
     if key.endswith("_table"):
