@@ -37,7 +37,9 @@ Two phases, because motion needs frames to happen in:
 The motion run is timed on the simulation's clock (the MuJoCo manager's sim
 time; the world's game time where there is none), not in rendered frames: a
 settle of SETTLE_S, then forward, strafe and turn for LEG_S each, about 7 s of
-simulated time in all. Counted in frames, a leg's length followed the editor's
+simulated time in all. Each leg is timed from the sample its command went out
+on, so a late callback lengthens the leg it lands in and never shortens the
+next. Counted in frames, a leg's length followed the editor's
 frame rate -- 45 frames was under a second at a high rate, less than the wheels
 take to come up to speed, so the strafe leg was mostly the forward leg winding
 down and failed on a robot that strafes; at a low rate the same legs ran for
@@ -209,7 +211,10 @@ if PHASE == "kinematics":
     LEG_S = 2.0
     SWITCH_WAIT_S = 10.0
     LEGS = [("forward", (1.0, 0.0, 0.0)), ("strafe", (0.0, 1.0, 0.0)), ("turn", (0.0, 0.0, 1.0))]
-    st = {"t_wait": None, "t0": None, "leg": -1, "last_t": None, "yaw": None, "yaw_unwrapped": 0.0}
+    # leg: -1 settling, 0..2 the legs, 3 stopped; leg_t: when the current one
+    # began (its command's sample); prev_leg: the leg the last sample was in.
+    st = {"t_wait": None, "t0": None, "leg": -1, "leg_t": 0.0, "prev_leg": -1,
+          "last_t": None, "yaw": None, "yaw_unwrapped": 0.0}
 
     def stop_sampling():
         h = getattr(unreal, "_ramms_drive_h", None)
@@ -255,22 +260,26 @@ if PHASE == "kinematics":
             st["yaw_unwrapped"] = yaw
         st["yaw"] = yaw
 
-        # Which leg the clock is in; the command changes on the first sample
-        # past a boundary, and that sample opens the leg.
-        leg = -1 if t < SETTLE_S else min(len(LEGS), int((t - SETTLE_S) // LEG_S))
-        if leg != st["leg"]:
-            # A frame long enough to pass a whole leg still marks it (empty).
-            while st["leg"] < leg:
-                st["leg"] += 1
-                d["marks"].append(len(d["samples"]))
-            v = LEGS[leg][1] if 0 <= leg < len(LEGS) else (0.0, 0.0, 0.0)
+        # Each leg runs for its full length from the sample its command went
+        # out on, and the next begins on the first sample after that: a late
+        # callback lengthens the leg it lands in, never shortens or skips the
+        # next one.
+        if st["leg"] < len(LEGS) and t - st["leg_t"] >= (SETTLE_S if st["leg"] < 0 else LEG_S):
+            st["leg"] += 1
+            st["leg_t"] = t
+            d["marks"].append(len(d["samples"]))
+            v = LEGS[st["leg"]][1] if st["leg"] < len(LEGS) else (0.0, 0.0, 0.0)
             holo.set_drive_command(unreal.Vector(*v))
+        leg = st["leg"]
 
         # Mean wheel speed over the legs, so a leg can be scored on how much of
         # the rolling the ground took up -- and so a loop that never reaches
         # its commanded rate is visible separately from one that reaches it
-        # and slips. Integrated over simulated time, not the frame's.
-        if leg >= 0 and st["last_t"] is not None and t > st["last_t"]:
+        # and slips. Integrated over simulated time, not the frame's, and only
+        # over intervals that began inside a leg: the sample that opens the
+        # forward leg closes an interval of settling, which the path length
+        # the rolling is set against does not include either.
+        if st["prev_leg"] >= 0 and st["last_t"] is not None and t > st["last_t"]:
             speeds = [abs(base.get_motor_velocity(mid)) for mid in wheel_ids]
             mean = sum(speeds) / max(1, len(speeds))
             d["rolled"] += mean * radius * (t - st["last_t"])
@@ -278,6 +287,7 @@ if PHASE == "kinematics":
             d["speed_n"] += 1
             d["peak_speed"] = max(d["peak_speed"], max(speeds))
         st["last_t"] = t
+        st["prev_leg"] = leg
 
         d["samples"].append((t, loc.x, loc.y, st["yaw_unwrapped"]))
         if leg >= len(LEGS):
