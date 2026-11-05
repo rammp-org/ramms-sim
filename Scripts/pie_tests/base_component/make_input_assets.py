@@ -8,7 +8,8 @@ source of truth):
   /Game/Input/Ramms/DA_RammsInput_<robot>  URammsControlInputMap per robot family:
                                            action -> control Id (wildcards ok)
 
-Keys (see IMC below): W/S A/D drive; E/Q linkage height; Y/H T/B Z/X C/V four
+Keys (see IMC below): W/S A/D drive (A/D strafe on a holonomic drive), Q/E turn a
+holonomic drive; E/Q linkage height; Y/H T/B Z/X C/V four
 motor groups; N / Home camera; I/K J/L U/O arm move, arrows + M/. arm rotate,
 R resync; [ ] G gripper; Backspace / P / Slash sim reset / pause / step; 1-7
 sim debug toggles; Tab drive mode; Enter cross the curb ahead, End held stop
@@ -166,7 +167,6 @@ ensure_dir(ACTIONS)
 
 # ---------------------------------------------------------------- actions
 IA = {
-    "Drive": action("IA_Ramms_Drive", VT.AXIS2D),               # X = turn, Y = forward
     "DriveStick": action("IA_Ramms_DriveStick", VT.AXIS3D),     # X lateral, Y forward, Z twist
     "DriveMode": action("IA_Ramms_DriveMode", VT.BOOLEAN),
     "CurbCross": action("IA_Ramms_CurbCross", VT.BOOLEAN),
@@ -203,10 +203,17 @@ else:
 Sw = unreal.InputAxisSwizzle
 DZ = unreal.DeadZoneType
 maps = [
-    mapping(imc, IA["Drive"], "W", swizzle=Sw.YXZ),
-    mapping(imc, IA["Drive"], "S", negate=True, swizzle=Sw.YXZ),
-    mapping(imc, IA["Drive"], "D"),
-    mapping(imc, IA["Drive"], "A", negate=True),
+    # The keyboard drives the same stick as the gamepad: W/S forward, A/D its X
+    # (a turn on a differential drive, a strafe on a holonomic one) and Q/E its
+    # twist (the holonomic drive's turn; nothing on a differential one, which
+    # turns with A/D). E/Q also stay on the linkage height, which only the
+    # linkage pawn binds, and it has no drive the twist turns.
+    mapping(imc, IA["DriveStick"], "W", swizzle=Sw.YXZ),
+    mapping(imc, IA["DriveStick"], "S", negate=True, swizzle=Sw.YXZ),
+    mapping(imc, IA["DriveStick"], "D"),
+    mapping(imc, IA["DriveStick"], "A", negate=True),
+    mapping(imc, IA["DriveStick"], "E", swizzle=Sw.ZYX),
+    mapping(imc, IA["DriveStick"], "Q", negate=True, swizzle=Sw.ZYX),
     mapping(imc, IA["DriveStick"], "Gamepad_Left2D", dead_zone=(DZ.RADIAL, STICK_DEAD)),
     mapping(imc, IA["DriveStick"], "Gamepad_RightX", swizzle=Sw.ZYX, dead_zone=(DZ.AXIAL, STICK_DEAD)),
     mapping(imc, IA["DriveMode"], "Tab"),
@@ -269,7 +276,6 @@ log("IMC_RammsRobot: %d key mappings" % len(maps))
 # ------------------------------------------------------------ input maps
 A, X, R, ST = Mode.AXIS, Mode.ACTION, Mode.INCREMENT_RATE, Mode.STICK
 common = [
-    binding(IA["Drive"], A, "drive.turn", cid_y="drive.forward"),
     # X turns, unless the live drive mode pairs forward with strafe; the twist
     # turns only where X does not.
     binding(IA["DriveStick"], ST, "drive.turn", cid_y="drive.forward", cid_z="drive.turn"),
@@ -316,4 +322,10 @@ input_map("DA_RammsInput_RammpGen1", imc, common + [
     binding(IA["MotorGroupB"], R, "lift.dw_main_plate_*", rate=10.0),
     binding(IA["MotorGroupC"], R, "lift.*_caster_swing_arm", rate=30.0),
 ])
+# IA_Ramms_Drive (2-D: X always a turn) carried the keyboard's drive keys until
+# they moved onto the drive stick, whose X follows the drive mode; nothing maps
+# or binds it now, so an older checkout's asset is removed.
+OLD_DRIVE = ACTIONS + "/IA_Ramms_Drive"
+if EAL.does_asset_exist(OLD_DRIVE):
+    log("removed %s: %s" % (OLD_DRIVE, EAL.delete_asset(OLD_DRIVE)))
 log("done")
