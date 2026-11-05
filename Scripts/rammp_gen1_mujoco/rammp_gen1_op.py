@@ -25,6 +25,9 @@
   expect_body_moved <body> <lo> <hi>  the body moved lo..hi cm (any direction) since mark_body
   mark_lifts                 remember every lift motor's value (for expect_lifts_back)
   expect_lifts_back <deg> <cm>     each lift is within deg (the angles) or cm (the translators) of its mark_lifts value
+  hold_stick <forward> [turn]      hold the rider's stick there every frame (source Script: whichever drive mode has
+                             the robot, a curb crossing included), until release_stick or end
+  release_stick              let the stick go
 """
 import math
 
@@ -63,6 +66,14 @@ def pose(chassis):
     return loc, rot
 
 
+def stop_stick():
+    """Stop hold_stick's per-frame callback (the stick is not released: release_stick does that)."""
+    handle = getattr(unreal, "_ramms_rammp_gen1_stick", None)
+    if handle is not None:
+        unreal.unregister_slate_post_tick_callback(handle)
+        unreal._ramms_rammp_gen1_stick = None
+
+
 if op[0] == "begin":
     if ues.get_game_world() is not None:
         les.editor_request_end_play()
@@ -72,6 +83,7 @@ if op[0] == "begin":
     les.editor_request_begin_play()
     log("PIE requested on " + MAP)
 elif op[0] == "end":
+    stop_stick()
     if ues.get_game_world() is not None:
         les.editor_request_end_play()
     log("PIE ended")
@@ -215,6 +227,44 @@ else:
                                                                        "ok" if lo <= dist <= hi else "FAIL"))
             if not lo <= dist <= hi:
                 raise RuntimeError("%s moved %.1f cm, outside %g..%g" % (op[1], dist, lo, hi))
+    elif op[0] == "hold_stick":
+        # Every frame, as a rider holds a stick: through the surface to whichever drive mode has the robot (a curb
+        # crossing takes drive.* while it runs), at the lowest source, so a person's keyboard or gamepad takes over.
+        # With `crossing`, only through the curb crossing under way (or about to begin): let go the frame it ends, as a
+        # rider would, so the drive mode it hands back to does not drive on.
+        stop_stick()
+        fwd = float(op[1])
+        turn = float(op[2]) if len(op) > 2 and op[2] != "crossing" else 0.0
+        through_crossing = "crossing" in op[2:]
+        script = unreal.RammsControlSource.SCRIPT
+        curb = pawn.get_component_by_class(unreal.RammsRammpGen1CurbController)
+        ended = (unreal.RammsRammpGen1CurbPhase.IDLE, unreal.RammsRammpGen1CurbPhase.DONE, unreal.RammsRammpGen1CurbPhase.ABORTED)
+        state = {"seen": False}
+
+        def hold(dt, cs=cs, curb=curb, fwd=fwd, turn=turn, state=state):
+            try:
+                if ues.get_game_world() is None:
+                    stop_stick()
+                    return
+                if through_crossing:
+                    running = curb.get_phase() not in ended
+                    state["seen"] |= running
+                    if state["seen"] and not running:
+                        stop_stick()
+                        for i in ("drive.forward", "drive.turn"):
+                            cs.release_control(i, script)
+                        return
+                cs.set_control("drive.forward", fwd, script)
+                cs.set_control("drive.turn", turn, script)
+            except Exception:  # noqa: BLE001  (PIE ended under it)
+                stop_stick()
+        unreal._ramms_rammp_gen1_stick = unreal.register_slate_post_tick_callback(hold)
+        log("holding the stick at forward %+.2f, turn %+.2f%s" % (fwd, turn, " through the crossing" if through_crossing else ""))
+    elif op[0] == "release_stick":
+        stop_stick()
+        for i in ("drive.forward", "drive.turn"):
+            cs.release_control(i, unreal.RammsControlSource.SCRIPT)
+        log("stick let go")
     elif op[0] == "mark_lifts":
         unreal._ramms_rammp_gen1_lifts = {m: base.get_motor_value(m) for m in LIFTS}
         log("mark lifts: " + "  ".join("%s %+.3f" % kv for kv in unreal._ramms_rammp_gen1_lifts.items()))

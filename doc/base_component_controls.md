@@ -305,7 +305,7 @@ keyboard key) as source `Gamepad`, otherwise `Keyboard`.
 | W / S, A / D | `IA_Ramms_Drive` (2-D) | `drive.forward` / `drive.turn` |
 | left stick, right stick X | `IA_Ramms_DriveStick` (3-D, Stick) | `drive.forward`; X the mode's pair (turn / strafe); Z (twist) `drive.turn` where X does not turn |
 | Tab, View | `IA_Ramms_DriveMode` | `drive.mode` (next mode in the selector's `CycleModeIds`) |
-| Enter, A | `IA_Ramms_CurbCross` | `curb.negotiate` |
+| Enter, A | `IA_Ramms_CurbCross` | `curb.assist` (curb assist on/off: with it on, drive at a curb to cross it; the panel's "Cross the curb ahead" is `curb.negotiate`) |
 | End held, B held (0.5 s) | `IA_Ramms_CurbStop` | `curb.abort` |
 | d-pad | `IA_Ramms_SeatJog` (2-D) | `seat.jog_fore_aft` / `seat.jog_up` |
 | X held (0.5 s) | `IA_Ramms_SeatReset` | `seat.reset` |

@@ -27,13 +27,14 @@ poll(){ if ! R=$(op "$@"); then echo "$R"; echo "!! the poll '$*' failed"; FAIL=
 drive_to(){ for i in $(seq 1 200); do poll drive_to "$1" 0.4 || { op release drive.forward; return 1; }
                 case "$R" in *arrived*) echo "$R"; return 0;; esac; sleep 0.15; done
             op release drive.forward; echo "!! did not reach x $1"; FAIL=1; return 1; }
-# Start a crossing and wait for it to end; it must end Done with the expected outcome. While it runs the arm is held:
-# a command to it is refused.
+# Start a crossing and wait for it to end; it must end Done with the expected outcome. It goes only while the rider's
+# stick is held forward: held through it, let go as it ends. While it runs the arm is held: a command to it is refused.
 cross(){ op trigger curb.negotiate || return 1
+         op hold_stick 0.6 crossing
          sleep 3; op expect_refused arm.up 1
-         for i in $(seq 1 60); do sleep 5; poll curb || return 1
-             case "$R" in *DONE*|*ABORTED*|*IDLE*) echo "$R"; case "$R" in *DONE*"$1"*) return 0;; esac; echo "!! the crossing did not finish: $1"; FAIL=1; return 1;; esac
-         done; echo "!! the crossing timed out"; FAIL=1; return 1; }
+         for i in $(seq 1 60); do sleep 5; poll curb || { op release_stick; return 1; }
+             case "$R" in *DONE*|*ABORTED*|*IDLE*) echo "$R"; op release_stick; case "$R" in *DONE*"$1"*) return 0;; esac; echo "!! the crossing did not finish: $1"; FAIL=1; return 1;; esac
+         done; op release_stick; echo "!! the crossing timed out"; FAIL=1; return 1; }
 
 # The stance: the front arm's and the elevators' angles (deg). A crossing must end with every lift back where it was
 # before it (half a degree, half a centimetre).
