@@ -1,7 +1,9 @@
 #!/bin/bash
 # PIE: the RAMMP Gen1 curb controller climbs Map_RammpGen1Curb_URL's 15 cm platform and descends its far edge, each
-# started with curb.negotiate within 1.5 m of the edge. Needs a running editor (Scripts/editor_remote_exec.py);
-# PYTHON overrides the interpreter. Exit status: nonzero unless both crossings finish (PIE is still ended).
+# started with curb.negotiate within 1.5 m of the edge, from a stance it must end in again. STANCE=outdoor (the
+# default: front arm -14 deg, the front omni wheels up; elevators 9 deg, for ground clearance) or reference (every
+# lift at 0, every wheel down). Needs a running editor (Scripts/editor_remote_exec.py); PYTHON overrides the
+# interpreter. Exit status: nonzero unless both crossings finish back in the stance (PIE is still ended).
 S=$(cd "$(dirname "$0")" && pwd); ROOT=$(cd "$S/../.." && pwd); cd "$ROOT" || exit 1
 PY=${PYTHON:-}
 if [ -z "$PY" ]; then
@@ -33,14 +35,28 @@ cross(){ op trigger curb.negotiate || return 1
              case "$R" in *DONE*|*ABORTED*|*IDLE*) echo "$R"; case "$R" in *DONE*"$1"*) return 0;; esac; echo "!! the crossing did not finish: $1"; FAIL=1; return 1;; esac
          done; echo "!! the crossing timed out"; FAIL=1; return 1; }
 
+# The stance: the front arm's and the elevators' angles (deg). A crossing must end with every lift back where it was
+# before it (half a degree, half a centimetre).
+case "${STANCE:-outdoor}" in
+    outdoor) FRONT=-14; ELEV=9;;
+    reference) FRONT=0; ELEV=0;;
+    *) echo "!! STANCE is outdoor or reference, not $STANCE"; exit 1;;
+esac
+rad(){ awk -v d="$1" -v t="$2" 'BEGIN { r = d * 3.14159265 / 180; t = t * 3.14159265 / 180; printf "%.4f %.4f", r - t, r + t }'; }
+back(){ op expect_lifts_back 0.5 0.5; }
+
 op begin || exit 1
 sleep 25
+echo "--- the stance: ${STANCE:-outdoor} (front arm $FRONT deg, elevators $ELEV deg) ---"
+op set lift.front_caster_swing_arm "$FRONT"; op set lift.motor_swing_arm_l "$ELEV"; op set lift.motor_swing_arm_r "$ELEV"; sleep 4
+# Loaded, the lifts sit up to about 2 deg short of their commands (the elevators reach 7.3 deg of 9).
+op expect_motor front_arm $(rad "$FRONT" 2.5); op expect_motor elevator_l $(rad "$ELEV" 2.5); op expect_motor elevator_r $(rad "$ELEV" 2.5)
 echo "--- climb: the 15 cm platform's near face is at x 300; the arm out, for the crossing to stow ---"
 op set arm.up 1; sleep 1; op release arm.up; sleep 1; op expect_control arm.stowed -0.1 0.1
-drive_to 150 && sleep 2 && cross "crossed up 15.0"
+drive_to 150 && sleep 2 && op mark_lifts && cross "crossed up 15.0" && back
 op expect_control arm.stowed 0.9 1.1
 echo "--- descent: its far edge is at x 600 ---"
-drive_to 450 && sleep 2 && cross "crossed down 15.0"
+drive_to 450 && sleep 2 && op mark_lifts && cross "crossed down 15.0" && back
 op state
 
 trap - EXIT
