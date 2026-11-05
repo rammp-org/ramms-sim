@@ -24,7 +24,7 @@ python -I Plugins/unreal-robotics-lab/Scripts/clean_meshes.py mujoco/rammp_gen1/
 | Component | |
 |---|---|
 | `RobotBase` | MuJoCo backend. One motor-table row per MJCF actuator: the drive wheels and the front omni hubs as torque motors, the lifts as position motors. The translators are in cm; ramms-mujoco-support converts cm to the slide's metres. The drive wheels carry speed-loop gains and a brake. |
-| `DifferentialDrive` | The drive wheels in velocity control (120 cm/s, 70 deg/s at full stick). Brakes close when it stops. |
+| `DifferentialDrive` | The drive wheels in velocity control (120 cm/s, 70 deg/s at full stick). Brakes close when it stops. Its speed loop's integral reaches the motors' torque less 5 N·m (55 of 60), so a turn in place from rest gets the ~50 N·m it needs to break away. Capped at the motor table's 25 N·m, it stalled at 39. |
 | `RammpGen1Controller` | The lifts, rate-limited at the MJCF's lift speeds (custom numerics). They use the chair's control ids, so `DA_RammsInput_RammpGen1` and the gamepad layout drive it unchanged: `lift.motor_swing_arm_*` the elevators, `lift.dw_main_plate_*` the translators, `lift.front_caster_swing_arm` the front arm and `lift.rear_caster_swing_arm` the rear lift (the suspension arm, in its own degrees). |
 | `ControlSurface`, `ControlInput` | Every control, plus the powered front omni hubs as `motor.front_omni_*`. Nothing drives them in normal driving, so they freewheel. |
 | `SimControl` | Puts the robot in the MJCF's `home` key at spawn, which also stands it on the ground under it. |
