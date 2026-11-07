@@ -302,14 +302,13 @@ keyboard key) as source `Gamepad`, otherwise `Keyboard`.
 
 | Keys | Action | Binds to |
 |---|---|---|
-| W / S, A / D | `IA_Ramms_Drive` (2-D) | `drive.forward` / `drive.turn` |
-| left stick, right stick X | `IA_Ramms_DriveStick` (3-D, Stick) | `drive.forward`; X the mode's pair (turn / strafe); Z (twist) `drive.turn` where X does not turn |
+| W / S, A / D, Q / E; left stick, right stick X | `IA_Ramms_DriveStick` (3-D, Stick) | `drive.forward` (W / S, stick Y); X (A / D, stick X) the mode's pair: `drive.turn` on a differential drive, `drive.strafe` on a holonomic one; Z (Q / E, right stick X, a twist) `drive.turn` where X does not turn |
 | Tab, View | `IA_Ramms_DriveMode` | `drive.mode` (next mode in the selector's `CycleModeIds`) |
 | Enter, A | `IA_Ramms_CurbCross` | `curb.assist` (curb assist on/off: with it on, drive at a curb to cross it; the panel's "Cross the curb ahead" is `curb.negotiate`) |
 | End held, B held (0.5 s) | `IA_Ramms_CurbStop` | `curb.abort` |
 | d-pad | `IA_Ramms_SeatJog` (2-D) | `seat.jog_fore_aft` / `seat.jog_up` |
 | X held (0.5 s) | `IA_Ramms_SeatReset` | `seat.reset` |
-| E / Q | `IA_Ramms_LinkageHeight` | `linkage.*.height` (6 cm/s) |
+| E / Q | `IA_Ramms_LinkageHeight` | `linkage.*.height` (6 cm/s); only the linkage pawn binds it, and Q / E's twist turns nothing on its differential drive |
 | Y / H, T / B, Z / X, C / V; right stick Y (A), RT / LT (B), RB / LB (C) | `IA_Ramms_MotorGroupA..D` | per family: cranks / hips (0.6 rad/s), chair elevators / translators / caster arms |
 | N / Y, Home / right stick click | `IA_Ramms_CameraNext` / `CameraReset` | `camera.next` / `camera.reset` |
 | I / K, J / L, U / O | `IA_Ramms_ArmMove` (3-D) | `arm.forward` / `arm.strafe` / `arm.up` |
@@ -331,6 +330,17 @@ simulation, with no motor groups; give a pawn's `DriveModeSelector` a
 never selects, or leaves, a mode outside it, such as a curb crossing, which
 selecting another mode aborts wherever its wheels are.
 
+Xbox-style (XInput) pads work as they are. Other HID gamepads come in through
+the GameInput plugin (Win64 only), which on Windows reads only the devices that
+`Config/DefaultInput.ini` lists, each with its button and axis mapping; the
+Backbone Pro (VID 358A PID 0402) is listed. A new pad needs its own entry, and
+its axis and button numbers measured first. Every device drives player 0
+(`input.DeviceMappingPolicy=3`): the engine's PC default gave a second pad its
+own local player, which the sim never creates. The game module also turns on
+GameInput's background input (`Source/Ramms/Ramms.cpp`); otherwise an
+unfocused editor read such a pad's sticks as pushed fully over and the camera
+spun.
+
 Since UE 5.7 a mapping context keeps its keys in `DefaultKeyMappings`; one
 saved since then with keys only in the deprecated `Mappings` array has none.
 `make_input_assets.py` writes the former.
@@ -345,7 +355,7 @@ and its simulate widget are disabled, so R / P / O / 1-7 / Tab are ours; the
 sim functions come back as the `sim.*` controls above. Pixel Streaming
 keyboard events reach Enhanced Input like local ones (spike in
 `ui_input_refactor_plan.md`). Touch panels and tests use the same path:
-`ControlInput.InjectActionByName("IA_Ramms_Drive", (0, 1, 0), hold_s)`.
+`ControlInput.InjectActionByName("IA_Ramms_DriveStick", (0, 1, 0), hold_s)`.
 Tests that need the keys themselves (dead zones, held buttons, the reported
 device) press them with `URammsInputTestLibrary.SetKeyDown` and move stick
 axes with `SetAxisKey` (`Gamepad_LeftX`, ...; an axis stays where it was put).
@@ -368,7 +378,8 @@ polled `RammsKeyboardTeleopComponent` it used to carry is gone.
 | Key | Linkage pawn | Holonomic pawn |
 |---|---|---|
 | W / S | drive forward / back (centre wheels) | same |
-| A / D | turn left / right | same |
+| A / D | turn left / right | turn in differential mode, strafe left / right in holonomic mode |
+| Q / E | — (E / Q below) | turn left / right in holonomic mode |
 | E / Q | centre 5-bar legs: endpoint up (retract) / down (extend) | — |
 | Y / H | front cranks + / − | front hips + / − |
 | T / B | rear cranks + / − | rear hips + / − |

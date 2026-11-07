@@ -12,7 +12,8 @@ RammsKeyboardTeleopComponent these pawns used to carry is removed on sight:
 keys arrive through Enhanced Input and the surface now.
 
 Keys live in the input assets, not here — `make_input_assets.py` owns
-IMC_RammsRobot and the DA_RammsInput_* maps (W/S drive, A/D turn, E/Q linkage
+IMC_RammsRobot and the DA_RammsInput_* maps (W/S drive, A/D turn -- strafe in
+holonomic mode, Q/E turning there --, E/Q linkage
 endpoint, Y/H T/B Z/X C/V motor groups, N camera / Home reset, P pause,
 Backspace reset, 1-7 debug). Mouse orbit and wheel zoom stay on the camera
 component.

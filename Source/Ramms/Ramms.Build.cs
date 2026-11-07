@@ -51,6 +51,18 @@ public class Ramms : ModuleRules
 			PrivateDefinitions.Add("RAMMS_WITH_PIXEL_STREAMING=0");
 		}
 
+		// GameInput reads HID gamepads that are not XInput pads (Config/DefaultInput.ini); the
+		// plugin is enabled for Win64 only (Ramms.uproject). The module sets its focus policy.
+		if (Target.Platform == UnrealTargetPlatform.Win64)
+		{
+			PrivateDependencyModuleNames.Add("GameInputBase");
+			PrivateDefinitions.Add("RAMMS_WITH_GAMEINPUT=1");
+		}
+		else
+		{
+			PrivateDefinitions.Add("RAMMS_WITH_GAMEINPUT=0");
+		}
+
 		// Uncomment if you are using Slate UI
 		// PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });
 
