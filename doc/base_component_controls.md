@@ -330,6 +330,17 @@ simulation, with no motor groups; give a pawn's `DriveModeSelector` a
 never selects, or leaves, a mode outside it, such as a curb crossing, which
 selecting another mode aborts wherever its wheels are.
 
+Xbox-style (XInput) pads work as they are. Other HID gamepads come in through
+the GameInput plugin (Win64 only), which on Windows reads only the devices that
+`Config/DefaultInput.ini` lists, each with its button and axis mapping; the
+Backbone Pro (VID 358A PID 0402) is listed. A new pad needs its own entry, and
+its axis and button numbers measured first. Every device drives player 0
+(`input.DeviceMappingPolicy=3`): the engine's PC default gave a second pad its
+own local player, which the sim never creates. The game module also turns on
+GameInput's background input (`Source/Ramms/Ramms.cpp`); otherwise an
+unfocused editor read such a pad's sticks as pushed fully over and the camera
+spun.
+
 Since UE 5.7 a mapping context keeps its keys in `DefaultKeyMappings`; one
 saved since then with keys only in the deprecated `Mappings` array has none.
 `make_input_assets.py` writes the former.
