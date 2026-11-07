@@ -23,7 +23,8 @@ doesn't. `move_private_assets.py` is the one-shot migration that put them there.
   with a RammsRobotCameraComponent, ControlSurface, SimControl, ControlInput
   with the family's input map, AutoPossessPlayer). The legacy polled
   KeyboardTeleop is removed.
-  Keys (IMC_RammsRobot): W/S A/D drive, E/Q legs, Y/H T/B Z/X C/V motor
+  Keys (IMC_RammsRobot): W/S A/D drive (A/D strafe in holonomic mode, Q/E
+  turn there), E/Q legs, Y/H T/B Z/X C/V motor
   groups, N camera / Home reset, I/K J/L U/O + arrows + M/. arm, R resync,
   [ ] G gripper, P pause, Backspace reset, / step, 1-7 debug toggles; mouse
   drag orbit and wheel zoom stay on the camera component.
