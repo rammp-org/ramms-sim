@@ -23,13 +23,6 @@
   expect_joint <joint> <lo> <hi>   an MJCF joint's position (rad, or m for a slide) is in lo..hi
   mark_body <body>           remember where an MJCF body is (for expect_body_moved)
   expect_body_moved <body> <lo> <hi>  the body moved lo..hi cm (any direction) since mark_body
-  mark_lifts                 remember every lift motor's value (for expect_lifts_back)
-  expect_lifts_back <deg> <cm>     each lift is within deg (the angles) or cm (the translators) of its mark_lifts value
-  hold_stick <forward> [turn] [crossing] [back_in PHASE]
-                             hold the rider's stick there every frame (source Script: whichever drive mode has
-                             the robot, a curb crossing included), until release_stick or end; `crossing`: let go as
-                             the crossing ends; `back_in PHASE`: pulled back from the frame the crossing reaches PHASE
-  release_stick              let the stick go
 """
 import math
 
@@ -37,7 +30,6 @@ import unreal
 
 MAP = "/Game/Maps/Map_RammpGen1Curb_URL"
 SRC = unreal.RammsControlSource.REMOTE
-LIFTS = ("elevator_l", "elevator_r", "translator_l", "translator_r", "front_arm", "rear_lift")   # rad, but cm for the translators
 les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 ues = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem)
 op = getattr(unreal, "_ramms_rammp_gen1_op", "state").split()
@@ -68,14 +60,6 @@ def pose(chassis):
     return loc, rot
 
 
-def stop_stick():
-    """Stop hold_stick's per-frame callback (the stick is not released: release_stick does that)."""
-    handle = getattr(unreal, "_ramms_rammp_gen1_stick", None)
-    if handle is not None:
-        unreal.unregister_slate_post_tick_callback(handle)
-        unreal._ramms_rammp_gen1_stick = None
-
-
 if op[0] == "begin":
     if ues.get_game_world() is not None:
         les.editor_request_end_play()
@@ -85,7 +69,6 @@ if op[0] == "begin":
     les.editor_request_begin_play()
     log("PIE requested on " + MAP)
 elif op[0] == "end":
-    stop_stick()
     if ues.get_game_world() is not None:
         les.editor_request_end_play()
     log("PIE ended")
@@ -229,65 +212,5 @@ else:
                                                                        "ok" if lo <= dist <= hi else "FAIL"))
             if not lo <= dist <= hi:
                 raise RuntimeError("%s moved %.1f cm, outside %g..%g" % (op[1], dist, lo, hi))
-    elif op[0] == "hold_stick":
-        # Every frame, as a rider holds a stick: through the surface to whichever drive mode has the robot (a curb
-        # crossing takes drive.* while it runs), at the lowest source, so a person's keyboard or gamepad takes over.
-        # With `crossing`, only through the curb crossing under way (or about to begin): let go the frame it ends, as a
-        # rider would, so the drive mode it hands back to does not drive on. With `back_in PHASE`, pulled back (-0.6)
-        # from the frame the crossing reaches that phase (curb.get_phase().name): a rider cancelling at once.
-        stop_stick()
-        words = op[2:]
-        back_in = words[words.index("back_in") + 1] if "back_in" in words and words.index("back_in") + 1 < len(words) else None
-        numbers = [w for w in words if w not in ("crossing", "back_in", back_in)]
-        fwd, turn = float(op[1]), float(numbers[0]) if numbers else 0.0
-        curb = pawn.get_component_by_class(unreal.RammsRammpGen1CurbController)
-        ended = (unreal.RammsRammpGen1CurbPhase.IDLE, unreal.RammsRammpGen1CurbPhase.DONE, unreal.RammsRammpGen1CurbPhase.ABORTED)
-
-        # Everything it reads bound here: remote execution reuses one namespace, so later ops reassign its globals.
-        def hold(dt, cs=cs, curb=curb, fwd=fwd, turn=turn, state={"seen": False, "back": False}, ended=ended,
-                 through_crossing="crossing" in words, back_in=back_in, script=unreal.RammsControlSource.SCRIPT,
-                 ues=ues, stop=stop_stick):
-            try:
-                if ues.get_game_world() is None:
-                    stop()
-                    return
-                phase = curb.get_phase()
-                if through_crossing:
-                    running = phase not in ended
-                    state["seen"] |= running
-                    if state["seen"] and not running:
-                        stop()
-                        for i in ("drive.forward", "drive.turn"):
-                            cs.release_control(i, script)
-                        return
-                state["back"] |= back_in is not None and phase.name == back_in
-                cs.set_control("drive.forward", -0.6 if state["back"] else fwd, script)
-                cs.set_control("drive.turn", 0.0 if state["back"] else turn, script)
-            except Exception:  # noqa: BLE001  (PIE ended under it)
-                stop()
-        unreal._ramms_rammp_gen1_stick = unreal.register_slate_post_tick_callback(hold)
-        log("holding the stick at forward %+.2f, turn %+.2f%s%s" % (fwd, turn, " through the crossing" if "crossing" in words else "",
-                                                                     ", back from %s" % back_in if back_in else ""))
-    elif op[0] == "release_stick":
-        stop_stick()
-        for i in ("drive.forward", "drive.turn"):
-            cs.release_control(i, unreal.RammsControlSource.SCRIPT)
-        log("stick let go")
-    elif op[0] == "mark_lifts":
-        unreal._ramms_rammp_gen1_lifts = {m: base.get_motor_value(m) for m in LIFTS}
-        log("mark lifts: " + "  ".join("%s %+.3f" % kv for kv in unreal._ramms_rammp_gen1_lifts.items()))
-    elif op[0] == "expect_lifts_back":
-        marked = getattr(unreal, "_ramms_rammp_gen1_lifts", None)
-        if marked is None:
-            raise RuntimeError("no lifts marked (mark_lifts first)")
-        off = {}
-        for m in LIFTS:
-            d = base.get_motor_value(m) - marked[m]
-            off[m] = d if m.startswith("translator") else math.degrees(d)   # cm, deg
-        bad = [m for m in LIFTS if abs(off[m]) > float(op[2] if m.startswith("translator") else op[1])]
-        log("lifts back: " + "  ".join("%s %+.2f %s" % (m, off[m], "cm" if m.startswith("translator") else "deg") for m in LIFTS)
-            + " (expect within %s deg, %s cm) -> %s" % (op[1], op[2], "FAIL" if bad else "ok"))
-        if bad:
-            raise RuntimeError("not back where they were: %s" % ", ".join(bad))
     else:
         raise RuntimeError("unknown op %s" % op[0])

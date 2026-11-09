@@ -1060,7 +1060,7 @@
           <inertial pos="0 0 0" mass="0.3" diaginertia="0.0005 0.0005 0.0005"/>
           <geom class="visual" mesh="rear_caster_dampener__caster_dampener" pos="0.641526 -0.002636 -0.237125" rgba="0.2398 0.2398 0.2398 1"/>
           <body name="rear_spring" pos="0 0 -0.121">
-            <joint name="rear_spring" type="slide" axis="0 -0 1" range="-0.01 0.02" stiffness="1e+06" springref="-0.0106" damping="30000" armature="5"/>
+            <joint name="rear_spring" type="slide" axis="0 -0 1" range="-0.01 0.02" stiffness="200000" springref="-0.013" damping="5000" armature="5"/>
             <inertial pos="0 0 0" mass="0.3" diaginertia="0.0005 0.0005 0.0005"/>
             <geom class="visual" mesh="rear_caster_dampener_rod__caster_dampener_rod" pos="0.641526 -0.002636 -0.116125" rgba="0.4746 0.4746 0.4746 1"/>
           </body>

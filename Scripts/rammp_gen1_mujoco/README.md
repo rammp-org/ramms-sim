@@ -9,8 +9,7 @@ These scripts bring the RAMMP Gen1 MJCF (`mujoco/rammp_gen1`, powered-front vari
 | `make_rammp_gen1_curb_map.py` | Builds `BP_RammpGen1PoweredFrontGameMode` and `/Game/Maps/Map_RammpGen1Curb_URL`: a floor and two platforms, 15 cm and 8 cm high, 3 m ahead of the spawn and 3 m deep. |
 | `rammp_gen1_op.py` | Drives and reads the pawn in PIE, one operation per call (see its docstring). |
 | `run_rammp_gen1_checks.sh` | PIE checks: the robot stands, drives, turns, every lift reaches its target in its own units, and the gamepad drives it. The arm moves on `arm.up`, the gripper closes on `gripper.close`, and the base still drives with the arm's IK running. |
-| `run_rammp_gen1_curb.sh` | PIE checks of the curb crossing: the robot climbs the 15 cm platform and descends its far edge, from the outdoor stance (`STANCE=reference`: every lift at 0), the stick held through each crossing, and must end each one with every lift back where it was. |
-| `run_rammp_gen1_assist.sh` | PIE checks of curb assist. Starting from the outdoor stance:<ul><li>A switches it on.</li><li>Holding forward at the curb starts a crossing; pulling back as it approaches cancels it, with the lifts back.</li><li>Switched off, driving at the curb starts nothing.</li><li>Switched on and held forward, it climbs, pausing with nothing moving while the stick is let go, then drives on and goes down the far edge.</li></ul> |
+| `run_rammp_gen1_curb.sh` | PIE checks of the curb crossing: the robot climbs the 15 cm platform and descends its far edge. |
 
 Run the three builders in order in a running editor with PIE stopped (`python Scripts/editor_remote_exec.py --file <script>`). Each re-import deletes the pawn, so re-run the two scripts after it.
 
@@ -25,7 +24,7 @@ python -I Plugins/unreal-robotics-lab/Scripts/clean_meshes.py mujoco/rammp_gen1/
 | Component | |
 |---|---|
 | `RobotBase` | MuJoCo backend. One motor-table row per MJCF actuator: the drive wheels and the front omni hubs as torque motors, the lifts as position motors. The translators are in cm; ramms-mujoco-support converts cm to the slide's metres. The drive wheels carry speed-loop gains and a brake. |
-| `DifferentialDrive` | The drive wheels in velocity control (120 cm/s, 70 deg/s at full stick). Brakes close when it stops. Its speed loop's integral reaches the motors' torque less 5 N·m (55 of 60), so a turn in place from rest gets the ~50 N·m it needs to break away. Capped at the motor table's 25 N·m, it stalled at 39. |
+| `DifferentialDrive` | The drive wheels in velocity control (120 cm/s, 70 deg/s at full stick). Brakes close when it stops. |
 | `RammpGen1Controller` | The lifts, rate-limited at the MJCF's lift speeds (custom numerics). They use the chair's control ids, so `DA_RammsInput_RammpGen1` and the gamepad layout drive it unchanged: `lift.motor_swing_arm_*` the elevators, `lift.dw_main_plate_*` the translators, `lift.front_caster_swing_arm` the front arm and `lift.rear_caster_swing_arm` the rear lift (the suspension arm, in its own degrees). |
 | `ControlSurface`, `ControlInput` | Every control, plus the powered front omni hubs as `motor.front_omni_*`. Nothing drives them in normal driving, so they freewheel. |
 | `SimControl` | Puts the robot in the MJCF's `home` key at spawn, which also stands it on the ground under it. |
@@ -49,27 +48,20 @@ Keyboard:
 
 ## Crossing a curb
 
-**Curb assist** (`curb.assist`, Off/On, off at spawn): switch it on, then just drive at the curb.
-- **Gamepad:** A switches it on and off; hold B to stop a crossing.
-- **Keyboard:** Enter switches it; hold End to stop.
-- **Panel:** the Curb group's "Curb assist" row.
-
-With it on, holding the stick forward at a curb the controller can cross starts the crossing once the edge is within 80 cm (`Assist.TriggerDistanceCm`) of the front omni wheels. It won't start one closer than 20 cm (`Assist.MinDistanceCm`); by then you've driven up to the curb. The curb must be within 10° of square (`Config.MaxApproachDeg`; a 10° approach crosses in PIE); the robot does not turn into it for you. A curb it can't cross is left to you, and the status says why. After a crossing it started that didn't finish (stopped, cancelled), it waits for you to let the stick go before it starts another. After one that finished, holding forward drives on to the next curb.
-
-**The stick drives every crossing** (`Stick`, as on RAMMP Gen2): it goes on only while the stick is held forward, at the planned speeds. Let go, or push any other way, and it pauses: the lifts hold where they are and the wheels brake. Push forward again and it goes on. Before any wheel has lifted for the curb or gone over it, pull back and hold: it cancels, puts the lifts back where it found them, and hands back.
-
-To start a crossing by hand, drive to within 1.5 m of a curb, square to it, then use the panel's curb group "Cross the curb ahead", the curb drive mode, or `curb.negotiate` through the control surface (Remote). Then hold the stick forward.
-
-A script or autonomy client that starts a crossing must hold `drive.forward` through it, as a rider would (`rammp_gen1_op.py hold_stick 0.6 crossing` does), or set the controller's `Stick.bRequired` false to have it run to the end once begun. Otherwise the crossing waits paused.
+Drive to within 1.5 m of a curb, square to it, then start a crossing:
+- **Gamepad:** A starts it; hold B to stop.
+- **Keyboard:** Enter starts it; hold End to stop.
+- **Remote:** `curb.negotiate` and `curb.abort` through the control surface.
+- **Panel:** the curb drive mode, or the curb group's "Cross the curb ahead".
 
 The controller finds the edge and its height with line traces ahead of the front omni wheels. An edge is ground that rises or falls steeply (a ramp is not a step), and the far side must stay level for 10 cm past it. A narrow strip, a second step or missing ground refuses the start. It picks the crossing height from each support's height table, then runs `curb_sequence.py`'s phases:
 1. Raise or lower the chassis, level, to the crossing height.
-2. Front omni wheels over the edge and down. If they start off the ground, as in the outdoor stance (front arm about -14 deg, elevators about 9 deg for ground clearance), they stay up: they are kept where they are, or raised if the crossing needs them higher. They are not set down only to be lifted again at the curb.
+2. Front omni wheels over the edge and down.
 3. Drive wheels over and down. With the powered front omni wheels, those pull the robot forward while the translators bring the drive wheels aft.
 4. The rule: the rear omni wheels are not lifted until each drive wheel is past the edge and down on the far level, both translated aft, with the centre of mass (from the exported mass model) ahead of their axle. If it fails, the crossing aborts. The mass model has the arm stowed, so a crossing stows it as it starts (`arm.stow`) and holds the `arm.*` controls at rest until it ends: arm commands are refused meanwhile.
 5. Rear omni wheels over and down, once both are past the edge. On a descent the chassis is first lowered onto the braked drive wheels, which swings them on their arms and can roll the robot back; if a rear omni wheel comes back over the edge, it creeps on until both are past it again and settled there before setting them down.
-6. Translators back where they started while the drive wheels roll, then every lift back where the crossing found it (each one's last command), so the robot ends in the stance it started in.
+6. Translators back to centre while the drive wheels roll, then the driving pose.
 
-A touchdown lowers the wheels by their measured height above the level, to contact and 1 cm past it. The sprung rear's lift is trimmed against the chassis's pitch while its wheels are down. A finished or stopped crossing brakes, then hands back to the differential drive. If it stops with the drive wheels up, the differential drive would hold nothing on the ground. So it holds the front omni hubs at rest instead, and leaves the lifts to the operator. Once the elevators have the drive wheels down, it hands back. While a crossing runs, `RammpGen1Controller` leaves the lifts alone, then takes them back at their last commands (not where a loaded lift sags to). Steps of 3–17 cm are crossed; others are refused with the reason.
+A touchdown lowers the wheels by their measured height above the level, to contact and 1 cm past it. The sprung rear's lift is trimmed against the chassis's pitch while its wheels are down. A finished or stopped crossing brakes, then hands back to the differential drive. If it stops with the drive wheels up, the differential drive would hold nothing on the ground. So it holds the front omni hubs at rest instead, and leaves the lifts to the operator. Once the elevators have the drive wheels down, it hands back. While a crossing runs, `RammpGen1Controller` leaves the lifts alone, then takes them back where they stand. Steps of 3–17 cm are crossed; others are refused with the reason.
 
 The level's URLab manager runs MuJoCo at the MJCF's 2 ms step, with elliptic friction cones and impratio 10 (the omni rollers creep when braked on pyramidal cones).

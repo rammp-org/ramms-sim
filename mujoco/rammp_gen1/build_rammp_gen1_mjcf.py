@@ -94,10 +94,8 @@ PARAMS = {
     "rear_lift": {"kp": 9000.0, "kv": 260.0, "force": 400.0, "speed_deg_s": 26.0},    # at the suspension arm: 79 deg in 3 s
     "rear_lift_deg": (-35.0, 44.0),        # +44: the rear arm at its 45 deg stop; near -40 the rear actuator passes dead centre
     # The rear damper: spring rate, damping, the preload it holds against its top-out stop, and its travel from the
-    # reference pose (top-out first; positive compresses it, as load on the rear wheels does). Stiffened to 5x the rate
-    # and 6x the damping, as the robot's is stiffer: 200 kN/m and 5 kN*s/m sagged 6 mm in the outdoor stance and rang
-    # about four half-swings at 1.5 Hz (2.4 deg of pitch) when it braked from 1 m/s; this sags 1 mm and swings 0.4 deg.
-    "rear_spring": {"stiffness": 1000000.0, "damping": 30000.0, "preload": 600.0, "travel_cm": (-1.0, 2.0)},  # N/m, N*s/m, N
+    # reference pose (top-out first; positive compresses it, as load on the rear wheels does).
+    "rear_spring": {"stiffness": 200000.0, "damping": 5000.0, "preload": 600.0, "travel_cm": (-1.0, 2.0)},  # N/m, N*s/m, N
     "translator": {"kp": 30000.0, "kv": 2000.0, "force": 1500.0, "speed_cm_s": 13.0},  # N/m, N*s/m, N; 80 cm in 6 s
     # N*m; 9 rad/s ~ 6 km/h; the geared motor's inertia at the wheel, kg*m^2 (with less, a wheel that slips spins up at once)
     "drive": {"torque": 60.0, "max_speed_rad_s": 9.0, "armature": 0.1},

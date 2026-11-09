@@ -14,9 +14,8 @@ public class RammsTarget : TargetRules
 
 		// Same clang memory blowup as RammsEditor.Target.cs: URLab's
 		// generated component model in jumbo .gen unity TUs needs ~25 GB per
-		// clang process. Compile generated files individually on Mac and Linux
-		// (x86_64 and arm64).
-		if (Target.Platform == UnrealTargetPlatform.Mac || Target.Platform.IsInGroup(UnrealPlatformGroup.Linux))
+		// clang process. Compile generated files individually on Mac and Linux.
+		if (Target.Platform == UnrealTargetPlatform.Mac || Target.Platform == UnrealTargetPlatform.Linux)
 		{
 			bAlwaysUseUnityForGeneratedFiles = false;
 

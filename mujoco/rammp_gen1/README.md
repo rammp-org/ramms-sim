@@ -20,7 +20,7 @@ python Scripts/editor_remote_exec.py --file mujoco/rammp_gen1/extract_ue_rammp_g
 python Scripts/editor_remote_exec.py --file mujoco/rammp_gen1/extract_ue_rammp_gen1_meshes.py   # likewise
 python mujoco/rammp_gen1/build_rammp_gen1_mjcf.py [--rider-kg 75] [--no-arm]
 python mujoco/rammp_gen1/check_rammp_gen1.py
-python mujoco/rammp_gen1/curb_sequence.py --variant powered_front --dir up [--height 0.15] [--stance -14 9 0] [--clip climb.mp4]
+python mujoco/rammp_gen1/curb_sequence.py --variant powered_front --dir up [--height 0.15] [--clip climb.mp4]
 python mujoco/rammp_gen1/export_curb_config.py [--variant powered_front]   # after the model changes; then Scripts/rammp_gen1_mujoco/make_rammp_gen1_pawn.py
 python -m mujoco.viewer --mjcf=mujoco/rammp_gen1/rammp_gen1_scene.xml
 ```
@@ -37,7 +37,7 @@ The builder and the checks need `mujoco` and `numpy`; `--clip` also needs `image
 - **drive_wheel_l / _r**: torque motors, with a geared motor's inertia at the wheel (armature 0.1 kg·m²). Positive drives forward.
 - **front_arm / rear_arm**: hinges; each arm carries a pair of omni wheels. Positive puts the wheels down and raises that end. The front arm is driven directly. The rear arm is sprung and not driven itself.
 - **rear_lift**: the rear suspension arm, which the rear actuator turns. It pushes the rear arm down through the aux link, the damper's pivot and the damper. Positive puts the rear wheels down.
-- **rear_spring**: the damper's rod, a preloaded spring-damper (`PARAMS["rear_spring"]`: 1 MN/m, 30 kN·s/m, 600 N preload). It sits on its top-out stop until the rear wheels take load, then gives about 1 mm in the outdoor stance. It used to be 200 kN/m and 5 kN·s/m, softer and springier than the robot's: that sagged 6 mm and rang for about four half-swings at 1.5 Hz (2.4° of pitch) after braking from 1 m/s, where this swings 0.4°.
+- **rear_spring**: the damper's rod, a preloaded spring-damper (`PARAMS["rear_spring"]`). It sits on its top-out stop until the rear wheels take load.
 - **front_omni_* / rear_omni_***: omni wheels. Each is a hub plus two staggered rows of passive barrel rollers, measured from the visual meshes:
   - front: 2 × 12 rollers;
   - rear: 2 × 18 rollers, with treads 2.5 cm outboard of the physics asset's hulls.
@@ -69,10 +69,8 @@ The rule: the rear omni wheels are not lifted until both drive wheels are on the
 
 On a descent, the chassis is lowered onto the braked drive wheels before the rear omni wheels go down. That swings the drive wheels on their arms and can roll the robot back; if the rear omni wheels come back over the edge, it creeps on until they are past it again. Throughout, the arm is held stowed.
 
-`--stance FRONT ELEVATORS REAR` starts the robot with its lifts at those angles (degrees). The outdoor stance is about `-14 9 0`: the front omni wheels up, the drive wheels down for ground clearance, the robot on its drive and rear wheels. Front omni wheels that start off the ground stay up. The chassis is levelled with them where they are, or higher if the crossing needs it, and they are not set down only to be lifted again at the curb. Every crossing ends with the translators and then every lift back where it started, and the levelling trim goes out with that last move, so the robot is back in its stance at its own pitch.
-
 With these limits it crosses 8 to 15 cm both ways.
 - **16 cm:** it climbs, but on the descent the front omni wheels can't reach the road.
 - **17 cm:** no crossing height works, because the rear lifts its wheels only about 4.7 cm.
 - **15 cm with the powered front:** the frame passes 2–5 mm over the curb top while the drive wheels are brought aft and re-centred; at 12 cm it keeps about 2 cm.
-- **Pitch on climbs:** it reaches 2–3° nose-up with the seat, rider and arm (4.5–5° with the softer damper it had). While the drive wheels are forward, the rear carries the most load and sags at full reach, beyond what the trim can correct.
+- **Pitch on climbs:** it reaches 4.5–5° nose-up with the seat, rider and arm. While the drive wheels are forward, the rear carries the most load and sags at full reach, beyond what the trim can correct.

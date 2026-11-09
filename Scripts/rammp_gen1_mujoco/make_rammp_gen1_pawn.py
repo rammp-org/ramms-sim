@@ -52,11 +52,6 @@ DRIVE = ("drive_l", "drive_r")
 # Wheel speed loops (FRammsVelocityGains) and the drive wheels' brake, as the lift-drive robots'
 # 50 N*m wheels have them; the RAMMP Gen1's are placeholders until its motors are known.
 DRIVE_GAINS = {"Kp": 15.0, "Ki": 60.0, "MaxIntegralTorque": 25.0}
-# The differential drive's own speed loop may wind its integral up to the drive motors' torque less
-# this (as the lift-drive robots' wheel loops do), not DRIVE_GAINS' 25 N*m: a turn in place from rest
-# asks the wheels for about 1 rad/s, so with the integral at 25 the loop gave at most 15 + 25 = 39 N*m,
-# and the robot at rest needs about 50 to break away into a turn -- it stood still under a held turn.
-DIFF_INTEGRAL_HEADROOM_NM = 5.0
 DRIVE_BRAKE_NM = 100.0
 FRONT_OMNI_GAINS = {"Kp": 3.0, "Ki": 10.0, "MaxIntegralTorque": 10.0}
 TOP_SPEED_CM_S = 120.0
@@ -151,13 +146,8 @@ diff = add_component(bp, unreal.RammsDifferentialDriveController, "DifferentialD
 setp(diff, left_motor_id=DRIVE[0], right_motor_id=DRIVE[1], wheel_radius=numeric["drive_wheel_radius"] * 100.0,
      track_width=60.8, use_motor_separation_as_track_width=True, skeletal_mesh_component_name="None",
      control_mode=unreal.DriveControlMode.VELOCITY_CONTROL, max_velocity=TOP_SPEED_CM_S, max_turning_speed=TOP_TURN_DEG_S,
-     pid_kp=DRIVE_GAINS["Kp"], pid_ki=DRIVE_GAINS["Ki"], pid_kd=0.0)
+     pid_kp=DRIVE_GAINS["Kp"], pid_ki=DRIVE_GAINS["Ki"], pid_kd=0.0, pid_integral_max=DRIVE_GAINS["MaxIntegralTorque"] / DRIVE_GAINS["Ki"])
 drive_torque = next(r["ControlRange"]["Y"] for r in rows if r["Id"] == DRIVE[0])
-# pid_integral_max is in rad*s (the error's integral); Ki times it is the integral's torque.
-diff_integral_nm = max(DRIVE_GAINS["MaxIntegralTorque"], drive_torque - DIFF_INTEGRAL_HEADROOM_NM)
-setp(diff, pid_integral_max=diff_integral_nm / DRIVE_GAINS["Ki"])
-log("differential drive: speed loop Kp %g / Ki %g, integral up to %g of the motors' %g N*m" % (
-    DRIVE_GAINS["Kp"], DRIVE_GAINS["Ki"], diff_integral_nm, drive_torque))
 for side in ("left_motor_params", "right_motor_params"):
     mp = diff.get_editor_property(side)
     mp.set_editor_property("max_torque", drive_torque)
@@ -200,11 +190,6 @@ if removed:
 # The curb crossing, configured from the model (export_curb_config.py), and the drive modes it switches between.
 with open(os.path.join(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_dir()), CURB_CONFIG_REL), encoding="utf-8") as fh:
     curb_fields = json.load(fh)["config"]
-# The differential drive's VehicleMass: the robot's whole mass (the curb config's mass model, fixed
-# plus both drive assemblies), which its torque hold brakes and holds. Left at the 100 kg default, the
-# hold braked the 246 kg robot short of its target and pulled it back some 6 cm once it had stopped.
-setp(diff, vehicle_mass=curb_fields["fixed_mass_kg"] + 2.0 * curb_fields["drive_assembly_mass_kg"])
-log("differential drive: vehicle mass %.1f kg" % diff.get_editor_property("vehicle_mass"))
 curb_cfg = unreal.RammsRammpGen1CurbConfig()
 for key, value in curb_fields.items():
     if key.endswith("_table"):

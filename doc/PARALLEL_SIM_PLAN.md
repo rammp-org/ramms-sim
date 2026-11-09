@@ -78,18 +78,14 @@ Two supported build routes:
 **B. Windows→Linux cross-compile** (standard UE workflow, needs the UE Linux
 cross-toolchain / `LINUX_MULTIARCH_ROOT`):
 - `Scripts/build_all_linux_cross.ps1` — cross-compiles MuJoCo/CoACD/libzmq
-  and URLab's own MjShim and ProtoSpec with the cross-toolchain's clang/libc++
-  (same flags as `build_all.sh --engine`) into
-  `third_party/install-linux/` — separate from the
+  with the cross-toolchain's clang/libc++ (same flags as `build_all.sh
+  --engine`) into `third_party/install-linux/` — separate from the
   Windows-native `install/` so the local editor's libs survive (each dep
   build wipes its install dir). `URLab.Build.cs` picks `install-linux/`
   automatically when targeting Linux from a Windows host (in the local-fixes
   patch).
 - `Scripts/build_linux_cross.ps1 [-Package]` — UBT Linux build + optional
   `BuildCookRun -platform=Linux` (cooking runs the Windows editor).
-- Both take `-Platform LinuxArm64` for aarch64 targets; its libraries go to
-  `third_party/install-linuxarm64/`, which `URLab.Build.cs` reads for a
-  LinuxArm64 target on a Windows host.
 
 Both routes produce the same `Packaged/Linux` output.
 

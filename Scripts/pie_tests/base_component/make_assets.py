@@ -152,14 +152,6 @@ _, dd = find_component(bp, cls_name="RammsDifferentialDriveController")
 setp(dd, left_motor_id="left_motor", right_motor_id="right_motor",
      # honest bone names (the legacy bone path uses them when no base is present)
      left_wheel_bone_name="drive_wheel_l", right_wheel_bone_name="drive_wheel_r")
-# Velocity control: the stick sets wheel speeds and the PID finds the torque, so the
-# chair turns at the commanded rate whatever its casters drag (torque mode's turn rate
-# was set by the drag alone: ~6 deg/s at half stick with the old caster drag, ~66 with
-# PhysMat_CasterRear's). The MuJoCo pawn's 120 cm/s / 70 deg/s; its Kp 15 / Ki 60 chatter
-# on Chaos (wheel-rate readings are noisy), Kp 3 / Ki 6 tracks best. The integral is the
-# wheel-speed error over time (rad), so its cap of 1 lets Ki reach 6 of the motors' 7.
-setp(dd, control_mode=unreal.DriveControlMode.VELOCITY_CONTROL, max_velocity=120.0, max_turning_speed=70.0,
-     pid_kp=3.0, pid_ki=6.0, pid_kd=0.0, pid_integral_max=1.0)
 log("  diff-drive: left_motor_id=%s right_motor_id=%s bones=%s/%s" % (
     dd.get_editor_property("left_motor_id"), dd.get_editor_property("right_motor_id"),
     dd.get_editor_property("left_wheel_bone_name"), dd.get_editor_property("right_wheel_bone_name")))

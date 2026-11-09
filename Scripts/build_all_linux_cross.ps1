@@ -1,15 +1,12 @@
 # Cross-compiles URLab's third-party dependencies (MuJoCo, CoACD, libzmq)
-# and URLab's own native libraries (MjShim, ProtoSpec) for LINUX from a
-# WINDOWS machine, using the same UE Linux cross-toolchain that UBT uses for
-# Windows->Linux game builds. -Platform picks the target: Linux (x86_64,
-# the default) or LinuxArm64 (aarch64).
+# for LINUX from a WINDOWS machine, using the same UE Linux cross-toolchain
+# that UBT uses for Windows->Linux game builds.
 #
-# Output goes to Plugins/unreal-robotics-lab/third_party/install-linux/
-# (Linux) or install-linuxarm64/ (LinuxArm64) - deliberately separate from
-# install/ (the Windows-native libs your local editor uses) and from each
-# other, because every dep build wipes its own install dir and the targets
-# would otherwise clobber each other. URLab.Build.cs picks the matching root
-# automatically when targeting Linux or LinuxArm64 from a Windows host
+# Output goes to Plugins/unreal-robotics-lab/third_party/install-linux/ -
+# deliberately separate from install/ (the Windows-native libs your local
+# editor uses), because every dep build wipes its own install dir and the
+# two platforms would otherwise clobber each other. URLab.Build.cs picks
+# install-linux/ automatically when targeting Linux from a Windows host
 # (committed on our fork branch ramms/v0.6.0-beta).
 #
 # Prerequisites:
@@ -25,33 +22,18 @@
 # compile with clang 20, and the Build.cs fix makes UBT read install-linux/.
 #
 # Usage:
-#   powershell -ExecutionPolicy Bypass -File Scripts\build_all_linux_cross.ps1 [-Platform Linux|LinuxArm64]
+#   powershell -ExecutionPolicy Bypass -File Scripts\build_all_linux_cross.ps1
 #
 # NOTE: mirrors third_party/build_all.sh's `--engine` flags (libc++,
 # -fuse-ld=lld, warning suppressions for TBB/OpenVDB under clang 20). This
 # script never syncs submodules (equivalent of --no-submodule-sync) so it
 # cannot discard the CoACD source patch.
 
-param(
-    [ValidateSet("Linux", "LinuxArm64")]
-    [string]$Platform = "Linux"
-)
-
 $ErrorActionPreference = "Stop"
-
-# Per target: the toolchain's target triple (also its directory under
-# LINUX_MULTIARCH_ROOT), CMake's processor name, and the install root
-# URLab.Build.cs reads for that target.
-$Targets = @{
-    Linux      = @{ Triple = "x86_64-unknown-linux-gnu"; Processor = "x86_64"; Install = "install-linux" }
-    LinuxArm64 = @{ Triple = "aarch64-unknown-linux-gnueabi"; Processor = "aarch64"; Install = "install-linuxarm64" }
-}
-$Target = $Targets[$Platform]
 
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $ThirdParty = Join-Path $RepoRoot "Plugins\unreal-robotics-lab\third_party"
-$InstallName = $Target.Install
-$InstallRoot = Join-Path $ThirdParty $InstallName
+$InstallRoot = Join-Path $ThirdParty "install-linux"
 $BuildType = "Release"
 
 function Log($msg) { Write-Host "[cross-thirdparty] $msg" -ForegroundColor Cyan }
@@ -79,13 +61,13 @@ $MultiArch = $env:LINUX_MULTIARCH_ROOT
 if (-not $MultiArch) {
     throw "LINUX_MULTIARCH_ROOT is not set.`n$ToolchainHelp"
 }
-$TC = Join-Path $MultiArch $Target.Triple
+$TC = Join-Path $MultiArch "x86_64-unknown-linux-gnu"
 $Clang = Join-Path $TC "bin\clang.exe"
 $ClangXX = Join-Path $TC "bin\clang++.exe"
 if (-not (Test-Path $ClangXX)) {
     throw "Cross clang++ not found at $ClangXX - LINUX_MULTIARCH_ROOT points at an incomplete or wrong-version toolchain install.`n$ToolchainHelp"
 }
-Log "$Platform toolchain: $TC"
+Log "toolchain: $TC"
 
 if (-not (Get-Command ninja -ErrorAction SilentlyContinue)) {
     # Fall back to the ninja bundled with Visual Studio's CMake tools.
@@ -107,15 +89,15 @@ if (-not (Get-Command ninja -ErrorAction SilentlyContinue)) {
 }
 
 # Mirror build_all.sh --engine flag choices (see its comments for rationale).
-$Triple = $Target.Triple
-$CFlags = "--target=$Triple --sysroot=$TC -fPIC -Qunused-arguments -Wno-unknown-warning-option"
-$CxxFlags = "--target=$Triple --sysroot=$TC -stdlib=libc++ -nostdinc++ -isystem `"$TC/include/c++/v1`" -fPIC -Qunused-arguments -Wno-unknown-warning-option -Wno-missing-template-arg-list-after-template-kw"
-$LdFlags = "--target=$Triple --sysroot=$TC -stdlib=libc++ -fuse-ld=lld -L`"$TC/lib64`" -Wl,-rpath,`"`$ORIGIN`""
+$Target = "x86_64-unknown-linux-gnu"
+$CFlags = "--target=$Target --sysroot=$TC -fPIC -Qunused-arguments -Wno-unknown-warning-option"
+$CxxFlags = "--target=$Target --sysroot=$TC -stdlib=libc++ -nostdinc++ -isystem `"$TC/include/c++/v1`" -fPIC -Qunused-arguments -Wno-unknown-warning-option -Wno-missing-template-arg-list-after-template-kw"
+$LdFlags = "--target=$Target --sysroot=$TC -stdlib=libc++ -fuse-ld=lld -L`"$TC/lib64`" -Wl,-rpath,`"`$ORIGIN`""
 
 $CommonCMake = @(
     "-G", "Ninja",
     "-DCMAKE_SYSTEM_NAME=Linux",
-    "-DCMAKE_SYSTEM_PROCESSOR=$($Target.Processor)",
+    "-DCMAKE_SYSTEM_PROCESSOR=x86_64",
     "-DCMAKE_C_COMPILER=$Clang",
     "-DCMAKE_CXX_COMPILER=$ClangXX",
     "-DCMAKE_AR=$(Join-Path $TC 'bin\llvm-ar.exe')",
@@ -144,13 +126,12 @@ function Build-Dep {
     }
     $Install = Join-Path $InstallRoot $Name
     if (Test-Path $Install) {
-        Log "$Name - wiping previous $InstallName artifacts"
+        Log "$Name - wiping previous install-linux artifacts"
         Remove-Item -Recurse -Force $Install
     }
-    # Separate build dir from the native Windows build (src\build) and from
-    # the other cross target, so no two configurations share a CMake cache.
-    # Linux keeps the name build-linux-cross.
-    $BuildDir = Join-Path $Src "build-$($Platform.ToLower())-cross"
+    # Separate build dir from the native Windows build (src\build) so the
+    # two configurations never share a CMake cache.
+    $BuildDir = Join-Path $Src "build-linux-cross"
     New-Item -ItemType Directory -Force -Path $BuildDir | Out-Null
 
     Log "$Name - configuring"
@@ -199,76 +180,4 @@ Build-Dep -Name "libzmq" -SrcDir "libzmq" `
     -ExtraCMake @("-DBUILD_STATIC=OFF", "-DBUILD_TESTS=OFF", "-DWITH_PERF_TOOL=OFF", "-DENABLE_DRAFTS=OFF") `
     -BuildTargetArgs @()
 
-# --- URLab's own libraries: MjShim and ProtoSpec ---
-# Both build against the Linux MuJoCo installed above. Neither is a submodule,
-# so neither gets an INSTALLED_SHA stamp (URLab.Build.cs drift-checks only
-# MuJoCo/CoACD/libzmq). Their build trees live under this project's
-# Intermediate\ so the plugin checkout stays clean.
-$MujocoLinux = Join-Path $InstallRoot "MuJoCo"
-$CrossBuildRoot = Join-Path $RepoRoot "Intermediate\URLab$($Platform)Cross"
-
-# MjShim (mirrors third_party/MjShim/build.sh). MUJOCO_LIBRARY is given
-# rather than found: CMAKE_FIND_ROOT_PATH confines find_library to the
-# sysroot, and the MuJoCo install is outside it.
-$MjShimInstall = Join-Path $InstallRoot "MjShim"
-$MjShimBuild = Join-Path $CrossBuildRoot "MjShim"
-if (Test-Path $MjShimInstall) {
-    Log "MjShim - wiping previous $InstallName artifacts"
-    Remove-Item -Recurse -Force $MjShimInstall
-}
-Log "MjShim - configuring"
-& cmake -S (Join-Path $ThirdParty "MjShim") -B $MjShimBuild "-DCMAKE_INSTALL_PREFIX=$MjShimInstall" `
-    "-DMUJOCO_INSTALL_DIR=$MujocoLinux" "-DMUJOCO_LIBRARY=$(Join-Path $MujocoLinux 'lib\libmujoco.so')" @CommonCMake
-if ($LASTEXITCODE -ne 0) { throw "MjShim configure failed" }
-Log "MjShim - building"
-& cmake --build $MjShimBuild --config $BuildType
-if ($LASTEXITCODE -ne 0) { throw "MjShim build failed" }
-Log "MjShim - installing"
-& cmake --install $MjShimBuild --config $BuildType
-if ($LASTEXITCODE -ne 0) { throw "MjShim install failed" }
-
-# ProtoSpec (mirrors protospec/build.ps1, which stages the Windows install;
-# keep the two in step). Without it URLab's generated MuJoCo profile
-# (Source/URLab/*/MuJoCo/Gen) fails to compile with "'types.h' file not found".
-# Only the libraries URLab.Build.cs links are built, and the lib/ header
-# layout is mirrored rather than flattened, because the umbrella headers reach
-# the generated tables through relative paths.
-$PsSrc = Join-Path $RepoRoot "Plugins\unreal-robotics-lab\protospec\lib"
-$PsBuild = Join-Path $CrossBuildRoot "protospec"
-$PsInstall = Join-Path $InstallRoot "protospec"
-Log "ProtoSpec - configuring"
-& cmake -S $PsSrc -B $PsBuild "-DMUJOCO_ROOT=$MujocoLinux" @CommonCMake
-if ($LASTEXITCODE -ne 0) { throw "ProtoSpec configure failed" }
-Log "ProtoSpec - building"
-& cmake --build $PsBuild --config $BuildType --target protospec protospec_core protospec_mjcf protospec_harness
-if ($LASTEXITCODE -ne 0) { throw "ProtoSpec build failed" }
-
-# Every archive is found before the previous install is removed, so a failure
-# leaves what was there. The harness is its own CMake subdirectory and
-# archives one level down.
-$PsLibs = foreach ($Name in "protospec", "protospec_core", "protospec_mjcf", "tinyxml2", "protospec_harness") {
-    $Found = @((Join-Path $PsBuild "lib$Name.a"), (Join-Path $PsBuild "harness\lib$Name.a")) |
-        Where-Object { Test-Path $_ } | Select-Object -First 1
-    if (-not $Found) { throw "ProtoSpec did not build lib$Name.a under $PsBuild" }
-    $Found
-}
-Log "ProtoSpec - staging"
-if (Test-Path $PsInstall) { Remove-Item -Recurse -Force $PsInstall }
-New-Item -ItemType Directory -Force -Path (Join-Path $PsInstall "lib") | Out-Null
-foreach ($Dir in "include", "sdk", "generated", "core", "io", "harness") {
-    $From = Join-Path $PsSrc $Dir
-    if (-not (Test-Path $From)) { continue }
-    $FromFull = [System.IO.Path]::GetFullPath($From)
-    Get-ChildItem -Path $From -Include "*.h", "*.inc" -File -Recurse | ForEach-Object {
-        $Dest = Join-Path (Join-Path $PsInstall $Dir) $_.FullName.Substring($FromFull.Length).TrimStart('\', '/')
-        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $Dest) | Out-Null
-        Copy-Item -Force $_.FullName $Dest
-    }
-}
-$TinyXml = Join-Path $PsInstall "third_party\tinyxml2"
-New-Item -ItemType Directory -Force -Path $TinyXml | Out-Null
-Copy-Item -Force (Join-Path $PsSrc "third_party\tinyxml2\tinyxml2.h") $TinyXml
-$PsLibs | ForEach-Object { Copy-Item -Force $_ (Join-Path $PsInstall "lib") }
-Log "ProtoSpec - staged $(@($PsLibs).Count) libraries in $PsInstall"
-
-Log "done - $Platform third-party artifacts in $InstallRoot"
+Log "done - Linux third-party artifacts in $InstallRoot"

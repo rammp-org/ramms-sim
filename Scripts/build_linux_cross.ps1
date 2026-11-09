@@ -1,28 +1,23 @@
 # Builds and (optionally) packages RAMMS for LINUX from a WINDOWS machine
-# using UE's Windows->Linux cross-compilation toolchain. -Platform picks the
-# target: Linux (x86_64, the default) or LinuxArm64 (aarch64).
+# using UE's Windows->Linux cross-compilation toolchain.
 #
 # Usage:
-#   powershell -ExecutionPolicy Bypass -File Scripts\build_linux_cross.ps1 [-Platform Linux|LinuxArm64] [-Package] [-Config Development|Shipping] [-Maps "Map_A+Map_B"]
+#   powershell -ExecutionPolicy Bypass -File Scripts\build_linux_cross.ps1 [-Package] [-Config Development|Shipping] [-Maps "Map_A+Map_B"]
 #
 # Environment:
 #   UE_ROOT               UE 5.8 root (default: C:\Program Files\Epic Games\UE_5.8)
 #   LINUX_MULTIARCH_ROOT  set by the UE Linux cross-toolchain installer
 #
 # Order of operations for a fresh checkout on Windows:
-#   1. Scripts\build_all_linux_cross.ps1 with the same -Platform (third-party
-#      -> install-linux/ for Linux, install-linuxarm64/ for LinuxArm64)
+#   1. Scripts\build_all_linux_cross.ps1   (Linux third-party -> install-linux/)
 #   2. This script.
 # Both scripts apply the URLab local patches automatically (idempotently)
 # via Scripts\setup_urlab.ps1, so no manual git apply step is needed.
 #
-# The packaged output lands in Packaged\<Platform>. Packaged\Linux is what
-# containers/ramms.def bundles - copy it to a Linux box / the cluster and run
-# Scripts/run_headless.sh.
+# The packaged output (Packaged\Linux) is what containers/ramms.def bundles -
+# copy it to a Linux box / the cluster and run Scripts/run_headless.sh.
 
 param(
-    [ValidateSet("Linux", "LinuxArm64")]
-    [string]$Platform = "Linux",
     [switch]$Package,
     [string]$Config = "Development",
     [string]$Maps = ""
@@ -60,15 +55,14 @@ if (-not (Test-Path $BuildBat)) {
     throw "Engine not found at '$UERoot' (set UE_ROOT)."
 }
 
-$InstallName = if ($Platform -eq "LinuxArm64") { "install-linuxarm64" } else { "install-linux" }
-$InstallLinux = Join-Path $RepoRoot "Plugins\unreal-robotics-lab\third_party\$InstallName"
+$InstallLinux = Join-Path $RepoRoot "Plugins\unreal-robotics-lab\third_party\install-linux"
 if (-not (Test-Path (Join-Path $InstallLinux "MuJoCo\INSTALLED_SHA.txt"))) {
-    throw "$Platform third-party artifacts missing ($InstallLinux) - run Scripts\build_all_linux_cross.ps1 -Platform $Platform first."
+    throw "Linux third-party artifacts missing ($InstallLinux) - run Scripts\build_all_linux_cross.ps1 first."
 }
 
-Log "building Ramms $Platform $Config..."
-& $BuildBat Ramms $Platform $Config -Project="$UProject" -WaitMutex
-if ($LASTEXITCODE -ne 0) { throw "$Platform game build failed" }
+Log "building Ramms Linux $Config..."
+& $BuildBat Ramms Linux $Config -Project="$UProject" -WaitMutex
+if ($LASTEXITCODE -ne 0) { throw "Linux game build failed" }
 
 if ($Package) {
     # Cooking runs the WINDOWS editor to cook content for the Linux target,
@@ -77,17 +71,17 @@ if ($Package) {
     $UatArgs = @(
         "BuildCookRun",
         "-project=$UProject",
-        "-platform=$Platform",
+        "-platform=Linux",
         "-clientconfig=$Config",
         "-build", "-cook", "-stage", "-pak",
         "-archive", "-archivedirectory=$(Join-Path $RepoRoot 'Packaged')",
         "-unattended", "-noP4", "-utf8output"
     )
     if ($Maps) { $UatArgs += "-map=$Maps" }
-    Log "packaging for $Platform (config=$Config)..."
+    Log "packaging for Linux (config=$Config)..."
     & $RunUAT @UatArgs
     if ($LASTEXITCODE -ne 0) { throw "BuildCookRun failed" }
-    Log "done - output in Packaged\$Platform"
+    Log "done - output in Packaged\Linux (deploy to cluster + containers/ramms.def)"
 } else {
     Log "done (build only - pass -Package to cook/stage/pak)"
 }

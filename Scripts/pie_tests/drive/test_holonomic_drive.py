@@ -19,12 +19,12 @@ Two layers, deliberately separated.
   rolling that reached the ground. Speed far below the command is the
   controller or the loop; speed on target with the base still is traction.
 
-  A wheel modelled as a plain cylinder cannot strafe well: an omni wheel has to
-  slide along its axle, MuJoCo's per-geom friction is a single isotropic
-  coefficient, and the contact frame is only aligned to the geometry for
-  capsules. Pawns with the rollers modelled as bodies (the lift-drive
-  holonomic rollers pawn) strafe properly; on a cylinder-wheeled pawn a weak
-  strafe leg is the known limitation, not a regression.
+  As of the working configuration, forward and yaw drive the base properly.
+  Strafe does not, and a failure confined to the strafe leg is expected: an omni
+  wheel has to slide along its axle, MuJoCo's per-geom friction is a single
+  isotropic coefficient, and the contact frame is only aligned to the geometry
+  for capsules (these wheels are cylinders). That needs the rollers modelled,
+  not a friction number.
 
 Run inside the editor with PIE started on a holonomic test level:
     python3 Scripts/editor_remote_exec.py \
@@ -34,29 +34,13 @@ Two phases, because motion needs frames to happen in:
     unreal._ramms_drive_phase = "kinematics"   # default; also arms the motion run
     unreal._ramms_drive_phase = "motion"       # report what moved
 
-The motion run is timed on the simulation's clock (the MuJoCo manager's sim
-time; the world's game time where there is none), not in rendered frames: a
-settle of SETTLE_S, then forward, strafe and turn for LEG_S each, about 7 s of
-simulated time in all. Each leg is timed from the sample its command went out
-on, so a late callback lengthens the leg it lands in and never shortens the
-next. Counted in frames, a leg's length followed the editor's
-frame rate -- 45 frames was under a second at a high rate, less than the wheels
-take to come up to speed, so the strafe leg was mostly the forward leg winding
-down and failed on a robot that strafes; at a low rate the same legs ran for
-several seconds. Run the motion phase once the sampler has stopped
-(unreal._ramms_drive_h is None again); earlier, the report says the run was cut
-short. Displacements are reported in the robot's frame as it stood when the
-legs began (x forward, y to its right), and the yaw is unwrapped, so a turn past
-180 deg reads as what it is.
-
 A switch at rest makes the incoming mode active at once, but it drives nothing
 until the stance has put its own wheels down, and nothing the outgoing mode's
 wheels cannot carry until the change is done -- a stick pushed meanwhile waits.
 So the motion run waits for the selector to finish the switch to holonomic
 (IsSwitchingMode false) before it settles and drives; it times out after
-SWITCH_WAIT_S of simulated time. With no command the holonomic mode holds the
-robot still where it comes to rest, so the drift it is measured against is
-about zero.
+SWITCH_WAIT frames. With no command the holonomic mode holds the robot still
+where it comes to rest, so the drift it is measured against is about zero.
 """
 
 import math
@@ -180,41 +164,23 @@ if PHASE == "kinematics":
         raise RuntimeError("no RammsRobotBaseComponent; wheel speeds unreadable")
     wheel_ids = [unreal.Name(n) for n in names]
 
-    # The clock the legs are timed on: the MuJoCo manager's simulated time.
-    # MuJoCo steps on its own thread, so how much it advances per rendered
-    # frame varies with the frame rate; only its own clock says how long a
-    # leg lasted. Without a manager (a non-MuJoCo pawn), the world's game time.
-    mj = next((a for a in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.Actor)
-               if a.get_class().get_name() == "AMjManager"), None)
-
-    def sim_now():
-        if mj is not None:
-            return float(mj.get_sim_time())
-        return float(unreal.GameplayStatics.get_time_seconds(world))
-
     # Stamp the run with the world it was armed in. A PIE restart between the
     # two phases leaves the previous session's samples sitting on the unreal
     # module, and reporting those reads as a perfectly repeatable result --
     # three friction values once came back identical to the last decimal.
     unreal._ramms_drive_data = {"samples": [], "rolled": 0.0, "radius": radius,
                                 "speed_sum": 0.0, "speed_n": 0, "peak_speed": 0.0,
-                                "error": None, "world": world.get_path_name(),
-                                "clock": "mujoco sim time" if mj is not None else "world game time",
-                                "done": False, "marks": [0]}
-    # Seconds of simulated time. Switching to holonomic raises the centre
-    # wheels off the ground, and the base then drops onto the omni wheels.
-    # Drive before that settles and the first leg measures the fall, not the
-    # command. The switch itself is waited out first: at rest the mode drives
-    # nothing until its wheels are down. Each leg is long enough for the wheels
-    # to come up to the commanded rate (about a second from rest) and run there.
-    SETTLE_S = 0.5
-    LEG_S = 2.0
-    SWITCH_WAIT_S = 10.0
-    LEGS = [("forward", (1.0, 0.0, 0.0)), ("strafe", (0.0, 1.0, 0.0)), ("turn", (0.0, 0.0, 1.0))]
-    # leg: -1 settling, 0..2 the legs, 3 stopped; leg_t: when the current one
-    # began (its command's sample); prev_leg: the leg the last sample was in.
-    st = {"t_wait": None, "t0": None, "leg": -1, "leg_t": 0.0, "prev_leg": -1,
-          "last_t": None, "yaw": None, "yaw_unwrapped": 0.0}
+                                "error": None, "world": world.get_path_name()}
+    # Frames: n counts every frame; `start` is the frame the settle began,
+    # once the switch to holonomic was done (or SWITCH_WAIT frames passed).
+    st = {"n": 0, "start": None}
+    HOLD = 45
+    # Switching to holonomic raises the centre wheels off the ground, and the
+    # base then drops onto the omni wheels. Drive before that settles and the
+    # first leg measures the fall, not the command. The switch itself is waited
+    # out first: at rest the mode drives nothing until its wheels are down.
+    SETTLE = 30
+    SWITCH_WAIT = 400
 
     def stop_sampling():
         h = getattr(unreal, "_ramms_drive_h", None)
@@ -226,82 +192,64 @@ if PHASE == "kinematics":
         # A raise in here is invisible from the remote-exec side and repeats
         # every frame, so catch it once, keep it, and stand the run down.
         try:
-            sample_inner()
+            sample_inner(dt)
         except Exception:
             import traceback
             unreal._ramms_drive_data["error"] = traceback.format_exc()
             holo.set_drive_command(unreal.Vector(0.0, 0.0, 0.0))
             stop_sampling()
 
-    def sample_inner():
-        d = unreal._ramms_drive_data
-        now = sim_now()
-        if st["t0"] is None:
+    def sample_inner(dt):
+        if st["start"] is None:
             # Wait for the switch to holonomic to finish its stance: until then
             # the mode drives nothing (or nothing the treads cannot carry).
-            if st["t_wait"] is None:
-                st["t_wait"] = now
             switching = selector is not None and selector.is_switching_mode()
-            if switching and now - st["t_wait"] < SWITCH_WAIT_S:
+            st["wait"] = st.get("wait", 0) + 1
+            if switching and st["wait"] < SWITCH_WAIT:
                 return
-            st["t0"] = now
-            d["switch_s"] = round(now - st["t_wait"], 3)
-            d["switch_done"] = not switching
-        t = now - st["t0"]
+            st["start"] = 0
+            unreal._ramms_drive_data["switch_frames"] = st["wait"]
+            unreal._ramms_drive_data["switch_done"] = not switching
+        n = st["n"]
+        st["n"] = n + 1
         loc = chassis.get_world_location()
         # MjBody hands back a Quat here, not a Rotator; reading `.yaw` off it
         # raises inside the callback, which fails silently frame after frame and
         # leaves the motion phase with an empty sample list.
         yaw = chassis.get_world_rotation().rotator().yaw
-        if st["yaw"] is not None:
-            step = yaw - st["yaw"]
-            st["yaw_unwrapped"] += step - 360.0 * round(step / 360.0)
-        else:
-            st["yaw_unwrapped"] = yaw
-        st["yaw"] = yaw
 
-        # Each leg runs for its full length from the sample its command went
-        # out on, and the next begins on the first sample after that: a late
-        # callback lengthens the leg it lands in, never shortens or skips the
-        # next one.
-        if st["leg"] < len(LEGS) and t - st["leg_t"] >= (SETTLE_S if st["leg"] < 0 else LEG_S):
-            st["leg"] += 1
-            st["leg_t"] = t
-            d["marks"].append(len(d["samples"]))
-            v = LEGS[st["leg"]][1] if st["leg"] < len(LEGS) else (0.0, 0.0, 0.0)
-            holo.set_drive_command(unreal.Vector(*v))
-        leg = st["leg"]
-
-        # Mean wheel speed over the legs, so a leg can be scored on how much of
+        # Mean wheel speed this frame, so a leg can be scored on how much of
         # the rolling the ground took up -- and so a loop that never reaches
         # its commanded rate is visible separately from one that reaches it
-        # and slips. Integrated over simulated time, not the frame's, and only
-        # over intervals that began inside a leg: the sample that opens the
-        # forward leg closes an interval of settling, which the path length
-        # the rolling is set against does not include either.
-        if st["prev_leg"] >= 0 and st["last_t"] is not None and t > st["last_t"]:
+        # and slips.
+        if n > SETTLE and dt > 0.0:
             speeds = [abs(base.get_motor_velocity(mid)) for mid in wheel_ids]
             mean = sum(speeds) / max(1, len(speeds))
-            d["rolled"] += mean * radius * (t - st["last_t"])
+            d = unreal._ramms_drive_data
+            d["rolled"] += mean * radius * dt
             d["speed_sum"] += mean
             d["speed_n"] += 1
             d["peak_speed"] = max(d["peak_speed"], max(speeds))
-        st["last_t"] = t
-        st["prev_leg"] = leg
 
-        d["samples"].append((t, loc.x, loc.y, st["yaw_unwrapped"]))
-        if leg >= len(LEGS):
+        unreal._ramms_drive_data["samples"].append((n, loc.x, loc.y, yaw))
+        if n == SETTLE:
+            holo.set_drive_command(unreal.Vector(1.0, 0.0, 0.0))
+        elif n == SETTLE + HOLD:
+            holo.set_drive_command(unreal.Vector(0.0, 1.0, 0.0))
+        elif n == SETTLE + HOLD * 2:
+            holo.set_drive_command(unreal.Vector(0.0, 0.0, 1.0))
+        elif n >= SETTLE + HOLD * 3:
             # Stop from inside the callback, so a run that never reaches the
             # report phase cannot leave the base driving.
-            d["done"] = True
+            holo.set_drive_command(unreal.Vector(0.0, 0.0, 0.0))
             stop_sampling()
 
     stop_sampling()
     unreal._ramms_drive_h = unreal.register_slate_post_tick_callback(sample)
-    unreal._ramms_drive_leg_s = LEG_S
-    unreal._ramms_drive_settle_s = SETTLE_S
-    print("[drive] motion run armed: %.1f s settle, then forward, strafe, turn, "
-          "%.1f s each, on the %s" % (SETTLE_S, LEG_S, unreal._ramms_drive_data["clock"]))
+    unreal._ramms_drive_hold = HOLD
+    unreal._ramms_drive_settle = SETTLE
+    print("[drive] motion run armed: %d settle frames, then forward, strafe, "
+          "turn, %d frames each" % (SETTLE, HOLD))
     print("[drive] ---- %d kinematics checks failed ----" % len(failures))
     for f in failures:
         print("[drive] FAILED: %s" % f)
@@ -324,40 +272,24 @@ else:
             "these samples were taken in %s, not the session running now (%s) "
             "-- re-run the kinematics phase" % (data.get("world"), world.get_path_name()))
     s = data["samples"]
-    LEG_S = getattr(unreal, "_ramms_drive_leg_s", 2.0)
-    SETTLE_S = getattr(unreal, "_ramms_drive_settle_s", 0.5)
-    marks = data.get("marks", [])
-    print("[drive] %d samples over %.2f s of %s (%.1f s settle + 3 x %.1f s expected), "
-          "after %s s waiting for the switch"
-          % (len(s), s[-1][0], data.get("clock"), SETTLE_S, LEG_S, data.get("switch_s")))
-    check(data.get("switch_done", False), "the switch to holonomic finished its stance before the legs (%s s)"
-          % data.get("switch_s"))
-    if not data.get("done") or len(marks) < 5:
-        print("[drive] NOTE the run was cut short; run the motion phase once the "
-              "sampler has stopped (unreal._ramms_drive_h is None)")
-    # Sample indices: settle start, then the start of each leg and the stop.
-    marks = (marks + [len(s) - 1] * 5)[:5]
-    for name, a, b in (("forward", 1, 2), ("strafe", 2, 3), ("turn", 3, 4)):
-        print("[drive] %s leg: %.2f s" % (name, s[min(marks[b], len(s) - 1)][0] - s[min(marks[a], len(s) - 1)][0]))
-
-    # In the robot's frame as it stood when the legs began: x forward, y to its
-    # right (UE's Y-right), so a +1 strafe reads as +dy whichever way the level
-    # set the robot down.
-    i0 = min(marks[1], len(s) - 1)
-    h0 = math.radians(s[i0][3])
-    c0, s0 = math.cos(h0), math.sin(h0)
+    HOLD = getattr(unreal, "_ramms_drive_hold", 45)
+    SETTLE = getattr(unreal, "_ramms_drive_settle", 0)
+    print("[drive] %d samples collected (%d settle + 3 x %d expected), after %s frames waiting for the switch"
+          % (len(s), SETTLE, HOLD, data.get("switch_frames")))
+    check(data.get("switch_done", False), "the switch to holonomic finished its stance before the legs (%s frames)"
+          % data.get("switch_frames"))
+    if len(s) < SETTLE + HOLD * 3:
+        print("[drive] NOTE the run was cut short; give it more wall time next run")
 
     def leg(a, b):
         a = min(a, len(s) - 1)
         b = min(b, len(s) - 1)
-        wx, wy = s[b][1] - s[a][1], s[b][2] - s[a][2]
-        return (wx * c0 + wy * s0, -wx * s0 + wy * c0, s[b][3] - s[a][3])
+        return (s[b][1] - s[a][1], s[b][2] - s[a][2], s[b][3] - s[a][3])
 
-    ddx, ddy, ddyaw = leg(marks[0], marks[1])
-    fdx, fdy, fdyaw = leg(marks[1], marks[2])
-    sdx, sdy, sdyaw = leg(marks[2], marks[3])
-    tdx, tdy, tdyaw = leg(marks[3], marks[4])
-    SETTLE = marks[1]
+    ddx, ddy, ddyaw = leg(0, SETTLE)
+    fdx, fdy, fdyaw = leg(SETTLE, SETTLE + HOLD)
+    sdx, sdy, sdyaw = leg(SETTLE + HOLD, SETTLE + HOLD * 2)
+    tdx, tdy, tdyaw = leg(SETTLE + HOLD * 2, SETTLE + HOLD * 3)
 
     # Undriven drift is the yardstick. A leg that moves no further than the
     # robot moves on its own says nothing about the command, so the checks below
@@ -377,11 +309,8 @@ else:
     n_speed = max(1, data.get("speed_n", 1))
     mean_speed = data.get("speed_sum", 0.0) / n_speed
     peak_speed = data.get("peak_speed", 0.0)
-    # Path length over the legs (sample to sample), the turn's included, to set
-    # against the rolling.
-    travelled = sum(math.hypot(s[k + 1][1] - s[k][1], s[k + 1][2] - s[k][2])
-                    for k in range(SETTLE, len(s) - 1))
-    print("[drive] wheel speed: mean %.2f rad/s, peak %.2f rad/s over %d samples"
+    travelled = math.hypot(s[-1][1] - s[SETTLE][1], s[-1][2] - s[SETTLE][2])
+    print("[drive] wheel speed: mean %.2f rad/s, peak %.2f rad/s over %d frames"
           % (mean_speed, peak_speed, n_speed))
     print("[drive] that is %.1f cm of rolling at r=%.1f cm; the base covered %.1f cm"
           % (rolled, radius, travelled))
@@ -408,9 +337,9 @@ else:
         print("[drive] NOTE the wheels turned and the base did not follow. "
               "Check the commanded-vs-achieved speed above first: on target "
               "means traction, well below means the controller or the loop. "
-              "Traction on the strafe leg alone is the known one on a pawn "
-              "whose omni wheels are plain cylinders -- the rollers are not "
-              "simulated, so the wheels cannot slide along their axles.")
+              "Traction on the strafe leg alone is the known one -- the omni "
+              "rollers are not simulated, so the wheels cannot slide along "
+              "their axles.")
 
     print("[drive] ---- %d motion checks failed ----" % len(failures))
     for f in failures:

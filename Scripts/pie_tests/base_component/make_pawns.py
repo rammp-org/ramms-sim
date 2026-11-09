@@ -12,8 +12,7 @@ RammsKeyboardTeleopComponent these pawns used to carry is removed on sight:
 keys arrive through Enhanced Input and the surface now.
 
 Keys live in the input assets, not here — `make_input_assets.py` owns
-IMC_RammsRobot and the DA_RammsInput_* maps (W/S drive, A/D turn -- strafe in
-holonomic mode, Q/E turning there --, E/Q linkage
+IMC_RammsRobot and the DA_RammsInput_* maps (W/S drive, A/D turn, E/Q linkage
 endpoint, Y/H T/B Z/X C/V motor groups, N camera / Home reset, P pause,
 Backspace reset, 1-7 debug). Mouse orbit and wheel zoom stay on the camera
 component.
@@ -176,12 +175,7 @@ def child_bp(parent_path, child_name):
     return bp
 
 
-def mjcf_mass(xml_path):
-    """The robot's mass (kg): every <inertial>'s, as MuJoCo has them (these MJCFs give each body one)."""
-    return sum(float(m.group(1)) for m in re.finditer(r'<inertial\b[^>]*?\bmass="([-\d.e]+)"', open(xml_path).read()))
-
-
-def setup_pawn(bp, motor_table, drive_ids, input_map, linkage_rows=None, fivebar_table=None, vehicle_mass=None):
+def setup_pawn(bp, motor_table, drive_ids, input_map, linkage_rows=None, fivebar_table=None):
     log("=== %s" % bp.get_name())
     base = add_component(bp, unreal.RammsRobotBaseComponent, "RobotBase")
     setp(base, motor_table=motor_table, backend=unreal.RammsPhysicsBackend.MUJOCO)
@@ -190,10 +184,6 @@ def setup_pawn(bp, motor_table, drive_ids, input_map, linkage_rows=None, fivebar
     setp(dd, left_motor_id=drive_ids[0], right_motor_id=drive_ids[1], wheel_radius=12.7, track_width=54.8,
          skeletal_mesh_component_name="None", control_mode=unreal.DriveControlMode.TORQUE_CONTROL,
          use_motor_separation_as_track_width=True)
-    if vehicle_mass:
-        # What the torque hold brakes and holds (its gains): the robot's mass, not the 100 kg default.
-        setp(dd, vehicle_mass=vehicle_mass)
-        log("  vehicle mass %.1f kg" % vehicle_mass)
     # The defaults are tuned for the Chaos chair; the MuJoCo <motor>s allow +-30 N*m
     # and four undriven wheels + position-servo legs add drag, so give it headroom.
     for side in ("left_motor_params", "right_motor_params"):
@@ -254,12 +244,10 @@ dt_link = EAL.load_asset(DATA_DIR + "/DT_LiftDriveLinkage_Motors")
 dt_5bar = EAL.load_asset(DATA_DIR + "/DT_LiftDriveLinkage_5Bar")
 setup_pawn(child_bp(PRIVATE + "/Robots/URL/lift_drive_linkage", "BP_LiftDriveLinkage_Ramms"), dt_link,
            ("left_center_wheel", "right_center_wheel"), "DA_RammsInput_LiftDriveLinkage",
-           linkage_rows=["left_center", "right_center"], fivebar_table=dt_5bar,
-           vehicle_mass=mjcf_mass(PROJECT + "Plugins/RammsPrivateAssets/mujoco/lift_drive_linkage/lift_drive_linkage.xml"))
+           linkage_rows=["left_center", "right_center"], fivebar_table=dt_5bar)
 
 # ----------------------------------------------------------- holonomic base
 dt_holo = make_table("DT_LiftDriveHolonomic_Motors", unreal.RammsMotorSpec.static_struct(), holonomic_motors())
 setup_pawn(child_bp(PRIVATE + "/Robots/URL/lift_drive_holonomic", "BP_LiftDriveHolonomic_Ramms"), dt_holo,
-           ("left_center_wheel", "right_center_wheel"), "DA_RammsInput_LiftDriveHolonomic",
-           vehicle_mass=mjcf_mass(PROJECT + "Plugins/RammsPrivateAssets/mujoco/lift_drive_holonomic/lift_drive_holonomic.xml"))
+           ("left_center_wheel", "right_center_wheel"), "DA_RammsInput_LiftDriveHolonomic")
 log("done")
