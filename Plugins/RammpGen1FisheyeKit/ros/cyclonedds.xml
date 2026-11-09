@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  CycloneDDS settings for full-resolution sim images (1920x1200 bgr8 = 6.9 MB per message).
+  Large best-effort samples are split into hundreds of UDP fragments; with the kernel's default
+  212 KB receive buffer nearly all of them are dropped. Needs the kernel limit raised first:
+    sudo sysctl -w net.core.rmem_max=2147483647
+  Use it in every ROS terminal that publishes or subscribes to the images (bridge, foxglove_bridge,
+  ros2 bag):
+    export CYCLONEDDS_URI=file://<repo>/Scripts/ros/cyclonedds.xml
+-->
+<CycloneDDS xmlns="https://cdds.io/config">
+  <Domain Id="any">
+    <Internal>
+      <SocketReceiveBufferSize min="64MB"/>
+    </Internal>
+  </Domain>
+</CycloneDDS>

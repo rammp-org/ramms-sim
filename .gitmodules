@@ -3,7 +3,7 @@
 	url = git@github.com:rammp-org/ramms-core
 [submodule "Plugins/CameraCapture"]
 	path = Plugins/CameraCapture
-	url = git@github.com:finger563/unreal-camera-capture
+	url = git@github.com:prajapatisarvesh/unreal-camera-capture
 [submodule "Plugins/RammsStreaming"]
 	path = Plugins/RammsStreaming
 	url = git@github.com:rammp-org/ramms-streaming

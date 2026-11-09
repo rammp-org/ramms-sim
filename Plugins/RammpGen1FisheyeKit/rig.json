@@ -1,0 +1,14 @@
+{
+ "_comment": "Camera poses relative to BP_RammpGen1_Ramms's base mesh (component Mesh; RAMMP Gen1, formerly the MeBot): cm, Unreal axes (+X forward, +Y right, +Z up), rotation [roll, pitch, yaw] deg (pitch < 0 = down). Rig rear_level_sides_back30: fronts on the seat rails' front ends, sides on the rails' outer faces 14 cm further back and 30 deg down, rear pair level on the grey base plate. Edit and rerun Scripts/build_kit.py.",
+ "cameras": {
+  "TN_Front_L": [[3.2, -26.5, 41.0], [0.0, -10.0, 0.0]],
+  "TN_Front_R": [[3.2, 26.5, 41.0], [0.0, -10.0, 0.0]],
+  "TN_Side_L": [[-35.0, -31.0, 41.0], [0.0, -30.0, -105.0]],
+  "TN_Side_R": [[-35.0, 31.0, 41.0], [0.0, -30.0, 105.0]],
+  "TN_Rear_L": [[-57.5, -9.0, 22.0], [0.0, 0.0, -135.0]],
+  "TN_Rear_R": [[-57.5, 9.0, 22.0], [0.0, 0.0, 135.0]]
+ },
+ "lens": {"fx": 727.0, "fy": 727.0, "cx": 960.0, "cy": 600.0, "width": 1920, "height": 1200,
+          "k": [0.031329, -0.027551, 0.0027694, 0.0], "max_fov_deg": 200.0},
+ "stream": {"port": 30030, "capture_every_n_frames": 2, "capture_groups": 3}
+}

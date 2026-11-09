@@ -1,0 +1,23 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "0.1",
+	"FriendlyName": "RAMMP Gen1 Fisheye Kit",
+	"Description": "RAMMP Gen1 (formerly the MeBot) with six TechNexion S191 fisheye cameras streaming to ROS 2, as a child of BP_RammpGen1_Ramms and its own game mode: ramms-sim's robot and maps stay untouched.",
+	"Category": "Other",
+	"CreatedBy": "RAMMP",
+	"CanContainContent": true,
+	"EnabledByDefault": true,
+	"IsBetaVersion": true,
+	"Installed": false,
+	"Plugins": [
+		{
+			"Name": "CameraCapture",
+			"Enabled": true
+		},
+		{
+			"Name": "RammsStreaming",
+			"Enabled": true
+		}
+	]
+}
