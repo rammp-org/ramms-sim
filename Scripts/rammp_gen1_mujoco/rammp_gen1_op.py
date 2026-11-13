@@ -9,6 +9,8 @@
   trigger <control id>       a control-surface action (curb.negotiate, curb.abort)
   curb                       the curb crossing: phase, status, step and crossing height, the chassis
   stats                      the last crossing's measurements (times, stops, attitude, the rider's acceleration, margins)
+  status                     curb.status: the panel's "Curb status" words and how much they need the rider
+  expect_status <words...>   curb.status begins with those words (e.g. "Faulted:", "Crossing up")
   release <control id>       release it
   pad <key> <value> [...]    gamepad keys at values (URammsInputTestLibrary: through Enhanced Input)
   pad_key <key> <down|up>    a gamepad button (or any key) pressed or let go
@@ -120,6 +122,14 @@ else:
         step, height = curb.get_crossing()
         log("curb %s | %s | step %+.1f cm, crossing height %.1f cm | chassis (%.1f, %.1f, %.1f) pitch %+.1f" % (
             curb.get_phase().name, curb.get_status(), step, height, loc.x, loc.y, loc.z, rot.pitch))
+    elif op[0] in ("status", "expect_status"):
+        # curb.status, as the panel shows it: its words, and its value the severity (0 info, 1 attention, 2 fault).
+        words = cs.get_control_text("curb.status")
+        severity = int(round(cs.get_control_value("curb.status")))
+        log("status [%s] %s" % (("info", "attention", "fault")[max(0, min(severity, 2))], words))
+        want = " ".join(op[1:])
+        if op[0] == "expect_status" and not words.startswith(want):
+            raise RuntimeError("curb.status is %r, not %r..." % (words, want))
     elif op[0] == "stats":
         s = pawn.get_component_by_class(unreal.RammsRammpGen1CurbController).get_stats()
         frame = ("frame %.1f cm over the edge (%s)" % (s.min_frame_clearance_cm, s.min_clearance_phase.name)

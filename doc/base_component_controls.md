@@ -302,14 +302,16 @@ keyboard key) as source `Gamepad`, otherwise `Keyboard`.
 
 | Keys | Action | Binds to |
 |---|---|---|
-| W / S, A / D, Q / E; left stick, right stick X | `IA_Ramms_DriveStick` (3-D, Stick) | `drive.forward` (W / S, stick Y); X (A / D, stick X) the mode's pair: `drive.turn` on a differential drive, `drive.strafe` on a holonomic one; Z (Q / E, right stick X, a twist) `drive.turn` where X does not turn |
+| W / S, A / D, Q / E; left stick, RB + right stick X | `IA_Ramms_DriveStick` (3-D, Stick) | `drive.forward` (W / S, stick Y); X (A / D, stick X) the mode's pair: `drive.turn` on a differential drive, `drive.strafe` on a holonomic one; Z (Q / E, RB + right stick X, a twist) `drive.turn` where X does not turn |
+| right stick (no shoulder button held) | `IA_Ramms_CameraLook` (2-D) | `camera.orbit_yaw` / `camera.orbit_pitch`: orbits the active camera, or looks around with a first-person one |
+| LB, RB | `IA_Ramms_PadLift` / `IA_Ramms_PadTwist` | nothing: chords that, held, move the right stick off the camera onto the lifts (LB) or the twist (RB) |
 | Tab, View | `IA_Ramms_DriveMode` | `drive.mode` (next mode in the selector's `CycleModeIds`) |
 | Enter, A | `IA_Ramms_CurbCross` | `curb.assist` (curb assist on/off: with it on, drive at a curb to cross it; the panel's "Cross the curb ahead" is `curb.negotiate`) |
 | End held, B held (0.5 s) | `IA_Ramms_CurbStop` | `curb.abort` |
 | d-pad | `IA_Ramms_SeatJog` (2-D) | `seat.jog_fore_aft` / `seat.jog_up` |
 | X held (0.5 s) | `IA_Ramms_SeatReset` | `seat.reset` |
 | E / Q | `IA_Ramms_LinkageHeight` | `linkage.*.height` (6 cm/s); only the linkage pawn binds it, and Q / E's twist turns nothing on its differential drive |
-| Y / H, T / B, Z / X, C / V; right stick Y (A), RT / LT (B), RB / LB (C) | `IA_Ramms_MotorGroupA..D` | per family: cranks / hips (0.6 rad/s), chair elevators / translators / caster arms |
+| Y / H, T / B, Z / X, C / V; LB + right stick Y (A), RT / LT (B), LB + right stick X (C) | `IA_Ramms_MotorGroupA..D` | per family: cranks / hips (0.6 rad/s), chair elevators / translators / caster arms |
 | N / Y, Home / right stick click | `IA_Ramms_CameraNext` / `CameraReset` | `camera.next` / `camera.reset` |
 | I / K, J / L, U / O | `IA_Ramms_ArmMove` (3-D) | `arm.forward` / `arm.strafe` / `arm.up` |
 | ← →, ↑ ↓, M / . | `IA_Ramms_ArmRotate` (3-D) | `arm.yaw` / `arm.pitch` / `arm.roll` |
@@ -319,10 +321,13 @@ keyboard key) as source `Gamepad`, otherwise `Keyboard`.
 | 1 – 7 | `IA_Ramms_SimDebug1..7` | `sim.debug.*` |
 
 Gamepad buttons use their Xbox names (PlayStation: A Cross, B Circle, X
-Square, Y Triangle, View Create, Menu Options). The sticks carry their own dead
-zones in the context (radial 0.15 on the left stick, axial on the right X,
-full at 0.95), because Enhanced Input ignores `DefaultInput.ini`'s legacy
-`AxisConfig` dead zones. The drive stick is one 3-D action so that a 3-axis
+Square, Y Triangle, View Create, Menu Options; LB L1, RB R1). The shoulder
+buttons are chords: Enhanced Input's `ChordAction` trigger on the lift and
+twist mappings, and a `ChordBlocker` on the camera's, so while one is held the
+right stick moves what it names and not the camera. The sticks carry their own
+dead zones in the context (radial 0.15 on the left stick and on the right one
+as the camera's, axial on a right-stick axis on its own, full at 0.95), because
+Enhanced Input ignores `DefaultInput.ini`'s legacy `AxisConfig` dead zones. The drive stick is one 3-D action so that a 3-axis
 joystick or a space mouse maps onto the same action. `DA_RammsInput_Rider`
 binds the drive, its modes, the curb crossing, the seat, the cameras and the
 simulation, with no motor groups; give a pawn's `DriveModeSelector` a
@@ -421,7 +426,7 @@ on the video (the forwarded click focuses it).
 | Input | Action |
 |---|---|
 | **N** | next camera (Follow → Top → …); `CameraNames` lists the cycle in order and `[0]` is the start camera (without it: authored cameras first, runtime-added last) |
-| **Right-drag** (or left-drag, `bAlsoOrbitWithLeftDrag`) | orbit: yaw / pitch the active camera's spring arm (`OrbitSensitivity` °/px, pitch clamped to `[MinPitch, MaxPitch]` = [−85°, 15°]) |
+| **Right-drag** (or left-drag, `bAlsoOrbitWithLeftDrag`), **right stick** | orbit: yaw / pitch the active camera's spring arm (`OrbitSensitivity` °/px; the stick through `camera.orbit_*` at `ControlOrbitRateDegPerSec`, 90 °/s), pitch clamped to `[MinPitch, MaxPitch]` = [−85°, 15°]. A first-person camera -- on an arm authored at no length, such as the seat's `SeatEyeCamera` at the occupant's eyes -- looks around instead: `[FirstPersonMinPitch, FirstPersonMaxPitch]` = [−70°, 50°], and no zoom |
 | **Mouse wheel** | zoom: one wheel click = one step of `ZoomStepFraction` (8 %) of the current arm length (or a fixed `ZoomStep` with `bZoomProportional` off) × `ZoomSensitivity`; the arm eases toward it at `ZoomInterpSpeed` (10/s; 0 = instant) within `[MinArmLength, MaxArmLength]` = [60, 1500] cm. A physical click arrives as a burst of wheel events (macOS smooth scrolling: ~16 for one line), so a burst counts as one step: a new step starts after the wheel was idle for `ZoomIdleGap` (0.08 s), or when `ZoomRepeatDelay` (0.3 s) has passed since the last step (a held wheel repeats at ~3 steps/s) — that burst is why the old 40 cm-per-event zoom jumped metres per click. Tune `ZoomSensitivity` / `ZoomStepFraction` / `ZoomRepeatDelay` on the `CameraControl` component |
 | **Home** | reset the active arm to its authored rotation/length |
 

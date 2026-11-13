@@ -51,10 +51,10 @@ op set lift.rear_caster_swing_arm 0; sleep 3
 op state
 op expect_level 3
 
-echo "--- gamepad: left stick drives, right stick Y raises the elevators, the triggers move the translators ---"
+echo "--- gamepad: left stick drives, LB + right stick Y raises the elevators, the triggers move the translators ---"
 op mark; op pad Gamepad_LeftY 0.6; sleep 2; op pad_release; sleep 1.5
 op expect_moved x 40 250
-op pad Gamepad_RightY 0.5; sleep 1; op pad_release; sleep 3
+op pad_key Gamepad_LeftShoulder down; op pad Gamepad_RightY 0.5; sleep 1; op pad_release; sleep 3
 op expect_motor elevator_l 0.08 0.30
 op pad Gamepad_RightTriggerAxis 1.0; sleep 1; op pad_release; sleep 6
 op expect_motor translator_l 4 20

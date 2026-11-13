@@ -29,17 +29,19 @@ python -I Plugins/unreal-robotics-lab/Scripts/clean_meshes.py mujoco/rammp_gen1/
 | `RammpGen1Controller` | The lifts, rate-limited at the MJCF's lift speeds (custom numerics). They use the chair's control ids, so `DA_RammsInput_RammpGen1` and the gamepad layout drive it unchanged: `lift.motor_swing_arm_*` the elevators, `lift.dw_main_plate_*` the translators, `lift.front_caster_swing_arm` the front arm and `lift.rear_caster_swing_arm` the rear lift (the suspension arm, in its own degrees). |
 | `ControlSurface`, `ControlInput` | Every control, plus the powered front omni hubs as `motor.front_omni_*`. Nothing drives them in normal driving, so they freewheel. |
 | `SimControl` | Puts the robot in the MJCF's `home` key at spawn, which also stands it on the ground under it. |
-| `CurbController` | `URammsRammpGen1CurbController` (ramms-core), the curb crossing. It is `mujoco/rammp_gen1/curb_sequence.py` in Unreal: `curb.negotiate`, `curb.abort`, `curb.phase`, `curb.assist` and `curb.style` (Rolling, the default, or Stop and step). |
+| `CurbController` | `URammsRammpGen1CurbController` (ramms-core), the curb crossing. It is `mujoco/rammp_gen1/curb_sequence.py` in Unreal: `curb.negotiate`, `curb.abort`, `curb.status`, `curb.phase`, `curb.assist` and `curb.style` (Rolling, the default, or Stop and step). |
 | `DriveModeSelector` | The drive modes: `differential` (first) and `curb`. A crossing selects `curb`, then hands back. Selecting `curb` (the panel, the mode button) starts the crossing ahead; with no curb it can cross in range, it says why (`curb.phase`'s status, the log) and hands straight back. As the initial mode it starts nothing. |
 | `FollowCamera`, `TopCamera` | On the `chassis` body. |
+| `SeatEyeArm`, `SeatEyeCamera` | The rider's own view, on the `seat` body: `RammsSeat` puts the arm on the occupant's head bone every frame, so the camera is at the eyes of whoever spawned in. The camera cycles to it (`camera.next`) and looks around rather than orbiting (no zoom). |
 | On the `seat` body | `BP_RammpGen1_Ramms`'s seat parts, placed where the chair has them on the `seat_base` socket: the seat, its rails, the arm mount, and the LUCI and Gemini camera mounts and cameras (meshes, no collision). `RammsSeat` seats an occupant there, with the chair's settings copied. It is purely visual: the physics has the MJCF's rider mass. |
 | `ArmIK`, `ArmTeleop` | The Gen3 arm in the MJCF: `URammsMjEndEffectorController` (ramms-mujoco-support) drives only the arm's joints (from `arm_base_link` to the gripper), starts at the MJCF's `arm_stow` and holds its target in the chassis's frame. `arm.stow` takes it back there joint by joint; `arm.stowed` reads 1 once it is. `URammsMjArmTeleopComponent` puts `arm.*` and `gripper.*` on the control surface, so the chair's arm keys drive it. Both take the standalone arm's (`gen3_2f85_fixed`) settings. URLab writes the base's commands before the IK's, so they no longer silence each other. |
 
 Gamepad, as on the chair:
 - **Left stick:** drive.
-- **Right stick Y:** elevators.
+- **Right stick:** the camera (orbit, or look around in the first-person view).
+- **LB + right stick Y:** elevators.
+- **LB + right stick X:** front arm and rear lift.
 - **Triggers:** translators.
-- **Shoulders:** front arm and rear lift.
 
 Keyboard:
 - **W/S, A/D:** drive.
@@ -59,6 +61,14 @@ With it on, holding the stick forward at a curb the controller can cross starts 
 **The stick drives every crossing** (`Stick`, as on RAMMP Gen2): it goes on only while the stick is held forward, at the planned speeds. Let go, or push any other way, and it pauses: the lifts hold where they are and the wheels brake. Push forward again and it goes on. Before any wheel has lifted for the curb or gone over it, pull back and hold: it cancels, puts the lifts back where it found them, and hands back.
 
 To start a crossing by hand, drive to within 1.5 m of a curb, square to it, then use the panel's curb group "Cross the curb ahead", the curb drive mode, or `curb.negotiate` through the control surface (Remote). Then hold the stick forward.
+
+**The status** (`curb.status`, the panel's "Curb status" row, `GetStatusLine()`) says what the crossing is doing and why, in words, coloured by how much it needs you:
+- **Crossing up 15.0 cm: Drive to the edge** -- under way (`curb.phase` is the same step).
+- **Paused: ...** -- the stick is not held forward.
+- **Waiting: the front omni wheels to clear the curb (0.8 cm to go)** -- rolling, held short of the edge for a pair that is not up yet. With nothing moving -- no lift going anywhere that could bring it -- for `Config.WaitSeconds` (5 s), it faults instead of waiting out the phase's minute.
+- **Not moving (2 of 3 s): driven at 15 cm/s ...** -- driven, but the chassis is not moving (a wheel against the curb's face, the frame on its edge, the wheels slipping). After `Config.StallSeconds` (3 s) it faults.
+- **Faulted: ... Cross the curb ahead to try again.** -- stopped by one of its checks. If no wheel had gone up for the curb, "Cross the curb ahead" (or, with curb assist on, letting go of the stick and pushing forward again) starts it again from where it stands: within 50 cm of where it stopped, it looks for the curb from behind the drive wheels, since the front omni wheels may be over the edge already, and curb assist's reach and least distance do not apply. If a wheel had gone up, the lifts are yours to finish by hand.
+- **Stopped**, **Cancelled**, **Done**, **Not crossing: <why a start was refused>**, **Ready**.
 
 A script or autonomy client that starts a crossing must hold `drive.forward` through it, as a rider would (`rammp_gen1_op.py hold_stick 0.6 crossing` does), or set the controller's `Stick.bRequired` false to have it run to the end once begun. Otherwise the crossing waits paused.
 

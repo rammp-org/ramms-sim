@@ -27,7 +27,15 @@ ARM = "/Game/Robots/URL/gen3_2f85_fixed"
 SEAT_SETTINGS = ["spawn_on_begin_play", "occupant_mode", "occupant_actor_class", "randomize_appearance", "occupant_mesh",
                  "occupant_offset", "pose_bone_offsets", "align_pelvis", "pelvis_location", "body_adjustments", "left_hand",
                  "right_hand", "left_foot", "right_foot", "passive_sway", "sway_amount", "trunk_control", "voluntary_motion",
-                 "voluntary_amount", "look_where_going", "look_at_people"]
+                 "voluntary_amount", "look_where_going", "look_at_people",
+                 # The chair's first-person view: its head bone, and where the eyes are from it (tuned for this seat's pose).
+                 "track_occupant_head", "head_bone_name", "head_bone_fallbacks", "head_socket_offset", "track_head_rotation"]
+# The rider's own view, on the seat body: a spring arm of no length at the occupant's eyes -- the seat puts it on their
+# head bone every frame (track_occupant_head), so it is wherever the person spawned in has their eyes -- and its camera.
+# The robot camera cycles to it (camera_names) and looks around with it rather than orbiting or zooming
+# (URammsRobotCameraComponent::IsFirstPerson).
+EYE_ARM = "SeatEyeArm"
+EYE_CAMERA = "SeatEyeCamera"
 IK_SETTINGS = ["end_effector_site_name", "gripper_actuator_suffix", "damping_lambda", "step_gain", "control_orientation",
                "apply_home_on_bind", "track_base_frame", "enabled"]
 TELEOP_SETTINGS = ["teleop_enabled", "enable_key_polling", "local_frame", "linear_speed", "angular_speed", "fast_multiplier",
@@ -130,6 +138,15 @@ def add_seat_and_arm(bp, stow, seat_body="seat"):
     # On the seat body's origin, the socket, as on the chair. Set, not left: URLab re-parents a component added under a
     # body keeping where it was, so it would sit the body's offset back and down.
     setp(occupant, relative_location=unreal.Vector(0.0, 0.0, 0.0), relative_rotation=unreal.Rotator(pitch=0.0, yaw=0.0, roll=0.0))
+    # The first-person rig. Its location here is only where it waits for an occupant (about a seated person's eyes); its
+    # rotation is the seat's, which the seat leaves alone (track_head_rotation off), so looking around turns it about the
+    # eyes while it follows the seat's tilt.
+    eye_arm = add_component(bp, unreal.SpringArmComponent, EYE_ARM, parent_var=seat_body)
+    setp(eye_arm, target_arm_length=0.0, do_collision_test=False, enable_camera_lag=False, enable_camera_rotation_lag=False,
+         use_pawn_control_rotation=False, relative_location=unreal.Vector(5.0, 0.0, 75.0),
+         relative_rotation=unreal.Rotator(pitch=0.0, yaw=0.0, roll=0.0))
+    setp(add_component(bp, unreal.CameraComponent, EYE_CAMERA, parent_var=EYE_ARM), auto_activate=False, field_of_view=90.0)
+    setp(occupant, tracked_component_name=EYE_ARM)
     ik = add_component(bp, unreal.RammsMjEndEffectorController, "ArmIK")
     copy_settings(ik, template(ARM, unreal.RammsMjEndEffectorController), IK_SETTINGS)
     # Mounted on the robot, not on a mocap target: no tracking base; the target rides the robot (track_base_frame). The
