@@ -2,8 +2,10 @@
 # PIE: the RAMMP Gen1 curb controller climbs Map_RammpGen1Curb_URL's 15 cm platform and descends its far edge, each
 # started with curb.negotiate within 1.5 m of the edge, from a stance it must end in again. STANCE=outdoor (the
 # default: front arm -14 deg, the front omni wheels up; elevators 9 deg, for ground clearance) or reference (every
-# lift at 0, every wheel down). Needs a running editor (Scripts/editor_remote_exec.py); PYTHON overrides the
-# interpreter. Exit status: nonzero unless both crossings finish back in the stance (PIE is still ended).
+# lift at 0, every wheel down). STYLE=rolling (the default: it rolls through each crossing, as the real robot does)
+# or stepped (it stops for each step), set on curb.style. Needs a running editor (Scripts/editor_remote_exec.py);
+# PYTHON overrides the interpreter. Exit status: nonzero unless both crossings finish back in the stance (PIE is
+# still ended).
 S=$(cd "$(dirname "$0")" && pwd); ROOT=$(cd "$S/../.." && pwd); cd "$ROOT" || exit 1
 PY=${PYTHON:-}
 if [ -z "$PY" ]; then
@@ -43,11 +45,18 @@ case "${STANCE:-outdoor}" in
     reference) FRONT=0; ELEV=0;;
     *) echo "!! STANCE is outdoor or reference, not $STANCE"; exit 1;;
 esac
+case "${STYLE:-rolling}" in
+    rolling) STYLE_V=1;;
+    stepped) STYLE_V=0;;
+    *) echo "!! STYLE is rolling or stepped, not $STYLE"; exit 1;;
+esac
 rad(){ awk -v d="$1" -v t="$2" 'BEGIN { r = d * 3.14159265 / 180; t = t * 3.14159265 / 180; printf "%.4f %.4f", r - t, r + t }'; }
 back(){ op expect_lifts_back 0.5 0.5; }
 
 op begin || exit 1
 sleep 25
+echo "--- crossings: ${STYLE:-rolling} ---"
+op set curb.style "$STYLE_V"; op expect_control curb.style $((STYLE_V)).0 $((STYLE_V)).0
 echo "--- the stance: ${STANCE:-outdoor} (front arm $FRONT deg, elevators $ELEV deg) ---"
 op set lift.front_caster_swing_arm "$FRONT"; op set lift.motor_swing_arm_l "$ELEV"; op set lift.motor_swing_arm_r "$ELEV"; sleep 4
 # Loaded, the lifts sit up to about 2 deg short of their commands (the elevators reach 7.3 deg of 9).

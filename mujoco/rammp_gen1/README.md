@@ -20,7 +20,7 @@ python Scripts/editor_remote_exec.py --file mujoco/rammp_gen1/extract_ue_rammp_g
 python Scripts/editor_remote_exec.py --file mujoco/rammp_gen1/extract_ue_rammp_gen1_meshes.py   # likewise
 python mujoco/rammp_gen1/build_rammp_gen1_mjcf.py [--rider-kg 75] [--no-arm]
 python mujoco/rammp_gen1/check_rammp_gen1.py
-python mujoco/rammp_gen1/curb_sequence.py --variant powered_front --dir up [--height 0.15] [--stance -14 9 0] [--clip climb.mp4]
+python mujoco/rammp_gen1/curb_sequence.py --variant powered_front --dir up [--height 0.15] [--stance -14 9 0] [--sequence blended] [--clip climb.mp4]
 python mujoco/rammp_gen1/export_curb_config.py [--variant powered_front]   # after the model changes; then Scripts/rammp_gen1_mujoco/make_rammp_gen1_pawn.py
 python -m mujoco.viewer --mjcf=mujoco/rammp_gen1/rammp_gen1_scene.xml
 ```
@@ -76,3 +76,24 @@ With these limits it crosses 8 to 15 cm both ways.
 - **17 cm:** no crossing height works, because the rear lifts its wheels only about 4.7 cm.
 - **15 cm with the powered front:** the frame passes 2–5 mm over the curb top while the drive wheels are brought aft and re-centred; at 12 cm it keeps about 2 cm.
 - **Pitch on climbs:** it reaches 2–3° nose-up with the seat, rider and arm (4.5–5° with the softer damper it had). While the drive wheels are forward, the rear carries the most load and sags at full reach, beyond what the trim can correct.
+
+### The blended crossing (`--sequence blended`)
+
+The steps above stop for each step. The real robot's own sequence does not: in videos of it (November 2026, a 15 cm curb, powered front omni wheels) it keeps rolling at about 12 cm/s and moves each pair as it reaches the edge. Each pair goes over in 2–2.5 s, about what the modelled lift speeds give. A climb takes about 15 s from the front omni wheels at the face to the rear omni wheels down (17 s to stopped); a descent about 10 s (13 s).
+
+`--sequence blended` (powered front only) crosses that way:
+- It rolls at `--crawl` (0.12 m/s) through the crossing, faster on the approach. A pair that reaches the edge before it is up off the level it is leaving holds the robot short of the edge, slowing it to a stop, until it is.
+- **Front omni wheels:** set down on the curb, or down to the road, as soon as they are past the edge.
+- **Drive wheels:** they go up as they near the face or edge. The powered front omni wheels roll the robot on, carrying them over, and they are set down once over. On a descent the set-down starts early enough that they land where their swing arms and motors clear the edge, as `LAND` says. Once down, the translators draw them aft while it rolls on to the rear's step. Drawing them aft under the chassis moves load onto the front omni wheels, so if a drive wheel no longer carries its share for the rule, they are set down again until it does.
+- **Rear omni wheels:** up once the rule holds, and down once past the edge. On a descent the chassis comes down on the drive and front wheels at the same time.
+- **Touchdowns:** each is one move at the lift's speed, from the measured height until the pair carries load. There are no 5 mm steps.
+- **Finish:** the translators re-centre while it rolls on, then the lifts go back to the stance and it stops.
+
+| 15 cm, outdoor stance | front at the face/edge → rear down | → stopped | worst pitch |
+|---|---|---|---|
+| climb, blended | 14.3 s | 18.2 s | 2.8° |
+| climb, video | ≈15 s | ≈17 s | |
+| descent, blended | 13.0 s | 17.5 s | 2.4° |
+| descent, video | ≈10 s | ≈13 s | |
+
+It crosses 8, 12 and 15 cm both ways in both stances (`-14 9 0` and `0 0 0`), with no frame contact, in 15–18 s from the front at the edge to stopped. The Unreal controller's default style (`curb.style` Rolling) runs it: in PIE, 14.4 / 17.7 s up and 12.5 / 16.1 s down. Its stop-and-step style is the sequence above.
