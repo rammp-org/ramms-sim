@@ -71,7 +71,7 @@ You then have to build the protospec for the URL module:
 
 **Windows (PowerShell):**
 ```powershell
-cd Plugins/unreal-robotics-lab/protospec
+cd ../protospec
 ./build.ps1
 ```
 
