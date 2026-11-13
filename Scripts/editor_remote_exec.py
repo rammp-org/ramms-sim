@@ -29,12 +29,23 @@ import uuid
 
 MULTICAST_GROUP = ("239.0.0.1", 6766)
 BIND_ADDR = "127.0.0.1"
-# Where we SEND. The editor binds its multicast socket to BIND_ADDR:port and
-# reads whatever lands there, so unicasting to that endpoint reaches it even on
-# macOS, where a multicast route for 239.0.0.0/8 typically points at a physical
-# NIC rather than lo0 (a group-addressed ping then never arrives). The editor's
-# replies still go to the group, which our group-joined socket receives.
+# Where we send (send_to: the group instead once another editor answers). The editor binds its multicast socket to
+# BIND_ADDR:port and reads whatever lands there, so unicasting to that endpoint
+# reaches it even on macOS, where a multicast route for 239.0.0.0/8 typically
+# points at a physical NIC rather than lo0 (a group-addressed ping then never
+# arrives). The editor's replies still go to the group, which our group-joined
+# socket receives.
 EDITOR_ENDPOINT = (BIND_ADDR, MULTICAST_GROUP[1])
+
+
+def send_to(other_editors):
+    """Where the client's messages go: unicast to EDITOR_ENDPOINT (above), unless another project's editor has
+    answered (other_editors) and this is not macOS -- then the group, which every editor joined. A unicast to a port
+    several editors share reaches only one of them, so with another project's editor open a ping might never reach
+    this project's. Not the group always: on Windows an open_connection sent to it while the editor starts PIE was
+    not answered in time, where a unicast one was. Read at send time, so a caller that moves the endpoints
+    (Plugins/RammsPrivateAssets/Scripts/pie_curb/remote_exec.py) moves this too."""
+    return MULTICAST_GROUP if other_editors and sys.platform != "darwin" else EDITOR_ENDPOINT
 MAGIC = "ue_py"
 PROTO_VERSION = 1
 DISCOVER_TIMEOUT_S = 6.0
@@ -101,7 +112,7 @@ def main():
     skipped = []
     deadline = time.monotonic() + DISCOVER_TIMEOUT_S
     while time.monotonic() < deadline and remote_id is None:
-        mcast.sendto(make_msg("ping", node_id), EDITOR_ENDPOINT)
+        mcast.sendto(make_msg("ping", node_id), send_to(skipped))
         try:
             payload, _ = mcast.recvfrom(4096)
         except socket.timeout:
@@ -136,7 +147,7 @@ def main():
 
     mcast.sendto(make_msg("open_connection", node_id, remote_id,
                           {"command_ip": cmd_endpoint[0], "command_port": cmd_endpoint[1]}),
-                 EDITOR_ENDPOINT)
+                 send_to(skipped))
     try:
         conn, _ = listener.accept()
     except socket.timeout:
@@ -162,7 +173,7 @@ def main():
             print("ERROR: timed out waiting for a command result from the editor.", file=sys.stderr)
             return 1
     finally:
-        mcast.sendto(make_msg("close_connection", node_id, remote_id), EDITOR_ENDPOINT)
+        mcast.sendto(make_msg("close_connection", node_id, remote_id), send_to(skipped))
         conn.close()
         listener.close()
         mcast.close()
