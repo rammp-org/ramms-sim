@@ -70,6 +70,10 @@ elif op[0] == "action":
     row = panel.find_row(op[1])
     if not row:
         raise RuntimeError("[hud] no row for %s" % op[1])
+    # The row drops TriggerAction's result, so a refused click logs like an
+    # applied one: say so here rather than in a later readback.
+    if op[1].split(".")[0] in ("arm", "gripper") and cs_common.arm_teleop_enabled(pawn) is False:
+        raise RuntimeError("[hud] %s: arm teleop is off, the click would be refused" % op[1])
     row.simulate_action()
     log("action %s clicked" % op[1])
 elif op[0] in ("hold", "release"):
