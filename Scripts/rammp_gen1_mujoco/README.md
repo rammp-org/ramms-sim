@@ -89,6 +89,23 @@ The controller finds the edge and its height with line traces ahead of the front
 
 `STYLE=stepped run_rammp_gen1_curb.sh` runs the checks stopping and stepping.
 
+**Measurements.** The controller's `GetStats()` (`FRammsRammpGen1CurbStats`) measures each crossing on every tick, from its start to its end. It keeps the last crossing's until the next one starts. The summary is logged as the crossing ends, and `rammp_gen1_op.py stats` prints it; `run_rammp_gen1_curb.sh` does after each crossing. The measures are those of `curb_sequence.py`'s:
+- **Times:** the whole crossing, from the front omni wheels reaching the edge to the rear omni wheels down, and to the end.
+- **Stops:** stops, and the time spent stopped.
+- **Chassis:** the largest pitch, roll, inclination and pitch rate.
+- **Rider:** acceleration peaks (fore/aft, vertical) and RMS, at `Config.RiderOffsetCm` on `Config.SeatBody`, low-passed at 50 ms.
+- **Stability margin:** the config's mass model against the wheels on the ground, each within the touch tolerance of the surface under it; the least, and in which phase.
+- **Frame clearance:** the frame's underside over the edge (`Config.Frame*`, the MJCF's chassis boxes); the least, and in which phase.
+
+| PIE, 15 cm, outdoor stance | stops (time stopped) | rider peak / RMS (m/s²) | least margin | frame over the edge |
+|---|---|---|---|---|
+| climb, rolling | 2 (3.0 s) | 1.35 / 0.19 | 8.7 cm | 1.6 cm |
+| climb, stepped | 9 (15.9 s) | 1.29 / 0.21 | 8.6 cm | 2.4 cm |
+| descent, rolling | 2 (0.9 s) | 1.04 / 0.18 | 9.1 cm | 2.3 cm |
+| descent, stepped | 13 (17.2 s) | 2.33 / 0.26 | 9.1 cm | 2.5 cm |
+
+The rider's acceleration reads higher than in `curb_sequence.py`, as Unreal's drive-wheel brakes stop the wheels harder than the reference's soft hold.
+
 A stop-and-step touchdown lowers the wheels by their measured height above the level, to contact and 1 cm past it. The sprung rear's lift is trimmed against the chassis's pitch while its wheels are down. A finished or stopped crossing brakes, then hands back to the differential drive. If it stops with the drive wheels up, the differential drive would hold nothing on the ground. So it holds the front omni hubs at rest instead, and leaves the lifts to the operator. Once the elevators have the drive wheels down, it hands back. While a crossing runs, `RammpGen1Controller` leaves the lifts alone, then takes them back at their last commands (not where a loaded lift sags to). Steps of 3–17 cm are crossed; others are refused with the reason.
 
 The level's URLab manager runs MuJoCo at the MJCF's 2 ms step, with elliptic friction cones and impratio 10 (the omni rollers creep when braked on pyramidal cones).

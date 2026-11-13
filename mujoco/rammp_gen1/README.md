@@ -96,4 +96,22 @@ The steps above stop for each step. The real robot's own sequence does not: in v
 | descent, blended | 13.0 s | 17.5 s | 2.4° |
 | descent, video | ≈10 s | ≈13 s | |
 
+### Measurements
+
+Either sequence ends with a measurements block, and `--csv out.csv` writes the same measures as a time series. Both cover the crossing proper, every 20 ms, from after the stance settles to the end:
+- **Stability margin:** the robot's centre of mass, straight down, against the convex hull of the contacts of the wheels carrying load (over 10 N each); the least, and when.
+- **Frame clearance:** the least distance from any of the robot's geoms but its wheels' (the frame, the caster arms, the drive motors, the arm) to the curb's top edge, from MuJoCo's geom distance; which geom, and when.
+- **Chassis:** the largest pitch, roll and pitch rate.
+- **Rider:** the acceleration at the rider's mass, gravity left out, fore/aft and vertical. Its peak and RMS are low-passed at 50 ms: the wheels' and rollers' contacts shake the chassis at the step's scale.
+- **Stops:** under 2 cm/s for 0.2 s or more, once it has moved, and the time spent under 2 cm/s.
+
+| 15 cm, outdoor stance | stops (time stopped) | rider peak / RMS (m/s²) | least margin | least frame clearance |
+|---|---|---|---|---|
+| climb, blended | 2 (2.8 s) | 0.58 / 0.15 | 8.0 cm | 2.5 cm (front caster arm) |
+| climb, step | 10 (16.3 s) | 0.83 / 0.16 | 7.8 cm | 2.7 cm (frame) |
+| descent, blended | 3 (1.6 s) | 0.63 / 0.14 | 7.6 cm | 2.2 cm (front caster arm) |
+| descent, step | 14 (18.5 s) | 1.19 / 0.20 | 4.9 cm | 2.1 cm (front caster arm) |
+
+The Unreal controller keeps the same measures (`GetStats`).
+
 It crosses 8, 12 and 15 cm both ways in both stances (`-14 9 0` and `0 0 0`), with no frame contact, in 15–18 s from the front at the edge to stopped. The Unreal controller's default style (`curb.style` Rolling) runs it: in PIE, 14.4 / 17.7 s up and 12.5 / 16.1 s down. Its stop-and-step style is the sequence above.

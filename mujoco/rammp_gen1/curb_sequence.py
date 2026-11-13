@@ -76,6 +76,173 @@ LEAD_DOWN = 0.10      # descents: the drive wheels start up when their axle is t
 JOINTS = {"drive": ("elevator_l", "elevator_r"), "front_arm": ("front_arm",), "rear_lift": ("rear_lift",)}
 
 
+def hull_margin(points, p):
+    """The signed distance (m) from p to the boundary of the convex hull of points (x-y): positive inside. With
+    fewer than three points off one line the hull is a segment or a point, and the margin is minus p's distance
+    from it."""
+    pts = sorted(set((round(a, 6), round(b, 6)) for a, b in points))
+    if not pts:
+        return -math.inf
+
+    def cross(o, a, b):
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+    lower, upper = [], []
+    for q in pts:                              # Andrew's monotone chain
+        while len(lower) >= 2 and cross(lower[-2], lower[-1], q) <= 0:
+            lower.pop()
+        lower.append(q)
+    for q in reversed(pts):
+        while len(upper) >= 2 and cross(upper[-2], upper[-1], q) <= 0:
+            upper.pop()
+        upper.append(q)
+    hull = lower[:-1] + upper[:-1]             # counter-clockwise
+    if len(hull) < 3:
+        def seg(a, b):
+            ab = (b[0] - a[0], b[1] - a[1])
+            L2 = ab[0] ** 2 + ab[1] ** 2
+            t = 0.0 if L2 == 0 else max(0.0, min(1.0, ((p[0] - a[0]) * ab[0] + (p[1] - a[1]) * ab[1]) / L2))
+            return math.hypot(p[0] - a[0] - t * ab[0], p[1] - a[1] - t * ab[1])
+        return -min(seg(hull[i], hull[(i + 1) % len(hull)]) for i in range(len(hull)))
+    m = math.inf
+    for i in range(len(hull)):
+        a, b = hull[i], hull[(i + 1) % len(hull)]
+        L = math.hypot(b[0] - a[0], b[1] - a[1])
+        m = min(m, cross(a, b, p) / L)          # positive on the inner (left) side of a counter-clockwise edge
+    return m
+
+
+class Meter:
+    """The crossing's measurements, sampled every EVERY steps (20 ms) from the crossing proper's start to its end:
+    - the stability margin: the robot's centre of mass, straight down, against the convex hull of the contacts of
+      the wheels on the ground carrying load (each over 10 N);
+    - the frame's clearance: the least distance from any of the robot's geoms but its wheels' (the frame, the caster
+      arms, the drive motors, the arm) to the curb's top edge, as MuJoCo's geom distance gives it;
+    - the rider: the chassis's pitch, roll and pitch rate, and the acceleration at the rider's mass (gravity left
+      out; low-passed at about 50 ms, since the contacts shake the chassis at the step's scale), fore/aft along the
+      heading, vertical, and its magnitude;
+    - stops: the chassis's speed under 2 cm/s for 0.2 s or more, once it has first moved (5 cm/s)."""
+    EVERY = 10
+    TAU = 0.05          # the low-pass on the rider's velocity and acceleration, and the pitch rate (s): as the Unreal meter's
+
+    def __init__(self, cx):
+        self.cx = cx
+        m = cx.m
+        self.on = False
+        self.n = 0
+        self.edge = m.geom("edge_probe").id
+        self.rider = m.geom("rider").id
+        root = m.body("chassis").id
+        robot = {b for b in range(m.nbody) if m.body_rootid[b] == root}   # the robot is the chassis's tree
+        self.frame = [g for g in range(m.ngeom) if m.geom_bodyid[g] in robot and m.geom_contype[g] and m.geom_bodyid[g] not in cx.support]
+        self.rows = []
+        self.reset()
+
+    def reset(self):
+        self.min_margin = (math.inf, 0.0, "")
+        self.min_clear = (math.inf, 0.0, "", "")
+        self.max_pitch = self.max_roll = self.max_rate = 0.0
+        self.peak = {"fore": 0.0, "vert": 0.0, "mag": 0.0}
+        self.sum_a2, self.n_a = 0.0, 0
+        self.stops, self.stopped, self.moved, self.still = 0, 0.0, False, 0.0
+        self.prev = None
+
+    def start(self):
+        self.reset()
+        self.on = True
+        self.t0 = self.cx.d.time
+
+    def stop(self):
+        self.on = False
+        self.t1 = self.cx.d.time
+
+    def step(self):
+        if not self.on:
+            return
+        self.n += 1
+        if self.n % self.EVERY:
+            return
+        cx, m, d = self.cx, self.cx.m, self.cx.d
+        t = d.time
+        # stability margin
+        pts, f6 = [], np.zeros(6)
+        for i in range(d.ncon):
+            c = d.contact[i]
+            og = c.geom2 if c.geom1 in cx.world else c.geom1 if c.geom2 in cx.world else None
+            if og is None or m.geom_bodyid[og] not in cx.support:
+                continue
+            mujoco.mj_contactForce(m, d, i, f6)
+            if f6[0] > 10.0:
+                pts.append((c.pos[0], c.pos[1]))
+        com = d.subtree_com[m.body("chassis").id]
+        margin = hull_margin(pts, (com[0], com[1]))
+        if margin < self.min_margin[0]:
+            self.min_margin = (margin, t, cx.label)
+        # the frame's clearance to the curb's edge
+        fromto = np.zeros(6)
+        clear, which = math.inf, ""
+        for g in self.frame:
+            dist = mujoco.mj_geomDistance(m, d, g, self.edge, 0.3, fromto) + 0.001   # from the edge line, not the probe's skin
+            if dist < clear:
+                clear, which = dist, m.geom(g).name or m.body(m.geom_bodyid[g]).name
+        if clear < self.min_clear[0]:
+            self.min_clear = (clear, t, which, cx.label)
+        # the chassis and the rider
+        pitch, roll = cx.pitch_roll()
+        self.max_pitch, self.max_roll = max(self.max_pitch, abs(pitch)), max(self.max_roll, abs(roll))
+        fwd = d.body("chassis").xmat.reshape(3, 3)[:, 0].copy()
+        fwd[2] = 0.0
+        fwd /= max(np.linalg.norm(fwd), 1e-9)
+        p = d.geom_xpos[self.rider].copy()
+        speed = float(np.dot(d.qvel[0:3], fwd))
+        a_fore = a_vert = a_mag = 0.0
+        if self.prev is not None:
+            dt = t - self.prev["t"]
+            k = dt / (self.TAU + dt)
+            v = self.prev["v"] + k * ((p - self.prev["p"]) / dt - self.prev["v"])
+            a = self.prev["a"] + k * ((v - self.prev["v"]) / dt - self.prev["a"])
+            rate = self.prev["rate"] + k * ((pitch - self.prev["pitch"]) / dt - self.prev["rate"])
+            if t - self.t0 > 0.2:                # the filters settled
+                a_fore, a_vert = float(np.dot(a, fwd)), float(a[2])
+                a_mag = float(math.hypot(a_fore, a_vert))
+                self.peak = {"fore": max(self.peak["fore"], abs(a_fore)), "vert": max(self.peak["vert"], abs(a_vert)),
+                             "mag": max(self.peak["mag"], a_mag)}
+                self.sum_a2 += a_mag ** 2
+                self.n_a += 1
+                self.max_rate = max(self.max_rate, abs(rate))
+            self.prev.update(p=p, v=v, a=a, rate=rate, pitch=pitch, t=t)
+            self.moved |= abs(speed) >= 0.05
+            if self.moved:
+                if abs(speed) < 0.02:
+                    self.still += dt
+                    self.stopped += dt
+                    if self.still - dt < 0.2 <= self.still:
+                        self.stops += 1
+                else:
+                    self.still = 0.0
+        else:
+            self.prev = {"t": t, "p": p, "v": np.zeros(3), "a": np.zeros(3), "rate": 0.0, "pitch": pitch}
+        self.rows.append((t, cx.label, com[0], com[2], pitch, roll, speed, margin, clear, a_fore, a_vert, a_mag))
+
+    def summary(self):
+        mm, mt, ml = self.min_margin
+        cc, ct, cg, cl = self.min_clear
+        rms = math.sqrt(self.sum_a2 / self.n_a) if self.n_a else 0.0
+        return ["measurements (the crossing proper, %.1f s):" % (getattr(self, "t1", self.cx.d.time) - self.t0),
+                "  stability margin: least %.1f cm, at %.1f s (%s)" % (mm * 100, mt, ml),
+                "  frame clearance to the curb's edge: least %.1f cm, at %.1f s (%s; %s)" % (cc * 100, ct, cg, cl),
+                "  chassis: pitch at most %.1f deg, roll %.1f deg, pitch rate %.1f deg/s" % (self.max_pitch, self.max_roll, self.max_rate),
+                "  rider: acceleration peak %.2f m/s^2 (fore/aft %.2f, vertical %.2f), RMS %.2f" % (
+                    self.peak["mag"], self.peak["fore"], self.peak["vert"], rms),
+                "  stops: %d, %.1f s stopped (under 2 cm/s for 0.2 s or more, once it moved)" % (self.stops, self.stopped)]
+
+    def write_csv(self, path):
+        with open(path + ".tmp", "w") as f:
+            f.write("t_s,activity,com_x_m,com_z_m,pitch_deg,roll_deg,speed_m_s,margin_m,frame_clearance_m,rider_a_fore_m_s2,rider_a_vert_m_s2,rider_a_m_s2\n")
+            for r in self.rows:
+                f.write("%.3f,\"%s\",%.4f,%.4f,%.3f,%.3f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f\n" % r)
+        os.replace(path + ".tmp", path)
+
+
 class Crossing:
     def __init__(self, variant, direction, h, clearance, stance=(0.0, 0.0, 0.0)):
         self.powered = variant == "powered_front"
@@ -90,6 +257,9 @@ class Crossing:
             curb.pos, curb.size = [FACE - 3.0, 0, h / 2], [3.0, 3, h / 2]
             c = spec.body("chassis")
             c.pos = [c.pos[0] + 0.2, c.pos[1], c.pos[2] + h]
+        # The curb's top edge, for the measurements' frame clearance: a thin capsule along it that collides with nothing.
+        spec.worldbody.add_geom(name="edge_probe", type=mujoco.mjtGeom.mjGEOM_CAPSULE, fromto=[FACE, -3.0, h, FACE, 3.0, h],
+                                size=[0.001, 0, 0], contype=0, conaffinity=0, group=5, rgba=[1, 0, 0, 0])
         self.m = m = spec.compile()
         self.d = mujoco.MjData(m)
         B.hold_arm_stowed(m, self.d)           # the arm stowed, and held there
@@ -136,6 +306,7 @@ class Crossing:
         self.tds = {}                          # blended: touchdowns under way, per support
         self.events = {}                       # blended: when each event happened (s)
         self.t_event = 0.0
+        self.meter = Meter(self)               # the crossing's measurements (on from the start of the crossing proper)
 
     # --- model geometry
     def support_tables(self):
@@ -304,6 +475,7 @@ class Crossing:
             near = self.x("rear_omni_l") + (self.r_ro + 0.02 if self.dir == "up" else 0.03)
             if near > FACE:
                 raise RuntimeError("the rear omni wheels reached the curb while the chassis was pulled forward")
+        self.meter.step()
         if self.on_frame:
             self.on_frame(self)
 
@@ -506,6 +678,7 @@ class Crossing:
         self.front_up = min(self.d.body(w).xpos[2] - self.r_fo for w in TOUCH["front_arm"]) - ground > TOUCH_TOLERANCE
         if self.front_up:
             self.log.append("        the front omni wheels start up: they stay up until they go down over the edge")
+        self.meter.start()                     # the crossing proper, from here to the end
 
     def climb(self):
         h, clr = self.h, self.clr
@@ -618,6 +791,7 @@ class Crossing:
         ph("Back to the stance it started in", lambda: (self.levelling(False), self.move({k: self.start[k] for k in LIFTS}, settle=1.5)))
         off = max(abs(self.d.joint(k).qpos[0] - self.start[k]) * (100.0 if k.startswith("translator") else math.degrees(1.0)) for k in LIFTS)
         self.log.append("        back in its stance: every lift within %.2f (deg or cm) of where it started" % off)
+        self.meter.stop()
 
     def recentre(self):
         """Translators back where they started while the drive wheels roll at the plates' speed, so the chassis stays
@@ -866,6 +1040,7 @@ class Crossing:
         self.wait(0.8)
         self.front["speed"] = None
         self.event("done", "Stopped")
+        self.meter.stop()
         off = max(abs(self.d.joint(k).qpos[0] - self.start[k]) * (100.0 if k.startswith("translator") else math.degrees(1.0)) for k in LIFTS)
         self.log.append("        back in its stance: every lift within %.2f (deg or cm) of where it started" % off)
         at, up = self.events["front_at"], self.dir == "up"
@@ -942,6 +1117,7 @@ def main():
                     help="step: stop and step, each pair in turn (what the Unreal controller does); blended: it rolls "
                          "through the crossing, moving each pair as it reaches the edge (as the real robot does)")
     ap.add_argument("--crawl", type=float, default=CRAWL, help="blended: its speed through the crossing, m/s")
+    ap.add_argument("--csv", help="write the measurements' time series (every 20 ms of the crossing proper) to this file")
     ap.add_argument("--clip", help="write a video of the crossing")
     ap.add_argument("--speedup", type=float, default=8.0)
     args = ap.parse_args()
@@ -964,7 +1140,9 @@ def main():
         ok = False
     if writer is not None:
         writer.close()
-    print("\n".join(cx.log))
+    print("\n".join(cx.log + cx.meter.summary()))
+    if args.csv:
+        cx.meter.write_csv(args.csv)
     print("frame contacts with the world: %s" % (cx.strikes or "none"))
     print("%s: %.1f s, worst pitch %.1f deg, roll %.1f deg" % ("crossed" if ok else "aborted", cx.d.time, cx.worst[0], cx.worst[1]))
     return 0 if ok and not cx.strikes else 1

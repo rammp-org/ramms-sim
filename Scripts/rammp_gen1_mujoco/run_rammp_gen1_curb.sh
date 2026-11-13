@@ -63,10 +63,10 @@ op set lift.front_caster_swing_arm "$FRONT"; op set lift.motor_swing_arm_l "$ELE
 op expect_motor front_arm $(rad "$FRONT" 2.5); op expect_motor elevator_l $(rad "$ELEV" 2.5); op expect_motor elevator_r $(rad "$ELEV" 2.5)
 echo "--- climb: the 15 cm platform's near face is at x 300; the arm out, for the crossing to stow ---"
 op set arm.up 1; sleep 1; op release arm.up; sleep 1; op expect_control arm.stowed -0.1 0.1
-drive_to 150 && sleep 2 && op mark_lifts && cross "crossed up 15.0" && back
+drive_to 150 && sleep 2 && op mark_lifts && cross "crossed up 15.0" && back; op stats
 op expect_control arm.stowed 0.9 1.1
 echo "--- descent: its far edge is at x 600 ---"
-drive_to 450 && sleep 2 && op mark_lifts && cross "crossed down 15.0" && back
+drive_to 450 && sleep 2 && op mark_lifts && cross "crossed down 15.0" && back; op stats
 op state
 
 trap - EXIT
