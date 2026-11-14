@@ -221,7 +221,7 @@ add_component(bp, unreal.RammsRobotControlSurfaceComponent, "ControlSurface")
 setp(add_component(bp, unreal.RammsMjSimControlComponent, "SimControl"), initial_keyframe="home")
 setp(add_component(bp, unreal.RammsRobotCameraComponent, "CameraControl"), orbit_sensitivity=0.25, zoom_sensitivity=1.0,
      zoom_step_fraction=0.08, zoom_interp_speed=10.0, min_arm_length=60.0, max_arm_length=1500.0,
-     camera_names=["FollowCamera", "TopCamera"])
+     camera_names=["FollowCamera", "TopCamera", seat_pawn.EYE_CAMERA])
 
 unreal.BlueprintEditorLibrary.compile_blueprint(bp)
 cdo = unreal.get_default_object(bp.generated_class())

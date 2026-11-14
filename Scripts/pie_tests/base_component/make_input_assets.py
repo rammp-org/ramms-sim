@@ -21,11 +21,14 @@ Gamepad (Xbox names; PlayStation in brackets):
                     differential drive (and a curb crossing), strafes on a
                     holonomic one -- the drive stick's X follows the live
                     mode's pairing (RammsControlInputMode.STICK)
-  right stick X     turns a holonomic drive (a 3-axis stick's twist); nothing
-                    on a differential one yet
-  right stick Y     motor group A (the RAMMP Gen1's drive-wheel elevators)
+  right stick       the camera: looks around (first person) or orbits
+                    (camera.orbit_yaw / camera.orbit_pitch) -- unless a
+                    shoulder button is held, which makes it one of these:
+  LB [L1] + right stick Y   motor group A (the RAMMP Gen1's drive-wheel elevators)
+  LB [L1] + right stick X   motor group C (the RAMMP Gen1's caster arms)
+  RB [R1] + right stick X   turns a holonomic drive (a 3-axis stick's twist);
+                            nothing on a differential one
   RT / LT [R2/L2]   motor group B +/- (the RAMMP Gen1's drive-wheel translators)
-  RB / LB [R1/L1]   motor group C +/- (the RAMMP Gen1's caster arms)
   A [Cross]         curb assist on/off (with it on, drive at a curb to cross it)
   B [Circle] held   stop the curb crossing (held 0.5 s)
   X [Square] held   seat to rest (held 0.5 s)
@@ -35,8 +38,12 @@ Gamepad (Xbox names; PlayStation in brackets):
   Menu [Options]    pause the simulation
   right stick click camera reset
 
-Sticks get a radial (left) / axial (right X) dead zone here, since Enhanced
-Input does not apply DefaultInput.ini's AxisConfig dead zones. The drive
+The shoulder buttons are chords (Enhanced Input's ChordAction trigger on
+IA_Ramms_PadLift / IA_Ramms_PadTwist, which nothing binds): held, they take the
+right stick off the camera (a ChordBlocker on its mapping) and onto what they
+name. Sticks get a radial (left, right on the camera) / axial (a right-stick
+axis on its own) dead zone here, since Enhanced Input does not apply
+DefaultInput.ini's AxisConfig dead zones. The drive
 stick is one 3-D action (X lateral, Y forward, Z twist) so that a 3-axis
 joystick or a space mouse can be mapped onto the same action later.
 """
@@ -84,9 +91,11 @@ def modifier(imc, cls, **props):
     return m
 
 
-def mapping(imc, ia, key_name, negate=False, swizzle=None, dead_zone=None, hold=None):
+def mapping(imc, ia, key_name, negate=False, swizzle=None, dead_zone=None, hold=None, chord=None, blocked_by=()):
     """dead_zone: (type, lower) -- applied first, on the key's own axes; hold:
-    seconds the key must be held before the action triggers (once)."""
+    seconds the key must be held before the action triggers (once); chord: an
+    action that must be triggering too (a held shoulder button); blocked_by:
+    actions that, while triggering, keep this mapping from triggering."""
     m = unreal.EnhancedActionKeyMapping()
     m.set_editor_property("action", ia)
     m.set_editor_property("key", key(key_name))
@@ -100,9 +109,15 @@ def mapping(imc, ia, key_name, negate=False, swizzle=None, dead_zone=None, hold=
     if swizzle:
         mods.append(modifier(imc, unreal.InputModifierSwizzleAxis, order=swizzle))
     m.set_editor_property("modifiers", mods)
+    triggers = []
     if hold:
-        m.set_editor_property("triggers", [modifier(imc, unreal.InputTriggerHold, hold_time_threshold=hold,
-                                                    is_one_shot=True)])
+        triggers.append(modifier(imc, unreal.InputTriggerHold, hold_time_threshold=hold, is_one_shot=True))
+    if chord:
+        triggers.append(modifier(imc, unreal.InputTriggerChordAction, chord_action=chord))
+    for blocker in blocked_by:
+        triggers.append(modifier(imc, unreal.InputTriggerChordBlocker, chord_action=blocker))
+    if triggers:
+        m.set_editor_property("triggers", triggers)
     return m
 
 
@@ -180,6 +195,10 @@ IA = {
     "MotorGroupD": action("IA_Ramms_MotorGroupD", VT.AXIS1D),
     "CameraNext": action("IA_Ramms_CameraNext", VT.BOOLEAN),
     "CameraReset": action("IA_Ramms_CameraReset", VT.BOOLEAN),
+    "CameraLook": action("IA_Ramms_CameraLook", VT.AXIS2D),     # X yaw, Y pitch
+    # The gamepad's shoulder buttons as chords for the right stick; nothing binds them.
+    "PadLift": action("IA_Ramms_PadLift", VT.BOOLEAN),
+    "PadTwist": action("IA_Ramms_PadTwist", VT.BOOLEAN),
     "ArmMove": action("IA_Ramms_ArmMove", VT.AXIS3D),           # X fwd, Y strafe, Z up
     "ArmRotate": action("IA_Ramms_ArmRotate", VT.AXIS3D),       # X yaw, Y pitch, Z roll
     "ArmResync": action("IA_Ramms_ArmResync", VT.BOOLEAN),
@@ -215,7 +234,11 @@ maps = [
     mapping(imc, IA["DriveStick"], "E", swizzle=Sw.ZYX),
     mapping(imc, IA["DriveStick"], "Q", negate=True, swizzle=Sw.ZYX),
     mapping(imc, IA["DriveStick"], "Gamepad_Left2D", dead_zone=(DZ.RADIAL, STICK_DEAD)),
-    mapping(imc, IA["DriveStick"], "Gamepad_RightX", swizzle=Sw.ZYX, dead_zone=(DZ.AXIAL, STICK_DEAD)),
+    mapping(imc, IA["DriveStick"], "Gamepad_RightX", swizzle=Sw.ZYX, dead_zone=(DZ.AXIAL, STICK_DEAD), chord=IA["PadTwist"]),
+    # The right stick is the camera's, unless a shoulder button makes it a lift's or the twist.
+    mapping(imc, IA["PadLift"], "Gamepad_LeftShoulder"),
+    mapping(imc, IA["PadTwist"], "Gamepad_RightShoulder"),
+    mapping(imc, IA["CameraLook"], "Gamepad_Right2D", dead_zone=(DZ.RADIAL, STICK_DEAD), blocked_by=(IA["PadLift"], IA["PadTwist"])),
     mapping(imc, IA["DriveMode"], "Tab"),
     mapping(imc, IA["DriveMode"], "Gamepad_Special_Left"),
     mapping(imc, IA["CurbCross"], "Enter"),
@@ -231,15 +254,14 @@ maps = [
     mapping(imc, IA["LinkageHeight"], "Q", negate=True),
     mapping(imc, IA["MotorGroupA"], "Y"),
     mapping(imc, IA["MotorGroupA"], "H", negate=True),
-    mapping(imc, IA["MotorGroupA"], "Gamepad_RightY", dead_zone=(DZ.AXIAL, STICK_DEAD)),
+    mapping(imc, IA["MotorGroupA"], "Gamepad_RightY", dead_zone=(DZ.AXIAL, STICK_DEAD), chord=IA["PadLift"]),
     mapping(imc, IA["MotorGroupB"], "T"),
     mapping(imc, IA["MotorGroupB"], "B", negate=True),
     mapping(imc, IA["MotorGroupB"], "Gamepad_RightTriggerAxis", dead_zone=(DZ.AXIAL, TRIGGER_DEAD)),
     mapping(imc, IA["MotorGroupB"], "Gamepad_LeftTriggerAxis", negate=True, dead_zone=(DZ.AXIAL, TRIGGER_DEAD)),
     mapping(imc, IA["MotorGroupC"], "Z"),
     mapping(imc, IA["MotorGroupC"], "X", negate=True),
-    mapping(imc, IA["MotorGroupC"], "Gamepad_RightShoulder"),
-    mapping(imc, IA["MotorGroupC"], "Gamepad_LeftShoulder", negate=True),
+    mapping(imc, IA["MotorGroupC"], "Gamepad_RightX", dead_zone=(DZ.AXIAL, STICK_DEAD), chord=IA["PadLift"]),
     mapping(imc, IA["MotorGroupD"], "C"),
     mapping(imc, IA["MotorGroupD"], "V", negate=True),
     mapping(imc, IA["CameraNext"], "N"),
@@ -286,6 +308,7 @@ common = [
     binding(IA["SeatReset"], X, "seat.reset"),
     binding(IA["CameraNext"], X, "camera.next"),
     binding(IA["CameraReset"], X, "camera.reset"),
+    binding(IA["CameraLook"], A, "camera.orbit_yaw", cid_y="camera.orbit_pitch"),
     binding(IA["ArmMove"], A, "arm.forward", cid_y="arm.strafe", cid_z="arm.up"),
     binding(IA["ArmRotate"], A, "arm.yaw", cid_y="arm.pitch", cid_z="arm.roll"),
     binding(IA["ArmResync"], X, "arm.resync"),

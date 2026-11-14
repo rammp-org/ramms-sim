@@ -12,11 +12,15 @@ Usage:
   python Scripts/editor_remote_exec.py --file  Plugins/RammsCrowd/Content/Python/ramms_crowd_assign_foot_ik.py
   python Scripts/editor_remote_exec.py --eval  "unreal.SystemLibrary.get_project_directory()"
 
+Only an editor of this project ("Ramms"; --project or $RAMMS_EDITOR_PROJECT for another, '*' for any) is used:
+another project's editor answers the same discovery, and this project's commands must not reach it.
+
 Exit code 0 on success (and prints the editor-side output), 1 otherwise.
 """
 
 import argparse
 import json
+import os
 import socket
 import struct
 import sys
@@ -25,12 +29,23 @@ import uuid
 
 MULTICAST_GROUP = ("239.0.0.1", 6766)
 BIND_ADDR = "127.0.0.1"
-# Where we SEND. The editor binds its multicast socket to BIND_ADDR:port and
-# reads whatever lands there, so unicasting to that endpoint reaches it even on
-# macOS, where a multicast route for 239.0.0.0/8 typically points at a physical
-# NIC rather than lo0 (a group-addressed ping then never arrives). The editor's
-# replies still go to the group, which our group-joined socket receives.
+# Where we send (send_to: the group instead once another editor answers). The editor binds its multicast socket to
+# BIND_ADDR:port and reads whatever lands there, so unicasting to that endpoint
+# reaches it even on macOS, where a multicast route for 239.0.0.0/8 typically
+# points at a physical NIC rather than lo0 (a group-addressed ping then never
+# arrives). The editor's replies still go to the group, which our group-joined
+# socket receives.
 EDITOR_ENDPOINT = (BIND_ADDR, MULTICAST_GROUP[1])
+
+
+def send_to(other_editors):
+    """Where the client's messages go: unicast to EDITOR_ENDPOINT (above), unless another project's editor has
+    answered (other_editors) and this is not macOS -- then the group, which every editor joined. A unicast to a port
+    several editors share reaches only one of them, so with another project's editor open a ping might never reach
+    this project's. Not the group always: on Windows an open_connection sent to it while the editor starts PIE was
+    not answered in time, where a unicast one was. Read at send time, so a caller that moves the endpoints
+    (Plugins/RammsPrivateAssets/Scripts/pie_curb/remote_exec.py) moves this too."""
+    return MULTICAST_GROUP if other_editors and sys.platform != "darwin" else EDITOR_ENDPOINT
 MAGIC = "ue_py"
 PROTO_VERSION = 1
 DISCOVER_TIMEOUT_S = 6.0
@@ -62,11 +77,14 @@ def main():
     group.add_argument("--code", help="python statements to execute (ExecuteStatement mode)")
     group.add_argument("--file", help="path to a python file whose contents are executed")
     group.add_argument("--eval", help="single expression to evaluate and print")
+    # Another project's editor answers the same multicast group; sending it this project's commands (a PIE start, a
+    # quit) would act on someone else's session. Only an editor of this project is taken.
+    ap.add_argument("--project", default=os.environ.get("RAMMS_EDITOR_PROJECT", "Ramms"),
+                    help="the editor's project name to connect to (default Ramms, or $RAMMS_EDITOR_PROJECT); '*' takes any")
     args = ap.parse_args()
 
     if args.file:
         # ExecuteFile takes a PATH to a python file (resolved editor-side).
-        import os
         command, exec_mode = os.path.abspath(args.file), "ExecuteFile"
     elif args.code:
         command, exec_mode = args.code, "ExecuteStatement"
@@ -89,24 +107,31 @@ def main():
     mcast.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 0)
     mcast.settimeout(0.5)
 
-    # Discover an editor node.
+    # Discover an editor node: this project's (--project).
     remote_id = None
+    skipped = []
     deadline = time.monotonic() + DISCOVER_TIMEOUT_S
     while time.monotonic() < deadline and remote_id is None:
-        mcast.sendto(make_msg("ping", node_id), EDITOR_ENDPOINT)
+        mcast.sendto(make_msg("ping", node_id), send_to(skipped))
         try:
             payload, _ = mcast.recvfrom(4096)
         except socket.timeout:
             continue
         msg = parse_msg(payload)
         if msg and msg.get("type") == "pong" and msg.get("source") != node_id:
-            remote_id = msg["source"]
             info = msg.get("data", {})
-            print("found editor node: %s (%s)" % (info.get("project_name", "?"), remote_id))
+            name = info.get("project_name", "?")
+            if args.project != "*" and name != args.project:
+                if name not in skipped:
+                    skipped.append(name)
+                continue
+            remote_id = msg["source"]
+            print("found editor node: %s (%s)" % (name, remote_id))
     if remote_id is None:
         print(
-            "ERROR: no editor responded on %s:%d - is the editor running with Remote Execution enabled?"
-            % MULTICAST_GROUP,
+            "ERROR: no %s editor responded on %s:%d - is it running with Remote Execution enabled?%s"
+            % ((args.project if args.project != "*" else "Unreal",) + MULTICAST_GROUP
+               + (" (other projects' editors answered: %s)" % ", ".join(skipped) if skipped else "",)),
             file=sys.stderr,
         )
         mcast.close()
@@ -122,7 +147,7 @@ def main():
 
     mcast.sendto(make_msg("open_connection", node_id, remote_id,
                           {"command_ip": cmd_endpoint[0], "command_port": cmd_endpoint[1]}),
-                 EDITOR_ENDPOINT)
+                 send_to(skipped))
     try:
         conn, _ = listener.accept()
     except socket.timeout:
@@ -148,7 +173,7 @@ def main():
             print("ERROR: timed out waiting for a command result from the editor.", file=sys.stderr)
             return 1
     finally:
-        mcast.sendto(make_msg("close_connection", node_id, remote_id), EDITOR_ENDPOINT)
+        mcast.sendto(make_msg("close_connection", node_id, remote_id), send_to(skipped))
         conn.close()
         listener.close()
         mcast.close()
