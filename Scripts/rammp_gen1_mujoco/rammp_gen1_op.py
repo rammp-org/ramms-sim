@@ -8,6 +8,7 @@
   set <control id> <value>   a control-surface command (source Remote)
   trigger <control id>       a control-surface action (curb.negotiate, curb.abort)
   curb                       the curb crossing: phase, status, step and crossing height, the chassis
+  stats                      the last crossing's measurements (times, stops, attitude, the rider's acceleration, margins)
   release <control id>       release it
   pad <key> <value> [...]    gamepad keys at values (URammsInputTestLibrary: through Enhanced Input)
   pad_key <key> <down|up>    a gamepad button (or any key) pressed or let go
@@ -119,6 +120,17 @@ else:
         step, height = curb.get_crossing()
         log("curb %s | %s | step %+.1f cm, crossing height %.1f cm | chassis (%.1f, %.1f, %.1f) pitch %+.1f" % (
             curb.get_phase().name, curb.get_status(), step, height, loc.x, loc.y, loc.z, rot.pitch))
+    elif op[0] == "stats":
+        s = pawn.get_component_by_class(unreal.RammsRammpGen1CurbController).get_stats()
+        frame = ("frame %.1f cm over the edge (%s)" % (s.min_frame_clearance_cm, s.min_clearance_phase.name)
+                 if s.frame_measured else "frame never over the edge")
+        log("stats: %.1f s (front at the edge -> rear down %.1f s, -> end %.1f s); %d stops, %.1f s stopped; pitch %.1f deg, "
+            "roll %.1f, rate %.1f deg/s; rider peak %.2f m/s^2 (fore/aft %.2f, vertical %.2f), RMS %.2f; stability margin "
+            "%.1f cm (%s); %s" % (
+                s.crossing_seconds, s.edge_to_rear_down_seconds, s.edge_to_end_seconds, s.stops, s.seconds_stopped,
+                s.max_abs_pitch_deg, s.max_abs_roll_deg, s.max_pitch_rate_deg_s, s.peak_rider_accel_ms2,
+                s.peak_rider_fore_aft_accel_ms2, s.peak_rider_vertical_accel_ms2, s.rms_rider_accel_ms2,
+                s.min_stability_margin_cm, s.min_margin_phase.name, frame))
     elif op[0] == "release":
         cs.release_control(op[1], SRC)
         log("released %s" % op[1])

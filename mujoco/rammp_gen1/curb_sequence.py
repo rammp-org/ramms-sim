@@ -1,8 +1,17 @@
 #!/usr/bin/env python3
-"""The RAMMP Gen1's curb crossing as a scripted stop-and-step sequence in MuJoCo: the reference for its curb controller.
+"""The RAMMP Gen1's curb crossing as a scripted sequence in MuJoCo: the reference for its curb controller.
 
     python mujoco/rammp_gen1/curb_sequence.py [--variant standard|powered_front] [--dir up|down] [--height 0.15]
-                                         [--stance FRONT ELEVATORS REAR] [--clip out.mp4 [--speedup 8]]
+                                         [--stance FRONT ELEVATORS REAR] [--sequence step|blended [--crawl 0.12]]
+                                         [--clip out.mp4 [--speedup 8]]
+
+--sequence step (the default, and what the Unreal controller does) stops for each step, below. --sequence blended
+(powered_front only) is how the real robot's own sequence crosses: it keeps rolling at a crawl and moves each pair as
+it reaches the edge, each touchdown one move until the pair carries load; it slows to a stop short of the edge only
+for a pair that is not up yet. The order and the rule are the same; the drive wheels go over with the translators
+where they are, and are drawn aft once down, as it rolls on to the rear's step. It prints each event, and the time
+from the front omni wheels reaching the curb face or edge to the rear omni wheels down and to stopped, which the
+robot's videos put at about 15 and 17 s up, and 10 and 13 s down, over a 15 cm curb.
 
 The chassis stays level and rides just under curb height (raised for a climb, lowered for a descent), so its
 frame clears the curb edge: the height is picked from where every support reaches the road and, lifted, clears
@@ -54,6 +63,185 @@ LAND = 0.12           # descents: the lifted drive wheels' centres this far past
 
 TOUCH_TOLERANCE = 0.008  # a wheel is down when its bottom is within this of the ground under it (m)
 
+# --sequence blended: the robot rolls through the crossing, as the real robot's own sequence does (videos of it, Nov
+# 2026: each pair of wheels goes over a 15 cm curb in 2-2.5 s while it keeps moving at about the translators' speed)
+CRAWL = 0.12          # its speed through the crossing (m/s)
+APPROACH = 0.25       # its speed until the front omni wheels are this close to the curb (m)
+APPROACH_NEAR = 0.30
+ACCEL = 0.5           # how fast its speed changes (m/s^2)
+STOP_GAIN = 2.0       # slowing for a pair not ready for the edge: m/s per m left to the point it must stop at
+CLEAR = 0.01          # a lifted pair is ready for the edge once its wheels are this far above the level they cross (m)
+LEAD_UP = 0.05        # climbs: the drive wheels start up when they are this far from the curb face (m)
+LEAD_DOWN = 0.10      # descents: the drive wheels start up when their axle is this far from the edge (m)
+JOINTS = {"drive": ("elevator_l", "elevator_r"), "front_arm": ("front_arm",), "rear_lift": ("rear_lift",)}
+
+
+def hull_margin(points, p):
+    """The signed distance (m) from p to the boundary of the convex hull of points (x-y): positive inside. With
+    fewer than three points off one line the hull is a segment or a point, and the margin is minus p's distance
+    from it."""
+    pts = sorted(set((round(a, 6), round(b, 6)) for a, b in points))
+    if not pts:
+        return -math.inf
+
+    def cross(o, a, b):
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+    lower, upper = [], []
+    for q in pts:                              # Andrew's monotone chain
+        while len(lower) >= 2 and cross(lower[-2], lower[-1], q) <= 0:
+            lower.pop()
+        lower.append(q)
+    for q in reversed(pts):
+        while len(upper) >= 2 and cross(upper[-2], upper[-1], q) <= 0:
+            upper.pop()
+        upper.append(q)
+    hull = lower[:-1] + upper[:-1]             # counter-clockwise
+    if len(hull) < 3:
+        def seg(a, b):
+            ab = (b[0] - a[0], b[1] - a[1])
+            L2 = ab[0] ** 2 + ab[1] ** 2
+            t = 0.0 if L2 == 0 else max(0.0, min(1.0, ((p[0] - a[0]) * ab[0] + (p[1] - a[1]) * ab[1]) / L2))
+            return math.hypot(p[0] - a[0] - t * ab[0], p[1] - a[1] - t * ab[1])
+        return -min(seg(hull[i], hull[(i + 1) % len(hull)]) for i in range(len(hull)))
+    m = math.inf
+    for i in range(len(hull)):
+        a, b = hull[i], hull[(i + 1) % len(hull)]
+        L = math.hypot(b[0] - a[0], b[1] - a[1])
+        m = min(m, cross(a, b, p) / L)          # positive on the inner (left) side of a counter-clockwise edge
+    return m
+
+
+class Meter:
+    """The crossing's measurements, sampled every EVERY steps (20 ms) from the crossing proper's start to its end:
+    - the stability margin: the robot's centre of mass, straight down, against the convex hull of the contacts of
+      the wheels on the ground carrying load (each over 10 N);
+    - the frame's clearance: the least distance from any of the robot's geoms but its wheels' (the frame, the caster
+      arms, the drive motors, the arm) to the curb's top edge, as MuJoCo's geom distance gives it;
+    - the rider: the chassis's pitch, roll and pitch rate, and the acceleration at the rider's mass (gravity left
+      out; low-passed at about 50 ms, since the contacts shake the chassis at the step's scale), fore/aft along the
+      heading, vertical, and its magnitude;
+    - stops: the chassis's speed under 2 cm/s for 0.2 s or more, once it has first moved (5 cm/s)."""
+    EVERY = 10
+    TAU = 0.05          # the low-pass on the rider's velocity and acceleration, and the pitch rate (s): as the Unreal meter's
+
+    def __init__(self, cx):
+        self.cx = cx
+        m = cx.m
+        self.on = False
+        self.n = 0
+        self.edge = m.geom("edge_probe").id
+        self.rider = m.geom("rider").id
+        root = m.body("chassis").id
+        robot = {b for b in range(m.nbody) if m.body_rootid[b] == root}   # the robot is the chassis's tree
+        self.frame = [g for g in range(m.ngeom) if m.geom_bodyid[g] in robot and m.geom_contype[g] and m.geom_bodyid[g] not in cx.support]
+        self.rows = []
+        self.reset()
+
+    def reset(self):
+        self.min_margin = (math.inf, 0.0, "")
+        self.min_clear = (math.inf, 0.0, "", "")
+        self.max_pitch = self.max_roll = self.max_rate = 0.0
+        self.peak = {"fore": 0.0, "vert": 0.0, "mag": 0.0}
+        self.sum_a2, self.n_a = 0.0, 0
+        self.stops, self.stopped, self.moved, self.still = 0, 0.0, False, 0.0
+        self.prev = None
+
+    def start(self):
+        self.reset()
+        self.on = True
+        self.t0 = self.cx.d.time
+
+    def stop(self):
+        self.on = False
+        self.t1 = self.cx.d.time
+
+    def step(self):
+        if not self.on:
+            return
+        self.n += 1
+        if self.n % self.EVERY:
+            return
+        cx, m, d = self.cx, self.cx.m, self.cx.d
+        t = d.time
+        # stability margin
+        pts, f6 = [], np.zeros(6)
+        for i in range(d.ncon):
+            c = d.contact[i]
+            og = c.geom2 if c.geom1 in cx.world else c.geom1 if c.geom2 in cx.world else None
+            if og is None or m.geom_bodyid[og] not in cx.support:
+                continue
+            mujoco.mj_contactForce(m, d, i, f6)
+            if f6[0] > 10.0:
+                pts.append((c.pos[0], c.pos[1]))
+        com = d.subtree_com[m.body("chassis").id]
+        margin = hull_margin(pts, (com[0], com[1]))
+        if margin < self.min_margin[0]:
+            self.min_margin = (margin, t, cx.label)
+        # the frame's clearance to the curb's edge
+        fromto = np.zeros(6)
+        clear, which = math.inf, ""
+        for g in self.frame:
+            dist = mujoco.mj_geomDistance(m, d, g, self.edge, 0.3, fromto) + 0.001   # from the edge line, not the probe's skin
+            if dist < clear:
+                clear, which = dist, m.geom(g).name or m.body(m.geom_bodyid[g]).name
+        if clear < self.min_clear[0]:
+            self.min_clear = (clear, t, which, cx.label)
+        # the chassis and the rider
+        pitch, roll = cx.pitch_roll()
+        self.max_pitch, self.max_roll = max(self.max_pitch, abs(pitch)), max(self.max_roll, abs(roll))
+        fwd = d.body("chassis").xmat.reshape(3, 3)[:, 0].copy()
+        fwd[2] = 0.0
+        fwd /= max(np.linalg.norm(fwd), 1e-9)
+        p = d.geom_xpos[self.rider].copy()
+        speed = float(np.dot(d.qvel[0:3], fwd))
+        a_fore = a_vert = a_mag = 0.0
+        if self.prev is not None:
+            dt = t - self.prev["t"]
+            k = dt / (self.TAU + dt)
+            v = self.prev["v"] + k * ((p - self.prev["p"]) / dt - self.prev["v"])
+            a = self.prev["a"] + k * ((v - self.prev["v"]) / dt - self.prev["a"])
+            rate = self.prev["rate"] + k * ((pitch - self.prev["pitch"]) / dt - self.prev["rate"])
+            if t - self.t0 > 0.2:                # the filters settled
+                a_fore, a_vert = float(np.dot(a, fwd)), float(a[2])
+                a_mag = float(math.hypot(a_fore, a_vert))
+                self.peak = {"fore": max(self.peak["fore"], abs(a_fore)), "vert": max(self.peak["vert"], abs(a_vert)),
+                             "mag": max(self.peak["mag"], a_mag)}
+                self.sum_a2 += a_mag ** 2
+                self.n_a += 1
+                self.max_rate = max(self.max_rate, abs(rate))
+            self.prev.update(p=p, v=v, a=a, rate=rate, pitch=pitch, t=t)
+            self.moved |= abs(speed) >= 0.05
+            if self.moved:
+                if abs(speed) < 0.02:
+                    self.still += dt
+                    self.stopped += dt
+                    if self.still - dt < 0.2 <= self.still:
+                        self.stops += 1
+                else:
+                    self.still = 0.0
+        else:
+            self.prev = {"t": t, "p": p, "v": np.zeros(3), "a": np.zeros(3), "rate": 0.0, "pitch": pitch}
+        self.rows.append((t, cx.label, com[0], com[2], pitch, roll, speed, margin, clear, a_fore, a_vert, a_mag))
+
+    def summary(self):
+        mm, mt, ml = self.min_margin
+        cc, ct, cg, cl = self.min_clear
+        rms = math.sqrt(self.sum_a2 / self.n_a) if self.n_a else 0.0
+        return ["measurements (the crossing proper, %.1f s):" % (getattr(self, "t1", self.cx.d.time) - self.t0),
+                "  stability margin: least %.1f cm, at %.1f s (%s)" % (mm * 100, mt, ml),
+                "  frame clearance to the curb's edge: least %.1f cm, at %.1f s (%s; %s)" % (cc * 100, ct, cg, cl),
+                "  chassis: pitch at most %.1f deg, roll %.1f deg, pitch rate %.1f deg/s" % (self.max_pitch, self.max_roll, self.max_rate),
+                "  rider: acceleration peak %.2f m/s^2 (fore/aft %.2f, vertical %.2f), RMS %.2f" % (
+                    self.peak["mag"], self.peak["fore"], self.peak["vert"], rms),
+                "  stops: %d, %.1f s stopped (under 2 cm/s for 0.2 s or more, once it moved)" % (self.stops, self.stopped)]
+
+    def write_csv(self, path):
+        with open(path + ".tmp", "w") as f:
+            f.write("t_s,activity,com_x_m,com_z_m,pitch_deg,roll_deg,speed_m_s,margin_m,frame_clearance_m,rider_a_fore_m_s2,rider_a_vert_m_s2,rider_a_m_s2\n")
+            for r in self.rows:
+                f.write("%.3f,\"%s\",%.4f,%.4f,%.3f,%.3f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f\n" % r)
+        os.replace(path + ".tmp", path)
+
 
 class Crossing:
     def __init__(self, variant, direction, h, clearance, stance=(0.0, 0.0, 0.0)):
@@ -69,6 +257,9 @@ class Crossing:
             curb.pos, curb.size = [FACE - 3.0, 0, h / 2], [3.0, 3, h / 2]
             c = spec.body("chassis")
             c.pos = [c.pos[0] + 0.2, c.pos[1], c.pos[2] + h]
+        # The curb's top edge, for the measurements' frame clearance: a thin capsule along it that collides with nothing.
+        spec.worldbody.add_geom(name="edge_probe", type=mujoco.mjtGeom.mjGEOM_CAPSULE, fromto=[FACE, -3.0, h, FACE, 3.0, h],
+                                size=[0.001, 0, 0], contype=0, conaffinity=0, group=5, rgba=[1, 0, 0, 0])
         self.m = m = spec.compile()
         self.d = mujoco.MjData(m)
         B.hold_arm_stowed(m, self.d)           # the arm stowed, and held there
@@ -108,6 +299,14 @@ class Crossing:
         self.trim = 0.0                        # start, off while the rear is lifted and for the return to the stance
         self.start = dict(self.cmd)
         self.front_up = False
+        self.roll = None                       # blended: the speed it rolls at (m/s), held back by self.limits
+        self.limits = []                       # blended: callables, each the most speed it allows now (m/s) or None
+        self.v = 0.0                           # blended: the speed it is rolling at
+        self.tvel = 0.0                        # the translators' commanded speed (m/s)
+        self.tds = {}                          # blended: touchdowns under way, per support
+        self.events = {}                       # blended: when each event happened (s)
+        self.t_event = 0.0
+        self.meter = Meter(self)               # the crossing's measurements (on from the start of the crossing proper)
 
     # --- model geometry
     def support_tables(self):
@@ -227,14 +426,28 @@ class Crossing:
             self.trim = max(lo - self.cmd["rear_lift"], min(hi - self.cmd["rear_lift"], self.trim))
         for k in LIFTS:
             err = self.goal[k] - self.cmd[k]
-            self.cmd[k] += max(-self.rate[k] * dt, min(self.rate[k] * dt, err))
+            delta = max(-self.rate[k] * dt, min(self.rate[k] * dt, err))
+            self.cmd[k] += delta
+            if k == "translator_l":
+                self.tvel = delta / dt
             q = d.joint(k).qpos[0]
             lim = 0.03 if k.startswith("translator") else math.radians(10)
             self.integ[k] = max(-lim, min(lim, self.integ[k] + 2.0 * (self.cmd[k] - q) * dt))   # the servo's integral action
             d.ctrl[self.A[k]] = self.cmd[k] + self.integ[k] + (self.trim if k == "rear_lift" else 0.0)
+        if self.roll is not None:              # blended: rolling, as fast as every limit allows
+            want = max(0.0, min([self.roll] + [v for v in (f() for f in self.limits) if v is not None]))
+            self.v += max(-ACCEL * dt, min(ACCEL * dt, want - self.v))
+            # the drive wheels roll at the chassis's speed plus their plates', so the chassis keeps its speed while
+            # the translators move; lifted, they spin at it, so they meet the ground at its speed
+            self.drive["speed"] = (self.v + self.tvel) / self.r_dw
+            if self.powered:
+                self.front["speed"] = self.v / self.r_fo
         tq = P["drive"]["torque"]
         for s in ("l", "r"):
             j = d.joint("drive_wheel_" + s)
+            if self.drive.get("free"):         # freewheeling (blended: while their arms lift them off the ground)
+                self.drive["i"][s] = d.ctrl[self.A["drive_" + s]] = 0.0
+                continue
             if self.drive["speed"] is not None:
                 e = self.drive["speed"] - j.qvel[0]
                 self.drive["i"][s] = max(-3.0, min(3.0, self.drive["i"][s] + e * dt))
@@ -262,6 +475,7 @@ class Crossing:
             near = self.x("rear_omni_l") + (self.r_ro + 0.02 if self.dir == "up" else 0.03)
             if near > FACE:
                 raise RuntimeError("the rear omni wheels reached the curb while the chassis was pulled forward")
+        self.meter.step()
         if self.on_frame:
             self.on_frame(self)
 
@@ -344,8 +558,8 @@ class Crossing:
         if extra:
             self.log.append("        %s touched down %.1f cm past contact" % (support, extra * 100))
 
-    def gate_rear(self, level):
-        """The rule, checked before the rear omni wheels come up."""
+    def rule(self, level):
+        """The rear-lift rule: (holds, what it found)."""
         con, _ = self.contacts()
         loads = {s: con.get(s, ("", 0.0)) for s in TOUCH["drive"]}
         on = all(loads[s][0] == level and loads[s][1] > LOADED * self.weight for s in TOUCH["drive"])
@@ -354,8 +568,13 @@ class Crossing:
         margin = com - 0.5 * (self.x("drive_wheel_l") + self.x("drive_wheel_r"))
         msg = "rear-lift rule: drive wheels on the %s carrying %.0f / %.0f N (need %.0f), translators aft %s, CoM %+.1f cm ahead of their axle" % (
             level, loads["drive_wheel_l"][1], loads["drive_wheel_r"][1], LOADED * self.weight, aft, margin * 100)
+        return on and aft and margin > 0.03, msg
+
+    def gate_rear(self, level):
+        """The rule, checked before the rear omni wheels come up."""
+        ok, msg = self.rule(level)
         self.log.append("        " + msg)
-        if not (on and aft and margin > 0.03):
+        if not ok:
             raise RuntimeError("rule not met: " + msg)
 
     def levelling(self, on):
@@ -365,6 +584,76 @@ class Crossing:
             self.goal["rear_lift"] = self.cmd["rear_lift"]
             self.trim = 0.0
         self.level = on
+
+    # --- blended: the robot keeps rolling and moves each pair as it reaches the edge
+    def go(self, goals):
+        """Start the joints toward goals, each at the rate that lands them together, and return at once (move()
+        without the wait): other joints keep moving to theirs."""
+        T = max([abs(v - self.cmd[k]) / self.RATE[k] for k, v in goals.items()] + [0.0])
+        for k, v in goals.items():
+            self.rate[k] = max(1e-6, abs(v - self.cmd[k]) / T) if T > 0 else self.RATE[k]
+            self.goal[k] = v
+
+    def arrived(self, keys=LIFTS):
+        return all(abs(self.goal[k] - self.cmd[k]) < 1e-9 for k in keys)
+
+    def bottom(self, support):
+        """The lower of a support's two wheels' bottoms, above the road (m)."""
+        r = {"drive": self.r_dw, "front_arm": self.r_fo, "rear_lift": self.r_ro}[support]
+        return min(self.d.body(w).xpos[2] - r for w in TOUCH[support])
+
+    def loaded(self, support, level, each=0.0):
+        """Both of a support's wheels on level, together carrying 8% of the weight and each the share each of it."""
+        con, _ = self.contacts()
+        return (all(s in con and con[s][0] == level and con[s][1] > each * self.weight for s in TOUCH[support])
+                and sum(con[s][1] for s in TOUCH[support]) > 0.08 * self.weight)
+
+    def start_touchdown(self, support, level, each=0.0):
+        """Lower a support at its full speed from its measured height above level, on past it (up to 4 cm, as far
+        as it reaches) until the pair carries load: tick_touchdowns() stops it there. One move, no stops: a load or
+        motor-current reading would tell the robot when."""
+        b = self.b_now(support) - self.gap(support, level)
+        lo = self.tables["elevator_l" if support == "drive" else support][1].min()
+        self.go(self.goals_for({support: max(lo + 1e-6, b - 0.04)}))
+        self.tds[support] = {"level": level, "each": each, "b": b}
+
+    def tick_touchdowns(self):
+        """Stop each touchdown under way once its pair carries load; True for each that finished this step."""
+        done = []
+        for support, td in list(self.tds.items()):
+            joints = JOINTS[support]
+            if self.loaded(support, td["level"], td["each"]):
+                for j in joints:
+                    self.goal[j] = self.cmd[j]
+                past = td["b"] - self.b_now(support)
+                if past > 0.002:
+                    self.log.append("        %s touched down %.1f cm past contact" % (support, past * 100))
+                del self.tds[support]
+                done.append(support)
+            elif self.arrived(joints) and self.arrived():
+                raise RuntimeError("%s did not touch down on the %s" % (support, td["level"]))
+        return done
+
+    def t_to_touch(self, support, level):
+        """How long a support's lift takes to bring its wheels down to level from here (s)."""
+        q_now = np.mean([self.cmd[j] for j in JOINTS[support]])
+        q_to = self.q_for(support, max(self.tables["elevator_l" if support == "drive" else support][1].min(),
+                                       self.b_now(support) - self.gap(support, level)))
+        return abs(q_to - q_now) / self.RATE[JOINTS[support][0]]
+
+    def stop_short(self, lead, at):
+        """The speed that brings a point at x = lead to rest at x = at (m/s)."""
+        return max(0.0, STOP_GAIN * (at - lead))
+
+    def event(self, key, label):
+        """Note an event of a blended crossing in the log, with the time since the last one."""
+        self.events[key] = self.d.time
+        con, _ = self.contacts()
+        p, r = self.pitch_roll()
+        on = ", ".join("%s@%s %.0fN" % (s.replace("drive_wheel", "dw").replace("_omni", "o"), w[0], w[1]) for s, w in sorted(con.items()))
+        self.log.append("%6.1fs %-56s %+5.1fs pitch %+5.1f roll %+5.1f v %4.2f | %s" % (
+            self.d.time, label[:56], self.d.time - self.t_event, p, r, self.v, on))
+        self.t_event = self.d.time
 
     def phase(self, label, fn):
         self.label = label
@@ -389,6 +678,7 @@ class Crossing:
         self.front_up = min(self.d.body(w).xpos[2] - self.r_fo for w in TOUCH["front_arm"]) - ground > TOUCH_TOLERANCE
         if self.front_up:
             self.log.append("        the front omni wheels start up: they stay up until they go down over the edge")
+        self.meter.start()                     # the crossing proper, from here to the end
 
     def climb(self):
         h, clr = self.h, self.clr
@@ -501,6 +791,7 @@ class Crossing:
         ph("Back to the stance it started in", lambda: (self.levelling(False), self.move({k: self.start[k] for k in LIFTS}, settle=1.5)))
         off = max(abs(self.d.joint(k).qpos[0] - self.start[k]) * (100.0 if k.startswith("translator") else math.degrees(1.0)) for k in LIFTS)
         self.log.append("        back in its stance: every lift within %.2f (deg or cm) of where it started" % off)
+        self.meter.stop()
 
     def recentre(self):
         """Translators back where they started while the drive wheels roll at the plates' speed, so the chassis stays
@@ -514,6 +805,249 @@ class Crossing:
         self.move({"translator_l": to, "translator_r": self.start["translator_r"]}, settle=0.0, during=during)
         self.brake()
         self.wait(0.8)
+
+    # --- the blended sequences (--sequence blended): it rolls through the crossing
+    def lead(self, body, r):
+        """The foremost point of a pair of wheels (x, m)."""
+        return max(self.x(body + "_l"), self.x(body + "_r")) + r
+
+    def trail(self, body, r):
+        """The hindmost point of a pair of wheels (x, m)."""
+        return min(self.x(body + "_l"), self.x(body + "_r")) - r
+
+    def axle(self, body):
+        """The foremost of a pair of wheels' axles (x, m): on level ground, where the pair touches it."""
+        return max(self.x(body + "_l"), self.x(body + "_r"))
+
+    def run(self, tick, done, limit=120.0):
+        """Step until done(), calling tick() after every step (it starts each pair's moves as their time comes)."""
+        t0 = self.d.time
+        while not done():
+            self.step()
+            tick()
+            if self.d.time - t0 > limit:
+                raise RuntimeError("the crossing stalled (%s)" % self.label)
+
+    def rear_gate(self, st, level, lift):
+        """Blended, with the drive wheels on the far level and the translators aft: the rear omni wheels up if the
+        rule holds. Drawing the drive wheels aft under the chassis moves load onto the front omni wheels; if a drive
+        wheel no longer carries its share, they are set down again until each does (the stop-and-step sequence sets
+        them down after the translators are aft, so it never needs this)."""
+        ok, msg = self.rule(level)
+        if ok:
+            self.log.append("        " + msg)
+            self.levelling(False)
+            self.go(self.goals_for({"rear_lift": lift}))
+            st["rear"] = "lifting"
+            self.event("rear_up", "Rear omni wheels up")
+        elif not self.loaded("drive", level, LOADED) and "drive" not in self.tds:
+            self.start_touchdown("drive", level, each=LOADED)
+            st["drive"] = "pressing"
+            self.event("drive_press", "Drive wheels down again: each to carry its share")
+
+    def climb_blended(self):
+        """The climb, rolling: each pair goes up the curb as it reaches it. The front omni wheels, held up, go down
+        on the curb as soon as they are over it; the drive wheels go up as they near the face while the translators
+        bring them aft (rolling at about the translators' speed, they hold their place on the road as they rise), and
+        down once over the curb; the rear omni wheels go up once the rule holds and down once over the curb. The
+        robot is held short of the face, slowing to a stop, whenever a pair reaching it is not up yet."""
+        h, clr = self.h, self.clr
+        self.begin()
+        self.t_event = self.d.time
+        Hc = self.crossing_height()
+        lift = h + clr - Hc
+        front = max(self.b_now("front_arm"), lift) if self.front_up else lift
+        heights = self.goals_for({"drive": -Hc, "front_arm": front, "rear_lift": -Hc})
+        self.go(heights)
+        st = {"raised": False, "front": "low", "drive": "low", "rear": "low"}
+        lead_f = lambda: self.lead("front_omni", self.r_fo)
+        self.limits = [
+            # the chassis at its crossing height before the front omni wheels reach the curb
+            lambda: None if st["raised"] else self.stop_short(lead_f(), FACE - 0.05),
+            # each pair held short of the face until it is up
+            lambda: self.stop_short(lead_f(), FACE - 0.02) if st["front"] == "low" else None,
+            lambda: self.stop_short(self.lead("drive_wheel", self.r_dw), FACE - 0.01) if st["drive"] in ("low", "lifting") else None,
+            lambda: self.stop_short(self.lead("rear_omni", self.r_ro), FACE - 0.03) if st["rear"] in ("low", "lifting") else None,
+        ]
+        self.roll = APPROACH
+
+        def tick():
+            fin = self.tick_touchdowns()
+            if not st["raised"] and self.arrived(heights.keys()):
+                st["raised"] = True
+                self.event("raised", "Chassis at its crossing height (rolling)")
+            self.roll = APPROACH if FACE - lead_f() > APPROACH_NEAR else CRAWL
+            if "front_at" not in self.events and lead_f() >= FACE:
+                self.event("front_at", "Front omni wheels at the curb face")
+            # front omni wheels: up (they may start up), down on the curb once over it
+            if st["front"] == "low" and self.bottom("front_arm") >= h + CLEAR:
+                st["front"] = "up"
+            if st["front"] == "up" and self.trail("front_omni", self.r_fo) >= FACE + 0.02:
+                self.start_touchdown("front_arm", "curb")
+                st["front"] = "lowering"
+                self.event("front_down", "Front omni wheels over the curb: down on it")
+            if "front_arm" in fin:
+                st["front"] = "on"
+                self.event("front_on", "Front omni wheels on the curb")
+            # drive wheels: up as they near the face; down once over the curb; then the translators aft, rolling on
+            if st["drive"] == "low" and st["front"] == "on" and self.lead("drive_wheel", self.r_dw) >= FACE - LEAD_UP:
+                self.drive["free"] = True
+                self.go(self.goals_for({"drive": lift}))
+                st["drive"] = "lifting"
+                self.event("drive_up", "Drive wheels up")
+            if st["drive"] == "lifting" and self.bottom("drive") >= h + CLEAR:
+                st["drive"] = "up"
+                self.event("drive_clear", "Drive wheels clear of the curb")
+            if st["drive"] == "up" and min(self.x("drive_wheel_l"), self.x("drive_wheel_r")) >= FACE + 0.65 * self.r_dw:
+                self.drive["free"] = False
+                self.start_touchdown("drive", "curb", each=LOADED)
+                st["drive"] = "lowering"
+                self.event("drive_down", "Drive wheels over the curb: down on it")
+            if "drive" in fin:
+                if st["drive"] == "pressing":
+                    self.event("drive_pressed", "Drive wheels carry their share again")
+                else:
+                    self.event("drive_on", "Drive wheels on the curb")
+                    self.go({"translator_l": AFT, "translator_r": AFT})
+                    self.event("aft", "Translators aft (rolling): chassis forward over them")
+                st["drive"] = "on"
+            # rear omni wheels: up once the rule holds, down once over the curb
+            if st["rear"] == "low" and st["drive"] == "on" and self.arrived(("translator_l", "translator_r")):
+                self.rear_gate(st, "curb", lift)
+            if st["rear"] == "lifting" and self.bottom("rear_lift") >= h + CLEAR:
+                st["rear"] = "up"
+                self.event("rear_clear", "Rear omni wheels clear of the curb")
+            if st["rear"] == "up" and self.rear_x() - self.r_ro >= FACE + 0.03:
+                self.start_touchdown("rear_lift", "curb")
+                st["rear"] = "lowering"
+                self.event("rear_down", "Rear omni wheels over the curb: down on it")
+            if "rear_lift" in fin:
+                self.levelling(True)
+                st["rear"] = "on"
+                self.event("rear_on", "Rear omni wheels on the curb")
+            self.label = "front %s | drive wheels %s | rear %s" % (st["front"], st["drive"], st["rear"])
+
+        self.run(tick, lambda: st["rear"] == "on")
+        self.finish_blended()
+
+    def descend_blended(self):
+        """The descent, rolling: each pair goes down off the edge as it passes it. The front omni wheels go down to
+        the road as soon as they are past the edge; the drive wheels go up off the upper level as they near the edge
+        while the translators bring them aft, and down to the road once their swing arms will clear the edge; the
+        rear omni wheels go up once the rule holds and, once past the edge, down to the road while the chassis
+        comes down on the drive and front wheels. The robot is held short of the edge, slowing to a stop, whenever
+        a pair reaching it is not up off the upper level yet."""
+        h, clr = self.h, self.clr
+        self.begin()
+        self.t_event = self.d.time
+        Hc = self.crossing_height()
+        lift, on_upper = h + clr - Hc, h - Hc
+        front = max(self.b_now("front_arm"), on_upper + clr) if self.front_up else on_upper
+        heights = self.goals_for({"drive": on_upper, "front_arm": front, "rear_lift": on_upper})
+        self.go(heights)
+        st = {"raised": False, "front": "on", "drive": "on", "rear": "on"}
+        lead_f = lambda: self.lead("front_omni", self.r_fo)
+        self.limits = [
+            lambda: None if st["raised"] else self.stop_short(lead_f(), FACE - 0.05),
+            # the drive and rear wheels held short of the edge until they are up off the upper level
+            lambda: self.stop_short(self.axle("drive_wheel"), FACE - 0.02) if st["drive"] in ("on", "lifting") else None,
+            lambda: self.stop_short(self.axle("rear_omni"), FACE - 0.02) if st["rear"] in ("on", "lifting") else None,
+        ]
+        self.roll = APPROACH
+
+        def tick():
+            fin = self.tick_touchdowns()
+            if not st["raised"] and self.arrived(heights.keys()):
+                st["raised"] = True
+                self.event("raised", "Chassis at its crossing height (rolling)")
+            self.roll = APPROACH if FACE - lead_f() > APPROACH_NEAR else CRAWL
+            if "front_at" not in self.events and lead_f() >= FACE:
+                self.event("front_at", "Front omni wheels at the edge")
+            if st["front"] == "on" and self.trail("front_omni", self.r_fo) >= FACE + 0.02:
+                self.start_touchdown("front_arm", "floor")
+                st["front"] = "lowering"
+                self.event("front_down", "Front omni wheels past the edge: down to the road")
+            if "front_arm" in fin:
+                st["front"] = "down"
+                self.event("front_on", "Front omni wheels on the road")
+            if st["drive"] == "on" and st["front"] == "down" and self.axle("drive_wheel") >= FACE - LEAD_DOWN:
+                self.drive["free"] = True
+                self.go(self.goals_for({"drive": lift}))
+                st["drive"] = "lifting"
+                self.event("drive_up", "Drive wheels up off the upper level")
+            if st["drive"] == "lifting" and self.bottom("drive") >= h + CLEAR:
+                st["drive"] = "up"
+                self.event("drive_clear", "Drive wheels clear of the upper level")
+            # down as they roll off the edge, starting early enough that they land where their swing arms and motors,
+            # which trail them, clear it (r + LAND past it), as they would set down there in place
+            dw = min(self.x("drive_wheel_l"), self.x("drive_wheel_r"))
+            if st["drive"] == "up" and dw >= FACE + 0.3 * self.r_dw and dw + self.v * self.t_to_touch("drive", "floor") >= FACE + self.r_dw + LAND:
+                self.drive["free"] = False
+                self.start_touchdown("drive", "floor", each=LOADED)
+                st["drive"] = "lowering"
+                self.event("drive_down", "Drive wheels rolling off the edge: down to the road")
+            if "drive" in fin:
+                if st["drive"] == "pressing":
+                    self.event("drive_pressed", "Drive wheels carry their share again")
+                else:
+                    self.event("drive_on", "Drive wheels on the road")
+                    self.go({"translator_l": AFT, "translator_r": AFT})
+                    self.event("aft", "Translators aft (rolling): chassis forward over them")
+                st["drive"] = "down"
+            if st["rear"] == "on" and st["drive"] == "down" and self.arrived(("translator_l", "translator_r")):
+                self.rear_gate(st, "floor", lift)
+            if st["rear"] == "lifting" and self.bottom("rear_lift") >= h + CLEAR:
+                st["rear"] = "up"
+                self.event("rear_clear", "Rear omni wheels clear of the upper level")
+            if st["rear"] == "up" and self.rear_x() - self.r_ro >= FACE + 0.03:
+                # the chassis comes down on the drive and front wheels as the rear goes down: the sprung rear, which
+                # reaches least, has less to reach
+                drop = Hc / 2
+                self.go(self.goals_for({"drive": self.b_now("drive") + drop, "front_arm": self.b_now("front_arm") + drop}))
+                self.start_touchdown("rear_lift", "floor")
+                st["rear"] = "lowering"
+                self.event("rear_down", "Rear omni wheels past the edge: down, chassis down")
+            if "rear_lift" in fin:
+                self.levelling(True)
+                st["rear"] = "down"
+                self.event("rear_on", "Rear omni wheels on the road")
+            self.label = "front %s | drive wheels %s | rear %s" % (st["front"], st["drive"], st["rear"])
+
+        self.run(tick, lambda: st["rear"] == "down")
+        self.finish_blended()
+
+    def finish_blended(self):
+        """Rolling on: the translators back where they started (the drive wheels rolling at the plates' speed plus
+        the chassis's), the rear trimmed level; then every lift back in the stance it started in, together (moving
+        the front arm and elevators to it while the rear is still at its crossing height tips the chassis 6-14 deg,
+        faster than the trim levels it); then it stops."""
+        self.limits = []
+        self.label = "translators back"
+        self.go({"translator_l": self.start["translator_l"], "translator_r": self.start["translator_r"]})
+        self.run(lambda: None, lambda: self.arrived())
+        self.event("recentred", "Translators back where they started (rolling)")
+        self.label = "back to the stance"
+        self.levelling(False)
+        self.go({k: self.start[k] for k in LIFTS if not k.startswith("translator")})
+        self.run(lambda: None, lambda: self.arrived())
+        self.event("stance", "Back in the stance it started in (rolling)")
+        self.label = "stopping"
+        self.roll = 0.0
+        self.run(lambda: None, lambda: self.v < 1e-4)
+        self.roll = None
+        self.brake()
+        self.front["speed"] = 0.0 if self.powered else None
+        self.wait(0.8)
+        self.front["speed"] = None
+        self.event("done", "Stopped")
+        self.meter.stop()
+        off = max(abs(self.d.joint(k).qpos[0] - self.start[k]) * (100.0 if k.startswith("translator") else math.degrees(1.0)) for k in LIFTS)
+        self.log.append("        back in its stance: every lift within %.2f (deg or cm) of where it started" % off)
+        at, up = self.events["front_at"], self.dir == "up"
+        self.log.append("        front omni wheels at the %s -> rear omni wheels down: %.1f s, -> stopped: %.1f s "
+                        "(the real robot's videos: about %s and %s s)" % (
+                            "curb face" if up else "edge", self.events["rear_on"] - at, self.events["done"] - at,
+                            "15" if up else "10", "17" if up else "13"))
 
 
 def clip_writer(path, speedup, cx):
@@ -571,6 +1105,7 @@ def clip_writer(path, speedup, cx):
 
 
 def main():
+    global CRAWL
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--variant", choices=("standard", "powered_front"), default="standard")
     ap.add_argument("--dir", choices=("up", "down"), default="up")
@@ -578,22 +1113,36 @@ def main():
     ap.add_argument("--clearance", type=float, default=0.03, help="a lifted support's clearance over the level it crosses, m")
     ap.add_argument("--stance", type=float, nargs=3, default=(0.0, 0.0, 0.0), metavar=("FRONT", "ELEVATORS", "REAR"),
                     help="the lifts' angles the robot starts in, deg (the outdoor stance: about -14 9 0)")
+    ap.add_argument("--sequence", choices=("step", "blended"), default="step",
+                    help="step: stop and step, each pair in turn (what the Unreal controller does); blended: it rolls "
+                         "through the crossing, moving each pair as it reaches the edge (as the real robot does)")
+    ap.add_argument("--crawl", type=float, default=CRAWL, help="blended: its speed through the crossing, m/s")
+    ap.add_argument("--csv", help="write the measurements' time series (every 20 ms of the crossing proper) to this file")
     ap.add_argument("--clip", help="write a video of the crossing")
     ap.add_argument("--speedup", type=float, default=8.0)
     args = ap.parse_args()
+    if args.sequence == "blended" and args.variant != "powered_front":
+        ap.error("--sequence blended needs --variant powered_front: with the drive wheels up, the front omni wheels' "
+                 "hub motors keep the robot rolling")
+    CRAWL = args.crawl
     cx = Crossing(args.variant, args.dir, args.height, args.clearance, args.stance)
     writer = None
     if args.clip:
         cx.on_frame, writer = clip_writer(args.clip, args.speedup, cx)
     ok = True
     try:
-        cx.climb() if args.dir == "up" else cx.descend()
+        if args.sequence == "blended":
+            cx.climb_blended() if args.dir == "up" else cx.descend_blended()
+        else:
+            cx.climb() if args.dir == "up" else cx.descend()
     except RuntimeError as e:
         cx.log.append("ABORT in '%s': %s" % (cx.label, e))
         ok = False
     if writer is not None:
         writer.close()
-    print("\n".join(cx.log))
+    print("\n".join(cx.log + cx.meter.summary()))
+    if args.csv:
+        cx.meter.write_csv(args.csv)
     print("frame contacts with the world: %s" % (cx.strikes or "none"))
     print("%s: %.1f s, worst pitch %.1f deg, roll %.1f deg" % ("crossed" if ok else "aborted", cx.d.time, cx.worst[0], cx.worst[1]))
     return 0 if ok and not cx.strikes else 1
