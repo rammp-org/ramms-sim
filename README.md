@@ -16,7 +16,7 @@
 </p>
 
 <p align="center">
-  <img src="doc/images/readme/hero.webp" width="100%" alt="The RAMMP Gen1 wheelchair with its Kinova arm driving down a generated downtown sidewalk past pedestrians">
+  <img src="doc/images/readme/hero.webp" width="100%" alt="RAMMP Gen1, with its rider and Kinova arm, climbing a 15 cm curb by itself on a generated downtown street">
 </p>
 
 <p align="center">
