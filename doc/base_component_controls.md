@@ -196,8 +196,33 @@ API (`BlueprintCallable`, also the `IRammsControlSurfaceProvider` /
 Values are clamped to the axis range; unknown ids are refused. Sources are
 arbitrated: Autonomy > Remote > local (Keyboard / Gamepad / Touch) > Script,
 and a Remote / Autonomy command holds its axis over local input for
-`ExternalHoldSeconds` (0.3 s). Releasing a Continuous axis springs it to its
-default; releasing a Position axis stops holding the target (`ReleaseMotor`).
+`ExternalHoldSeconds` (0.3 s; equal or lower sources yield at once). Releasing
+a Continuous axis springs it to its default; releasing a Position axis stops
+holding the target (`ReleaseMotor`).
+
+**The drive deadman.** A Continuous or Velocity control held by a Remote or
+Autonomy source springs back once nothing has been heard from that source on
+the surface for `DeadmanSeconds` (0.3 s, a class default) plus a grace of the
+last two frames. Heard means any command from that source the surface applied
+-- a set, a trigger, a release, of any control -- so it is per source, not per
+control: a client sending each control in its own request at 3 frames a second
+is still there. Springing back, a Continuous control goes as a release from
+its source would (contributor `ReleaseControl`, else `ApplyControl(Default)`; a
+raw torque motor is commanded its default); a Velocity control (a raw speed
+motor in the low-level mode) is commanded its default, 0, rather than released,
+since a released speed servo may coast and MuJoCo's `<velocity>` cannot let go.
+Either way the hold goes and local input takes over. Untouched: Keyboard,
+Gamepad, Touch and Script commands; the robot's own commands
+(`SetControlInternal`: drive-mode stances, the Gen1 crossing's arm hold);
+Position, Enum, Action and Text controls; a control another source took over;
+one a drive-mode switch moved to another contributor (the mode that stood down
+zeroed it). The deadman runs on real time on the core ticker, so it also
+springs back while the world is paused. `Source` is chosen by the caller (any
+Remote Control client can send as Autonomy), and Remote Control has no client
+identity, so clients sending as the same source keep each other alive.
+`ExternalHoldSeconds` (Blueprint-writable) and `DeadmanSeconds` are both used
+within 0.1-2 s. Reports: `LogRammsControlSurface`. Tests:
+`Ramms.Control.Deadman.*`.
 Every surface registers with `RammsUISubsystem` (ramms-ui) on BeginPlay —
 `GetAllControlSurfaces()` / `FindControlSurfaceByRobotName()`, or from Python
 `unreal.RammsRobotControlSurfaceComponent.find_control_surfaces(any_actor)` —
@@ -502,20 +527,12 @@ Ready-made chains: `Scripts/pie_tests/base_component/`.
 
 ### 4. Remote Control API (HTTP, `:30010`; Web UI on `:30000`)
 
-Every function above is `BlueprintCallable`, so it is callable through the
-Remote Control API on a running PIE / `-game` instance:
-
-```http
-PUT http://127.0.0.1:30010/remote/object/call
-{
-  "objectPath": "/Game/Maps/UEDPIE_0_Map_Demo.Map_Demo:PersistentLevel.BP_RammpGen1_Ramms_C_0.RammsDifferentialDriveController",
-  "functionName": "SetExternalDriveInput",
-  "parameters": { "Input": { "X": 0.0, "Y": 1.0 } }
-}
-```
-
-or, preferably, through the control surface (`GetControlSurfaceJson` lists
-the ids and ranges) — `Plugins/RammsCore/Scripts/unreal_remote/control_surface.py`
+Only allow-listed functions (`Config/DefaultRemoteControl.ini`; see
+[remote_and_scripting.md](remote_and_scripting.md)) can be called through the
+Remote Control API on a running PIE / `-game` instance. For driving, that is
+the control surface: `GetControlSurfaceJson` lists the ids and ranges, and a
+held command must be re-sent (the drive deadman springs it back about 0.3 s
+after its source goes quiet). `Plugins/RammsCore/Scripts/unreal_remote/control_surface.py`
 wraps it:
 
 ```python
