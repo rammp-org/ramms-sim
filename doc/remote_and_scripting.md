@@ -49,13 +49,15 @@ The sister repository [ramms-tools](https://github.com/rammp-org/ramms-tools)
 (`pip install -e ../ramms-tools`) is the supported way for programs and users
 to drive RAMMS from outside the editor. It talks to the engine's **Remote
 Control API** (HTTP port 30010, in the editor and in `-game` / packaged
-builds with the plugin) and ships a library plus CLIs: `ramms-kinova`,
-`ramms-rammp-gen1`, `ramms-gripper`, `ramms-pose`, `ramms-imu`, `ramms-stream`,
-`ramms-notify`, `ramms-status`, `ramms-tui`, and `ramms-worldgen` for
+builds with the plugin) and ships a library plus CLIs: `ramms-control`,
+`ramms-curb`, `ramms-sensors`, `ramms-kinova`, `ramms-rammp-gen1`,
+`ramms-gripper`, `ramms-pose`, `ramms-imu`, `ramms-stream`, `ramms-notify`,
+`ramms-status`, `ramms-tui`, and `ramms-worldgen` for
 [world generation](features.md#world-generation-procedural-randomized-environments).
 
 For any robot with a control surface (the RAMMP Gen1 and Gen2 curb pawns, the
-chair, the lift-drive bases):
+chair, the lift-drive bases; the Gen2 pawn and the lift-drive bases come with
+the private assets):
 
 - `ramms-control` lists robots and their controls, sets, triggers and releases
   them, drives (`drive --forward 0.3 --seconds 2`, strafing in holonomic modes)
@@ -63,44 +65,71 @@ chair, the lift-drive bases):
 - `ramms-curb` reads a crossing's phase and status, toggles curb assist and the
   Gen1 crossing style, shows what Gen2 senses ahead (`detect`: step height,
   edge distance, approach angle, far side) and runs a crossing
-  (`go --wait` starts it, holds the stick forward as a rider would and prints the
-  phase log and stats). It also reads and sets the Gen2 seat.
+  (`go --wait` starts it, holds the stick forward as a rider would while it
+  runs and prints the phase log and stats). It also reads and sets the Gen2 seat.
 - `ramms-sensors` lists, adds and reads ToF, sonar and IMU sensors and capture
   cameras, and streams a camera's colour, depth, motion vectors and segmentation
   mask over RMSS (`streams start`, `camera front_camera --save shots`).
 - The TUI's Robot tab shows the same live.
 
-Robot sensing goes through `URammsSensorRigComponent` (RammsCore). The Gen1 and
-Gen2 curb pawns ship with one (`SensorRig`: `imu`, `front_tof`, `front_sonar` and
-an RGB-D `front_camera` at the front of the chassis), and `URammsSensingBridge`
-adds the same sensors to any robot at runtime (`ramms-sensors rig apply chair`).
-A rig camera streams on RMSS channels C, C+100, C+200 and C+300 as
-`camera/<name>/color`, `camera/<name>/depth`, `motion/<name>` and `mask/<name>`,
-the stream ids and metadata ramms-tools already sends towards UE. RMSS needs no
-header or version change for this.
+A Remote or Autonomy command on a Continuous control (the drive axes, the jog,
+arm and camera rates) lasts only while it is repeated. Once its source has not
+set it again for 0.3 s (the control surface's `ExternalHoldSeconds`), the
+control springs back to its default, as if released. ramms-tools re-sends held
+commands at 10 Hz and releases them at the end, so a client that drops off
+stops the robot. Position, Enum and Action controls, and keyboard, gamepad,
+touch or Script commands, stay until they are released.
 
-IMU data comes from the physics engine that simulates the body, with no IMU
-component needed: `URammsPhysicsImuSubsystem` samples MuJoCo bodies (the
-RammsMujocoSupport provider, at each MuJoCo step) and Chaos bodies or bones (at
-each physics step) at the sensor's point. The acceleration is what an
-accelerometer reads (+g up at rest). `URammsIMUSensorComponent`'s `Source`
-(Auto by default) uses the same, with transform differencing (`Kinematic`) for
-bodies no engine simulates. Remote callers get it through
-`URammsSensingBridge::ReadBodyImuJson` (`ramms-sensors imu --body chassis`).
+Robot sensing goes through `URammsSensorRigComponent` (RammsCore). The Gen1
+curb pawn ships with one (`SensorRig`: `imu`, `front_tof`, `front_sonar` and an
+RGB-D `front_camera` at the front of the chassis), as does the Gen2 curb pawn in
+the private assets, and `URammsSensingBridge` adds the same sensors to any robot
+at runtime (`ramms-sensors --robot <chair> rig apply chair`; without `--robot` a
+preset goes on the first robot found). Sensing changes need a play world (PIE or
+a game).
+
+A rig camera streams on RMSS channels C, C+100, C+200 and C+300 as
+`camera/<name>/color`, `camera/<name>/depth`, `motion/<name>` and
+`mask/<name>`. These use the stream ids and the `group`, `role` and `fmt`
+metadata that ramms-tools' `StreamSender` uses, with one difference: colour goes
+out as `FrameRGB`, not `StreamSender`'s `ImageData`. Robots carry cameras with
+the same name (`front_camera`), so a client picks a robot's camera by the frame
+metadata's `actor` (and its channel), never by name alone. RMSS needs no header
+or version change for this.
+
+IMU data comes from the physics engine that simulates the body, and needs no
+IMU component:
+
+- `URammsPhysicsImuSubsystem` samples MuJoCo bodies (the RammsMujocoSupport
+  provider, at each MuJoCo step) and Chaos bodies or bones (at each physics
+  step) at the sensor's point.
+- The acceleration is what an accelerometer reads (+g up at rest).
+- `URammsIMUSensorComponent`'s `Source` (Auto by default) uses the same
+  samples, averaged over its update interval. It differences its own transform
+  (`Kinematic`) for a body no engine simulates, or when `bUsePhysicsVelocity`
+  is off.
+- Remote callers read the latest sample (`URammsSensingBridge::ReadBodyImuJson`,
+  `ramms-sensors imu --body chassis`) or every physics-step sample: in batches
+  over Remote Control (`ReadImuSamplesJson`), or as a continuous RMSS stream
+  (`StartImuStreamJson`).
 
 UE 5.6+ refuses remote function calls unless they are allow-listed.
 `Config/DefaultRemoteControl.ini` lists:
 
 - the RAMMS bridges (`RammsCoreBridge`, `RammsRemoteBridge`,
-  `RammsWorldGenBridge`, `RammsSensingBridge`);
+  `RammsWorldGenBridge`, `RammsSensingBridge`), whole;
 - the robot controller components;
-- the robot control surface, the drive-mode selector, the Gen1 and Gen2 curb
-  controllers and the Gen2 seat;
-- the IMU, sonar and ToF components;
-- the traffic spawner and signal clock;
+- function by function, what ramms-tools calls on the robot control surface,
+  the drive-mode selector, the Gen1 and Gen2 curb controllers, the Gen2 seat,
+  and the traffic spawner and signal clock;
 - the few engine getters the tools use.
 
-Add a line there when a new class needs to be callable remotely.
+Remote Control is reachable from the network (its WebSocket server, port 30020,
+listens on every interface), and this list is what it checks every call
+against. A class listed whole exposes every Blueprint-callable function it has
+and inherits (a component's `K2_DestroyComponent`, say). So add a new call by
+`FunctionName` unless the class is a bridge meant for remote use, and leave
+`bAllowChildClasses` off.
 
 ## Pixel Streaming (Remote Browser Access)
 
