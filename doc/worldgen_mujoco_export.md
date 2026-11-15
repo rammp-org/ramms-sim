@@ -283,6 +283,18 @@ or not; a height grid that the scale mirrors or turns over, or whose mesh it
 does not match, is exported as one prism per upward-facing triangle of the mesh
 (exact, never a hole).
 
+**Flush neighbours are one solid.** Separate geoms meeting at a seam give a
+body crossing it a contact on the far geom's edge whose normal leans sideways:
+`SeamContacts` measured 0.28 of a sphere's contact normal (r 5 cm), 0.19 of a
+wheel's (r 10 cm) and all of a roller pad's, 2 mm into two flush exported
+pavers, a bump a level surface does not have. So a GroundPrisms piece merges
+parts with the same surface whose tops lie in one plane (within 0.1 mm) and
+whose union is convex into one box or hull, and `GatherCollisionShapes` merges
+flush neighbouring boxes (`RammsCollisionShapes::MergeFlushBoxes`: paving and
+road cubes tiling a flat area, slabs side by side; the filter's
+`bMergeFlushBoxes`). A real lip, a gap or another surface keeps its solids, and
+its step. The Chaos mesh keeps its parts as built.
+
 Canopy blobs are sphere-boxes, whose box projection splits some quads inward
 (dents of a few centimetres); their edges are now flipped to fold outward when
 built, so each blob's mesh is its own hull and the hull export is exact there too.
@@ -370,9 +382,12 @@ its five parts, open between the legs where Chaos is),
 against Chaos's trace of every piece, ground kinds included),
 `Ramms.MuJoCo.WorldGenExport.NoDoubleExport` (one contributor per generator,
 none beside one with no `Generator`, quick-converted actors left out) and
-`Ramms.MuJoCo.WorldGenExport.SeamContacts` (reports how far contact normals
-lean sideways as a sphere, a wheel-like cylinder and a roller pad cross the
-seam between two coplanar exported boxes, 2 mm in).
+`Ramms.MuJoCo.WorldGenExport.SeamContacts` (a sphere, a wheel-like cylinder and
+a roller pad swept 2 mm in across where two pavers meet: flush pavers are one
+geom and no normal leans over 0.01; at a 6 mm lip the step remains, the sphere's
+normal leaning at least 0.4, the wheel's 0.25, the roller pad's 0.9), and in
+RammsWorldGen `Ramms.WorldGen.CollisionShapes.MergeFlushBoxes` (a field of flush
+boxes is one box; a lip, a gap, another surface or thickness is not).
 
 ## Still open after the build
 
@@ -386,13 +401,16 @@ seam between two coplanar exported boxes, 2 mm in).
   level already had pieces), the recompile on `OnWorldGenerated` brings it in.
 - Concave parts of complex-as-simple palette meshes are solid inside their
   hulls; CoACD (cached per asset plus content hash) would make them exact.
-- Seams between coplanar neighbours (pavers, panels, the boxes around a
-  pothole) are separate geoms: where a robot geom crosses one, MuJoCo can add a
-  contact on the far geom's edge whose normal leans sideways, a small bump.
-  `Ramms.MuJoCo.WorldGenExport.SeamContacts` measures how far for a sphere, a
-  wheel-like cylinder and a roller pad (it reports, it does not assert); what
-  that does to a crossing is not measured. Chaos's mesh has the same internal
-  walls (one trimesh of closed prisms); whether Chaos bumps there is not
+- Seams that remain. Flush neighbours within one GroundPrisms piece, and flush
+  boxes anywhere, are merged (no sideways normal across them in
+  `SeamContacts`). Still separate: flush parts whose union is not convex (an L
+  of pavers stays two solids; the merge is greedy, pairwise, so a field can end
+  as a few convex pieces rather than one), flush hulls in different pieces
+  (sloped facets of neighbouring pieces), and hulls against height fields
+  (a flare against its ramp). Where a robot geom crosses one of those, MuJoCo
+  can still add a contact on the far geom's edge, a small bump; what it does to
+  a crossing is not measured. Chaos's mesh keeps the internal walls between
+  prisms (one trimesh of closed prisms); whether Chaos bumps there is not
   measured either.
 - Packaged builds: the complex-as-simple hulls read `TriMeshGeometries` (cooked
   collision), untested in a package.
