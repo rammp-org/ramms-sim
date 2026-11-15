@@ -49,16 +49,137 @@ The sister repository [ramms-tools](https://github.com/rammp-org/ramms-tools)
 (`pip install -e ../ramms-tools`) is the supported way for programs and users
 to drive RAMMS from outside the editor. It talks to the engine's **Remote
 Control API** (HTTP port 30010, in the editor and in `-game` / packaged
-builds with the plugin) and ships a library plus CLIs: `ramms-kinova`,
-`ramms-rammp-gen1`, `ramms-gripper`, `ramms-pose`, `ramms-imu`, `ramms-stream`,
-`ramms-notify`, `ramms-status`, `ramms-tui`, and `ramms-worldgen` for
+builds with the plugin) and ships a library plus CLIs: `ramms-control`,
+`ramms-curb`, `ramms-sensors`, `ramms-kinova`, `ramms-rammp-gen1`,
+`ramms-gripper`, `ramms-pose`, `ramms-imu`, `ramms-stream`, `ramms-notify`,
+`ramms-status`, `ramms-tui`, and `ramms-worldgen` for
 [world generation](features.md#world-generation-procedural-randomized-environments).
 
-UE 5.6+ refuses remote function calls unless they are allow-listed;
-`Config/DefaultRemoteControl.ini` lists the RAMMS bridges
-(`RammsCoreBridge`, `RammsRemoteBridge`, `RammsWorldGenBridge`), the robot
-controller components and the few engine getters the tools use. Add a line
-there when a new class needs to be callable remotely.
+For any robot with a control surface (the RAMMP Gen1 and Gen2 curb pawns, the
+chair, the lift-drive bases; the Gen2 pawn and the lift-drive bases come with
+the private assets):
+
+- `ramms-control` lists robots and their controls, sets, triggers and releases
+  them, drives (`drive --forward 0.3 --seconds 2`, strafing in holonomic modes)
+  and switches drive modes (`mode holonomic`).
+- `ramms-curb` reads a crossing's phase and status, toggles curb assist and the
+  Gen1 crossing style, shows what Gen2 senses ahead (`detect`: step height,
+  edge distance, approach angle, far side) and runs a crossing
+  (`go --wait` starts it, holds the stick forward as a rider would while it
+  runs and prints the phase log and stats). It also reads and sets the Gen2 seat.
+- `ramms-sensors` lists, adds and reads ToF, sonar and IMU sensors and capture
+  cameras, and streams a camera's colour, depth, motion vectors and segmentation
+  mask over RMSS (`streams start`, `camera front_camera --save shots`).
+- The TUI's Robot tab shows the same live.
+
+A Remote or Autonomy command on a Continuous or Velocity control (the drive
+axes, the jog, arm and camera rates, a raw `motor.<id>` speed in a robot's
+low-level mode) lasts only while its source is heard from. Once nothing has
+come from that source on the robot's control surface for the deadman's window
+(`DeadmanSeconds`, 0.3 s) plus a grace of the last two frames, the control
+springs back to its default: a Continuous one as if released, a Velocity one by
+being commanded its default (0, stop). Heard is per source, not per control:
+any command the surface applies from that source -- a set, a trigger, a
+release, of any control -- keeps all of its held controls, so a client sending
+its controls one request at a time is not taken for gone between them, and a
+control it set once stays while it keeps sending others. The grace means a long
+frame (an editor throttled to 3 frames a second in the background, a hitch) is
+not taken for silence.
+
+Remote Control carries no client identity, and `Source` is whatever the caller
+passes: any client may send as `Autonomy` (which outranks `Remote` and local
+input) or as `Script` (whose commands never lapse). Two clients sending as the
+same source keep each other's commands alive.
+
+ramms-tools re-sends held commands at 10 Hz, one batched request per round,
+and releases them at the end, so a client that drops off stops the robot within
+about 0.3 s plus two frames. Position, Enum and Action controls, keyboard,
+gamepad, touch and Script commands, and the robot's own commands (a drive
+mode's stance, a curb crossing holding the arm still) stay until they are
+changed or released. A drive-mode switch carries held drive commands into the
+new mode as of when they were sent, so it gives a client that already went
+quiet no fresh lease. Details: the RammsCore README, "The drive deadman".
+
+Robot sensing goes through `URammsSensorRigComponent` (RammsCore). The Gen1
+curb pawn ships with one (`SensorRig`: `imu`, `front_tof`, `front_sonar` and an
+RGB-D `front_camera` at the front of the chassis), as does the Gen2 curb pawn in
+the private assets, and `URammsSensingBridge` adds the same sensors to any robot
+at runtime (`ramms-sensors --robot <chair> rig apply chair`; without `--robot` a
+preset goes on the first robot found). Sensing changes need a play world (PIE or
+a game).
+
+A rig camera streams on RMSS channels C, C+100, C+200 and C+300 as
+`camera/<name>/color`, `camera/<name>/depth`, `motion/<name>` and
+`mask/<name>`. These use the stream ids and the `group`, `role` and `fmt`
+metadata that ramms-tools' `StreamSender` uses, with one difference: colour goes
+out as `FrameRGB`, not `StreamSender`'s `ImageData`. Robots carry cameras with
+the same name (`front_camera`), so a client picks a robot's camera by the frame
+metadata's `actor` (and its channel), never by name alone. RMSS needs no header
+or version change for this.
+
+The sim sends frames only to a client that has subscribed (an empty Subscribe
+means every channel), so a send-only client such as `StreamSender` is never
+queued frames, and a camera role is built only while a subscriber wants it.
+Over the bridge, `save_to_disk` is refused, and `StopCameraStreams` stops only
+what the bridge started.
+
+IMU data comes from the physics engine that simulates the body, and needs no
+IMU component:
+
+- `URammsPhysicsImuSubsystem` samples MuJoCo bodies (the RammsMujocoSupport
+  provider, at each MuJoCo step) and Chaos bodies or bones (at each physics
+  step) at the sensor's point.
+- The acceleration is what an accelerometer reads (+g up at rest).
+- `URammsIMUSensorComponent`'s `Source` (Auto by default) uses the same
+  samples, averaged over its update interval. It differences its own transform
+  (`Kinematic`) for a body no engine simulates, or when `bUsePhysicsVelocity`
+  is off.
+- Remote callers read the latest sample (`URammsSensingBridge::ReadBodyImuJson`,
+  `ramms-sensors imu --body chassis`) or every physics-step sample: in batches
+  over Remote Control (`ReadImuSamplesJson`), or as a continuous RMSS stream
+  (`StartImuStreamJson`).
+- Remote callers share 32 of a world's 64 IMU points (a read point expires
+  after 10 s unread) and at most 8 IMU streams; a stream nobody has subscribed
+  to for 30 s stops.
+
+UE 5.6+ refuses remote **function calls** unless they are allow-listed.
+`Config/DefaultRemoteControl.ini` lists:
+
+- the RAMMS bridges (`RammsCoreBridge`, `RammsRemoteBridge`,
+  `RammsWorldGenBridge`, `RammsSensingBridge`), whole: function libraries
+  meant for remote use, with their own limits;
+- function by function, what ramms-tools calls on the robot control surface,
+  the drive-mode selector, the Gen1 and Gen2 curb controllers, the Gen2 seat,
+  the Kinova arm, the gripper, the Gen1 lift controller, the skeletal pose
+  component, the world generator, and the traffic spawner and signal clock;
+- the few engine getters the tools use.
+
+The list is checked against every function call: `/remote/object/call`, each
+call inside `/remote/batch`, and the WebSocket server's calls. A call matches an
+entry when the object's own class is the entry's class (or a subclass of it,
+with `bAllowChildClasses`) and the function's UFUNCTION name equals
+`FunctionName` (case ignored), wherever that function is declared -- an
+inherited function is listed under the class it is called on. A class listed
+whole exposes every Blueprint-callable function it has and inherits (a
+component's `K2_DestroyComponent`, an actor's `K2_DestroyActor`), so add a new
+call by `FunctionName` unless the class is a bridge meant for remote use.
+
+`FunctionName` is optional in UE, so its value goes in parentheses:
+`FunctionName=("SetControl")`. A bare `FunctionName="SetControl"` does not
+parse; the entry is then left without a function and allows every function of
+the class (and, with `bAllowChildClasses`, of every subclass).
+
+The list does **not** cover property access. `/remote/object/property` reads
+and writes any public property that is instance-editable in the editor, or
+Blueprint-visible (and not read-only) in a game -- on any object a client can
+name. Safety settings therefore are not instance-editable Blueprint-writable
+properties: the control surface's deadman window (`DeadmanSeconds`) is a class
+default, and the hold window that is writable (`ExternalHoldSeconds`) is used
+within 0.1 to 2 s whatever it is set to.
+
+Remote Control is reachable from the network: the HTTP server (:30010) binds
+localhost by default, but the WebSocket server (:30020) listens on every
+interface and carries the same calls and property access.
 
 ## Pixel Streaming (Remote Browser Access)
 
