@@ -18,11 +18,25 @@ reference); this page is the workflow.
 | `PRE_Indoor_Office` | an office floor | central corridor with rooms off it, wider doors, desks, filing, whiteboards |
 | `PRE_MainStreet` | a small-town main street | narrow storefronts from the small-business facade kits, wide sidewalks, cafe seating, kerbside parking |
 | `PRE_Indoor_Store` | a grocery / convenience store | gondola aisles (each recorded as an `Aisle` feature, some below the minimum clear width), wall freezers, checkout, stock room |
+| `PRE_GradedDowntown` | downtown on a hill, worn | streets up to 5 % between intersections, crowned roads, walks falling toward the curb (some too steeply), curbs 5-20 cm, panel lips, cracks, heaves, covers, brick and sett patches, potholes, speed humps |
+| `PRE_HillyResidential` | suburban on rolling hills | streets up to 7 %, curbs 8-18 cm, steep cross slopes on some walks, heaves, cracks, speed humps |
+| `PRE_DowntownTraffic` | downtown with moving traffic | 11 m streets with two traffic lanes between the parked cars, signals at the corners; vehicle lanes, a signal clock and cars are added after generation |
+| `PRE_GradedTraffic` / `PRE_HillyDowntown` | the traffic downtown, graded / on a steep hill | the graded downtown's slopes and wear (up to 5 %, or up to 12 % allowed: 2-7 % with seed 21) with traffic |
 
 Example levels: `/Game/Maps/Gen/Map_Gen_Downtown`, `Map_Gen_Suburban`,
 `Map_Gen_Park`, `Map_Gen_Indoor`, `Map_Gen_Office`, `Map_Gen_MainStreet`,
-`Map_Gen_Store` — each a lit level with a
+`Map_Gen_Store`, `Map_Gen_GradedDowntown`, `Map_Gen_HillyResidential` — each a lit level with a
 `WorldGenerator`, the RAMMP Gen1 game mode and a PlayerStart on the first route.
+The traffic levels (`levels.build_level("traffic")`, `"graded_traffic"`, `"hilly_downtown"`) are built from the
+Downtown palette recipe out of locally installed packs, so they are saved under `/Game/WorldGen/Maps` and not
+committed.
+
+**Slopes, cross slopes and curb heights** are parameters like any other: `MaxStreetGrade` (street grades, drawn per
+grid interval within ±the value), `RoadCrown`, `SidewalkCrossSlope` and `NonCompliantCrossSlopeChance` (how the walk
+falls toward the curb), and `CurbHeight` or `CurbHeightMin` / `CurbHeightMax`. Set them on a preset (`presets.py`) or
+on one level's generator (**Param Overrides** + **Override Keys**, `gen.set_param(...)`, or `worldgen_set_param`) and
+regenerate; all at 0 is the flat world. See the plugin README, "Adjusting slope, cross slope and curb heights", for
+what each one does and how they combine.
 
 `NonCompliance` is the dial. At 0 every curb has a compliant ramp, every door
 is 81 cm or wider, every hazard leaves 91 cm; above it, features roll to be
@@ -154,6 +168,8 @@ same-named node property; see the plugin README.
 ## Known limits
 
 Streets are axis-aligned grids; buildings are shells the robot does not
-enter; indoor and outdoor are separate presets; sidewalks have no cross
-slope yet; generated geometry is Chaos collision only (not imported into
-MuJoCo / Newton); pedestrians come from `RammsCrowd`, not the generator.
+enter; indoor and outdoor are separate presets; grades change only at street
+lines, curb ramps and the site's banks (no vertical curves or grade breaks
+part way along a block); generated geometry reaches MuJoCo through the exact
+export (`RammsMujocoSupport`, [worldgen_mujoco_export.md](worldgen_mujoco_export.md))
+but not Newton; pedestrians and traffic come from `RammsCrowd`, not the generator.
