@@ -272,8 +272,16 @@ itself: one code path for the Chaos mesh and the shapes, so they cannot drift.
 | Slab, Curb, Column, Planter, Steps, Ramp (slab, landing, lips), Wall (pieces around openings, frames, glass), Door (leaf, handles, threshold), Roof soffit, warning strip | boxes |
 | Bollard (16-gon), tree trunk and branches (frustums), tree and shrub canopy blobs (sphere-boxes), gable roof (prism), the ramp of a CurbRamp (planar top) | convex hulls of each part's own vertices |
 | CurbRamp flares, Mound and hollow | height grids over the mesh's own vertices |
+| GroundPrisms (graded roads, sidewalks, panels, potholes, covers, pavers) | a level rectangle along the piece's axes is a box; another planar convex top the hull of it and its footprint; a top that is not planar and convex the mesh's own fan, one prism per triangle |
+| Hump and table | a height grid two samples wide (the profile is constant across) |
 | Patch | the hull of the disc and its drop to the ground (same top) |
 | Decal | none (no collision) |
+
+The ground kinds describe themselves from the properties their builders read
+(not through the capture). A piece's scale is baked into its shapes, mirrored
+or not; a height grid that the scale mirrors or turns over, or whose mesh it
+does not match, is exported as one prism per upward-facing triangle of the mesh
+(exact, never a hole).
 
 Canopy blobs are sphere-boxes, whose box projection splits some quads inward
 (dents of a few centimetres); their edges are now flipped to fold outward when
@@ -295,10 +303,16 @@ have been up to about 4 mm on a 15 cm flare).
 it, through the engine's own scaling rules (`FK*Elem::GetFinalScaled`: a box
 keeps its axes and scales its extents, a sphere takes the smallest scale): box,
 sphere, capsule and convex elements, cached per asset. A complex-as-simple mesh
-is exported as the convex hull of its cooked triangles, coarser than Chaos
-wherever it is concave, logged once per asset. CoACD was not used (see below).
-Foliage, non-physics collision, pawns, articulated stand-ins and anything tagged
-`RammsDynamic` (traffic) are skipped.
+is exported as the convex hulls of its cooked triangles' connected parts
+(`RammsCollisionShapes::AppendComponentHulls`: a table is its top and four legs,
+open between them; a part inside a larger part's bounds joins it; at most 64
+per mesh), logged once per asset. A part that is itself concave (an L-shaped
+wall, a doorway in one welded mesh) is still solid inside its hull; CoACD was
+not used (see below). Anything without physics collision (PCG foliage is
+`NoCollision`), pawns, articulated stand-ins, anything tagged `RammsDynamic`
+(traffic) and actors MuJoCo already converts (a `UMjQuickConvertComponent`)
+are skipped; spline meshes and colliding components that are neither static
+meshes nor pieces are not exported, logged once per class.
 
 **Surfaces.** From the segmentation label (`Road` is Asphalt, `Sidewalk`
 Concrete, `Curb` Curb, `Lawn` Grass, `Hazard.Mud` Mud ...), else a physical
@@ -315,42 +329,71 @@ a thin box. Positions, rotations and vertices go through URLab's
 re-sorts a parent's children on every link), and registered under one
 effective-value scope, so authoring stays linear. Geoms are group 3, priority 0,
 default solref and solimp, sliding friction per surface (asphalt, concrete,
-curb 0.9; brick 0.8; cobble 0.7; grass, dirt, gravel, wood 0.6; metal 0.5;
-mud 0.4; glass 0.4; water 0.3; Default 0.9). Robot geoms keep their tuning; an
-equal-priority robot geom takes the larger friction, so values below the
-robot's change nothing.
+curb 1.0; brick 0.8; cobble 0.7; grass, dirt, gravel, wood 0.6; metal 0.5;
+foliage 0.5; mud 0.4; glass 0.4; water 0.3). `Default` (most static meshes)
+and any surface the table does not list take `DefaultFriction`, 1.0. The hard
+surfaces and `Default` are 1.0 because the flat slab they replace was (sliding
+friction 1.0), so a robot geom at 0.9 (RAMMP Gen2's `collision` class, its drive
+links included) still gets 1.0 there. Robot geoms keep their tuning; an
+equal-priority robot geom takes the larger friction, so a softer surface lowers a
+contact only as far as the robot geom's own friction (Gen2's 0.9 geoms see 0.9 on
+grass, cobble or brick; Gen1's 1.0 geoms and the priority-1 omni rollers see no
+change anywhere).
 
 `URammsPhysicsEngineSubsystem` adds one contributor per generator when the
-level runs on MuJoCo (Engine MuJoCo, or Auto with an `AAMjManager`), unless
-`ARammsPhysicsSettings::bMuJoCoWorldShapes` is off or the level has an
-`AMjHeightfieldActor` (`ramms.mj.WorldShapes` 0/1/2 overrides); the flat
-fallback slab is then skipped. The contributor recompiles the scene on
-`OnWorldGenerated` (`AAMjManager::CompileModel`) and reuses its spec for any
-other recompile; `ramms.mj.RecompileWorldShapes` forces one;
+level runs on MuJoCo (Engine MuJoCo, or Auto with an `AAMjManager`, which the
+log announces), unless `ARammsPhysicsSettings::bMuJoCoWorldShapes` is off or
+the level has an `AMjHeightfieldActor` (`ramms.mj.WorldShapes` 0/1/2
+overrides). No generator gets a second contributor, and none gets one when the
+level already has a contributor with no `Generator` (it exports every piece).
+When an exported world has a shape (`SuppliesGround`, which stops at the first
+piece or mesh with one) the flat fallback slab is not added. The contributor
+recompiles the scene on `OnWorldGenerated` (`AAMjManager::CompileModel`), reuses
+its spec for any other recompile, and drops a queued recompile that another
+compile already served; `ramms.mj.RecompileWorldShapes` forces one;
 `ramms.mj.WorldShapesRadius` (or `ExportRadius`) limits the export around the
 suggested start. `ramms.mj.DrawWorldShapes 1|2` draws the compiled geoms (read
 back from `mjModel`) over the level. Counts and times are logged per compile.
 
-**Tests.** `Ramms.WorldGen.CollisionShapes.ProcPieces` (every kind, pitched
-and rolled pieces: union bounds within 1 mm of the mesh, vertical probes
-within 2 mm of Chaos's trace), `Ramms.WorldGen.CollisionShapes.InstancedMeshes`
-(scaled, rotated engine shapes against Chaos simple collision) and
+**Measured** (PIE on MuJoCo): `Map_Gen_MainStreet` exports 1160 geoms and
+compiles in 186 ms; the graded downtown exports 7532 geoms and compiles in
+7.3 s. Step cost and the curb-crossing comparison are not measured yet.
+
+**Tests.** `Ramms.WorldGen.CollisionShapes.ProcPieces` (every kind, ground
+prisms and humps included, pitched, rolled, scaled and mirrored pieces: union
+bounds within 1 mm of the mesh, vertical probes within 2 mm of Chaos's trace,
+mirrored pieces bounds only), `Ramms.WorldGen.CollisionShapes.InstancedMeshes`
+(scaled, rotated engine shapes against Chaos simple collision; excluded
+actors), `Ramms.WorldGen.CollisionShapes.ComponentHulls` (a table exports as
+its five parts, open between the legs where Chaos is),
 `Ramms.MuJoCo.WorldGenExport.MatchesChaos` (`mj_ray` in the compiled model
-against Chaos's trace of every piece).
+against Chaos's trace of every piece, ground kinds included),
+`Ramms.MuJoCo.WorldGenExport.NoDoubleExport` (one contributor per generator,
+none beside one with no `Generator`, quick-converted actors left out) and
+`Ramms.MuJoCo.WorldGenExport.SeamContacts` (reports how far contact normals
+lean sideways as a sphere, a wheel-like cylinder and a roller pad cross the
+seam between two coplanar exported boxes, 2 mm in).
 
 ## Still open after the build
 
-- Measured nothing yet: compile time, geom counts and step cost for
-  `Map_Gen_MainStreet` and a Downtown level; the curb-crossing comparison
-  against the Chaos run and the Phase 0 heightfield run.
+- Step cost with thousands of world geoms, and the curb-crossing comparison
+  against the Chaos run and the Phase 0 heightfield run, are not measured.
+  Every recompile (a robot spawned, a structural edit) still pays URLab's full
+  compile of the world geoms, about 7 s on the graded downtown, even though the
+  authored spec is reused; `ExportRadius` is the lever until that is cheaper.
 - Two compiles at PIE start for `bGenerateOnBeginPlay` levels (question 4):
   the first compile has no world yet (and no fallback slab when the saved
   level already had pieces), the recompile on `OnWorldGenerated` brings it in.
-- Complex-as-simple palette meshes are one hull each; CoACD (cached per asset
-  plus content hash) would make concave ones exact.
-- Graded-street and roughness kinds must split their height-grid meshes with
-  `MatchHeightGridDiagonals` (or build them that way) and add their case to
-  `AppendCollisionShapes`; traffic must tag moving actors `RammsDynamic`.
-- Packaged builds: the complex-as-simple hull reads `TriMeshGeometries` (cooked
+- Concave parts of complex-as-simple palette meshes are solid inside their
+  hulls; CoACD (cached per asset plus content hash) would make them exact.
+- Seams between coplanar neighbours (pavers, panels, the boxes around a
+  pothole) are separate geoms: where a robot geom crosses one, MuJoCo can add a
+  contact on the far geom's edge whose normal leans sideways, a small bump.
+  `Ramms.MuJoCo.WorldGenExport.SeamContacts` measures how far for a sphere, a
+  wheel-like cylinder and a roller pad (it reports, it does not assert); what
+  that does to a crossing is not measured. Chaos's mesh has the same internal
+  walls (one trimesh of closed prisms); whether Chaos bumps there is not
+  measured either.
+- Packaged builds: the complex-as-simple hulls read `TriMeshGeometries` (cooked
   collision), untested in a package.
 - Movable props (Phase 4) and the Newton backend are not started.
