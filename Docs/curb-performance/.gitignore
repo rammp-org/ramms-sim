@@ -1,0 +1,3 @@
+# The recorder's lock and its temporary files beside a history.
+*.lock
+*.tmp

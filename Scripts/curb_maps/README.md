@@ -28,7 +28,9 @@ The frame:
 
 ## Test your robot on them
 
-A robot is chosen by, first that decides:
+`Scripts/curb_runner/run_curb.py` runs a robot's crossings on these maps, measures each one the same way for every robot, and records it in the robot's history. See `Scripts/curb_runner/README.md`. To add your robot, write a profile and an editor-side adapter for it.
+
+To start a map by hand, a robot is chosen by, first that decides:
 
 1. `?Robot=<id>` on the map URL, for example `UnrealEditor Ramms.uproject /Game/Maps/Curb/Map_Curb_A30_URL?Robot=rammp_gen1 -game`;
 2. the `ramms.Robot` console variable, set before Play in the editor (`-RammsRobot=<id>` sets it at startup);

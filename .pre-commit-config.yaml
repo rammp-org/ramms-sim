@@ -15,3 +15,8 @@ repos:
         entry: python Scripts/check_no_private_refs.py
         language: python
         files: ^(Config|Content|Source)/
+    -   id: public-curb-history
+        name: public curb history carries no private robot, repository or local path
+        entry: python Scripts/check_public_history.py
+        language: python
+        files: ^Docs/curb-performance/
