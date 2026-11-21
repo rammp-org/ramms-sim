@@ -58,7 +58,7 @@ namespace RammsPixelStreaming
 	void InstallViewportProducerSwap()
 	{
 #if RAMMS_WITH_PIXEL_STREAMING
-		FCoreDelegates::OnPostEngineInit.AddLambda(
+		FCoreDelegates::GetOnPostEngineInit().AddLambda(
 			[]() {
 				if (!IPixelStreaming2Module::IsAvailable())
 				{
