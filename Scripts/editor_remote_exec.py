@@ -15,6 +15,10 @@ Usage:
 Only an editor of this project ("Ramms"; --project or $RAMMS_EDITOR_PROJECT for another, '*' for any) is used:
 another project's editor answers the same discovery, and this project's commands must not reach it.
 
+$RAMMS_EDITOR_REMOTE_PORT picks another multicast group port, for an editor started with
+-ini:Engine:[/Script/PythonScriptPlugin.PythonScriptPluginSettings]:RemoteExecutionMulticastGroupEndpoint=239.0.0.1:<port>
+(several editors of this project at once, each on its own port).
+
 Exit code 0 on success (and prints the editor-side output), 1 otherwise.
 """
 
@@ -27,7 +31,7 @@ import sys
 import time
 import uuid
 
-MULTICAST_GROUP = ("239.0.0.1", 6766)
+MULTICAST_GROUP = ("239.0.0.1", int(os.environ.get("RAMMS_EDITOR_REMOTE_PORT") or 6766))
 BIND_ADDR = "127.0.0.1"
 # Where we send (send_to: the group instead once another editor answers). The editor binds its multicast socket to
 # BIND_ADDR:port and reads whatever lands there, so unicasting to that endpoint
