@@ -186,6 +186,10 @@ arbitration, so nothing hard-codes a key map or a motor name:
 - **In-game panels** (`RammsUI`): floating drive joystick, caster and lift
   sliders, arm pad, camera-capture (colour, depth, motion and class views) and
   status panels, generated from the surface.
+  The sim uses the plugin's Sim look (`Look=Sim` under
+  `[/Script/RammsUI.RammsControlHUDSettings]` in `Config/DefaultGame.ini`): the
+  robot panel in tabs, one-line rows, a status strip, and prompts for what
+  the robot wants of the user. Remove the line for the Classic look.
 - **Keyboard, gamepad and Enhanced Input** maps bound to control ids.
 - **RammsAccess**: BCI (OpenBCI Galea), pointer / HID devices (head mice, eye
   gaze) and assistive switches, sent as a versioned intent stream over UDP with
