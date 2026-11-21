@@ -29,9 +29,9 @@ Each crossing is one PIE session. Its timing runs inside the editor's own tick, 
 2. **Setup.** At 1 s of simulated time, the robot is put in its standard setup by its adapter's `prepare`.
 3. **The ask.** Once the robot is at rest, the crossing is asked for on the frame nearest 5 s. At rest means the chassis stays within 0.25 cm and 0.1° for 0.5 s, and no powered wheel turns faster than 0.5 rad/s. If it is not at rest, the runner waits at most 5 s more, then asks anyway and flags the crossing as unsteady.
 4. **The stick.** The rider's stick is held forward on every frame the crossing is under way. It is let go on the first frame after the crossing ends, so the drive mode the robot hands back to never drives on.
-5. **The trace.** One sample is taken every frame, from 1 s before the ask until 2 s after the end (`measures.py` documents the format). Every physics step's IMU sample of the rider's body is kept too.
+5. **The trace.** One sample is taken every frame, from 1 s before the ask until 2 s after the end, or 0.5 s after a refusal (`measures.py` documents the format). Every physics step's IMU sample of the rider's body is kept too.
 
-A crossing times out after 90 s of simulated time and is aborted.
+A session gives up when PIE has not started the robot its adapter knows within 5 s of simulated time, or when PIE started another robot. A crossing is aborted 90 s of simulated time after the robot appeared, or after 900 s of wall time.
 
 ## The shared measures (`measures.py`, `shared.version` 1)
 
@@ -44,7 +44,7 @@ All figures are taken from the trace, against the map's terrain (`curb_terrain`)
   - "Down" means its lowest point is within 1 cm of that surface, less the gap the wheel had at rest before the ask, with its hub past the edge.
   - Dips out of "down" shorter than 0.1 s (roller ripple, a bounce) are bridged.
   - A wheel held up at the ask, more than 2 cm over the start surface, is not counted. RAMMP Gen1's raised front omni wheels are an example.
-  - Every counted wheel must be down past the edge at the end. If not, the crossing did not get across and has no crossing times.
+  - Every counted wheel must be down past the edge by 1 s after the end: a wheel still settling as the controller reports Done counts when it gets there, so `t_last_down` can come after `t_done`. If one is not, the crossing did not get across and has no crossing times.
 - **`t_done`**: the controller reports Done.
 - **`t_rest`**: from `t_last_down` on, the chassis stays within 0.25 cm and 0.1° for 0.5 s.
 

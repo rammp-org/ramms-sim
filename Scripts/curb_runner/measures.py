@@ -9,8 +9,9 @@ A trace is a list of samples, oldest first, one per editor frame:
     {"t": simulated time (s),
      "phase": the controller's phase, generic: IDLE before the crossing, PLANNING while a controller plans it (not yet
               carrying it out), any other word while it runs, and DONE, FAULTED or ABORTED as it ends (TERMINAL),
-     "chassis": {"xyz": [x, y, z] (cm, world), "pitch", "yaw", "roll" (deg, the chassis's world rotation)},
-     "seat": {"pitch", "roll"} (deg, the rider's seat; optional: the chassis stands in),
+     "chassis": {"xyz": [x, y, z] (cm, world), "pitch", "yaw", "roll" (deg, the chassis's world rotation as a UE
+                 rotator: pitch nose up, roll positive with the right side (+Y) down)},
+     "seat": {"pitch", "roll"} (deg, the rider's seat, the same convention; optional: the chassis stands in),
      "wheels": [[x, y, z] (cm, world: the wheel's hub) or None, ...] in the robot's wheel order,
      "axles": [[x, y, z] (world unit vector) or None, ...] (optional: from the chassis rotation and each wheel's
               chassis-frame axle)}
@@ -87,6 +88,27 @@ def rotation_axes(pitch, yaw, roll):
     y = (sr * sp * cy - cr * sy, sr * sp * sy + cr * cy, -sr * cp)
     z = (-(cr * sp * cy + sr * sy), cy * sr - cr * sp * sy, cr * cp)
     return x, y, z
+
+
+def plane_rotator(plane, yaw):
+    """(pitch, roll) (deg) of the UE rotator a body lying on a plane (a curb_terrain Plane: z = z_ref + gradient . xy)
+    has at heading yaw: its forward axis in the plane along the heading, its up axis the plane's normal; roll as
+    FMatrix::Rotator takes it (positive lowers +Y), so it is the same convention as a sample's."""
+    g = plane.gradient
+    c, s = math.cos(math.radians(yaw)), math.sin(math.radians(yaw))
+    fx = (c, s, g[0] * c + g[1] * s)
+    n = math.sqrt(sum(v * v for v in fx))
+    fx = tuple(v / n for v in fx)
+    up = (-g[0], -g[1], 1.0)
+    n = math.sqrt(sum(v * v for v in up))
+    up = tuple(v / n for v in up)
+    # UE's axes: Y = Z x X (X forward, Y right, Z up).
+    y = (up[1] * fx[2] - up[2] * fx[1], up[2] * fx[0] - up[0] * fx[2], up[0] * fx[1] - up[1] * fx[0])
+    pitch = math.degrees(math.atan2(fx[2], math.hypot(fx[0], fx[1])))
+    yaw_r = math.atan2(fx[1], fx[0])
+    sy = (-math.sin(yaw_r), math.cos(yaw_r), 0.0)
+    roll = math.degrees(math.atan2(sum(a * b for a, b in zip(up, sy)), sum(a * b for a, b in zip(y, sy))))
+    return pitch, roll
 
 
 def to_world(axes, v):
@@ -291,7 +313,14 @@ def down_time(frame, samples, k, wheel, calib, i_end):
         return g is not None and g <= DOWN_GAP_CM and a >= 0.0
 
     if not ok(i_end):
-        return None
+        # A dip out of "down" at the very end (a bounce, a ripple, a frame without the hub) that is shorter than
+        # BRIDGE_S is bridged too: the stretch then ends on the last sample down before it.
+        j = i_end
+        while j >= 0 and not ok(j):
+            j -= 1
+        if j < 0 or samples[i_end]["t"] - _out_time(samples, state, j, j + 1) >= BRIDGE_S:
+            return None
+        i_end = j
     i = i_end
     while i > 0:
         if ok(i - 1):
@@ -386,8 +415,8 @@ def _unflat(v):
 
 
 def forward_speeds(samples):
-    """(t, signed speed along the chassis's heading, cm/s) over windows exactly SPEED_WINDOW_S long that end on a
-    sample (window_changes' first kind), the heading taken at the window's end."""
+    """(t, signed speed along the chassis's heading, cm/s) over windows exactly SPEED_WINDOW_S long (window_changes:
+    those that end on a sample and those that begin on one), in time order, the heading taken at the window's end."""
     out = []
     for d, s in window_changes(samples, chassis_xy, SPEED_WINDOW_S):
         yaw = math.radians((s.get("chassis") or {}).get("yaw", 0.0))
@@ -511,17 +540,20 @@ def shared_figures(samples, wheels, frame, t_ask, t_begin=None, source="trace"):
 
     fd, fr = final(t_done), final(t_rest)
     att_ask = value_at(samples, t_ask, chassis_attitude)
-    # The final attitude less the ask's, less what the surfaces explain (the end surface's tilt at the heading less the
-    # start surface's): ~0 for a robot that ends as it stood.
+    # The final attitude less the ask's, less what the surfaces explain: the end surface's attitude at the heading at
+    # Done less the start surface's at the heading at the ask, both as the rotator a body lying on them has
+    # (plane_rotator): ~0 for a robot that ends as it stood.
     unexplained = (None, None)
-    if fd[1] is not None and att_ask and hasattr(frame.plane_to, "tilt_deg"):
-        yaw = (sample_ask.get("chassis") or {}).get("yaw", 0.0)
-        tf, tt = frame.plane_from.tilt_deg(yaw), frame.plane_to.tilt_deg(yaw)
+    if fd[1] is not None and att_ask and hasattr(frame.plane_to, "gradient"):
+        yaw_ask = (sample_ask.get("chassis") or {}).get("yaw", 0.0)
+        yaw_done = value_at(samples, t_done, lambda s: [(s.get("chassis") or {}).get("yaw", 0.0)])[0]
+        tf, tt = plane_rotator(frame.plane_from, yaw_ask), plane_rotator(frame.plane_to, yaw_done)
         unexplained = (fd[1] - att_ask[0] - (tt[0] - tf[0]), fd[2] - att_ask[1] - (tt[1] - tf[1]))
     seat_ask = value_at(samples, t_ask, seat_attitude)
     out["attitude"] = {
         "max_seat_incl_deg": rnd(max_incl(a, seat_attitude)) if a else None,
         "max_chassis_incl_deg": rnd(max_incl(a, chassis_attitude)) if a else None,
+        "max_chassis_incl_to_done_deg": rnd(max_incl(b, chassis_attitude)) if b else None,
         "max_seat_incl_to_done_deg": rnd(max_incl(b, seat_attitude)) if b else None,
         "seat_tilt_rate_deg_s": rnd(tilt_rate_total(a, seat_attitude)) if a else None,
         "chassis_tilt_rate_deg_s": rnd(tilt_rate_total(a, chassis_attitude)) if a else None,

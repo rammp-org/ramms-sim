@@ -41,6 +41,7 @@ STEADY_RAD_S = 0.5
 STEADY_MAX_WAIT_S = 5.0
 STEADY_LEAD_S = 1.0
 TRACE_LEAD_S = 1.0
+ROBOT_WAIT_SIM_S = 5.0  # PIE without a robot the adapter knows this long: an error, not a wait
 TERMINAL = ("DONE", "FAULTED", "ABORTED")
 
 les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
@@ -131,10 +132,14 @@ def place_start(ct, cfg):
     unreal._curb_runner_moved_start = (ues.get_editor_world().get_path_name(), start.get_actor_location(),
                                        start.get_actor_rotation())
     if cfg["start"] == "top":
-        loc, x_axis, z_axis = ct.Layout(ct.BY_ID[cfg["scenario"]]).top_start_pose(None)
+        # Where a descent from the sidewalk starts (curb_terrain: nearer the near edge on a sidewalk falling toward
+        # the far one, where the robots rolled over the far edge before the crossing began).
+        L = ct.Layout(ct.BY_ID[cfg["scenario"]])
+        past = L.top_cross_past()
+        loc, x_axis, z_axis = L.top_start_pose(past)
         start.set_actor_location(unreal.Vector(*loc), False, False)
         start.set_actor_rotation(unreal.MathLibrary.make_rot_from_xz(unreal.Vector(*x_axis), unreal.Vector(*z_axis)), False)
-        return {"xyz": list(loc), "kind": "top"}
+        return {"xyz": list(loc), "kind": "top", "past_cm": past}
     off = float(cfg.get("start_offset_cm") or 0.0)
     loc = start.get_actor_location()
     if off:
@@ -237,15 +242,22 @@ def step(s):
         return
     t = sim_time(w)
     if s.get("adapter") is None:
+        # The robot PIE started, checked before looking for it: another robot, or the picker (no robot: an id that
+        # matched nothing), ends the session at once rather than waiting for a controller that never comes.
+        s["robot_active"] = unreal.RammsRobotBridge.get_active_robot_id()
+        s["robot_source"] = unreal.RammsRobotBridge.get_active_robot_source()
+        if s["robot_active"] and s["robot_active"] != cfg["robot_id"]:
+            raise RuntimeError("PIE started robot %r (%s), not %s" % (s["robot_active"], s["robot_source"], cfg["robot_id"]))
         mod = load_adapter(cfg["adapter"])
         s["adapter"] = mod["find"](w, cfg["wheels"])
         if s["adapter"] is None:
+            if t > ROBOT_WAIT_SIM_S or now_wall - s["started_wall"] > 120.0:
+                raise RuntimeError("no robot the adapter knows in PIE after %.1f s (active robot %r: %s)" % (
+                    t, s["robot_active"], s["robot_source"]))
             return
-        s["first_t"] = round(t, 4)
-        s["robot_active"] = unreal.RammsRobotBridge.get_active_robot_id()
-        s["robot_source"] = unreal.RammsRobotBridge.get_active_robot_source()
         if s["robot_active"] != cfg["robot_id"]:
             raise RuntimeError("PIE started robot %r (%s), not %s" % (s["robot_active"], s["robot_source"], cfg["robot_id"]))
+        s["first_t"] = round(t, 4)
         s["actor_path"] = s["adapter"].pawn.get_path_name()
         s["stage"] = "setup"
     a = s["adapter"]
@@ -365,8 +377,8 @@ def op_begin(cfg):
     placed = place_start(ct, cfg)
     if getattr(unreal, "_curb_runner_saved", None) is None:
         unreal._curb_runner_saved = {"t.MaxFPS": cvar_float("t.MaxFPS"), "robot": unreal.RammsRobotCatalog.get_console_robot()}
-    if cfg.get("max_fps"):
-        console("t.MaxFPS %s" % cfg["max_fps"])
+    if cfg.get("max_fps") is not None:
+        console("t.MaxFPS %s" % cfg["max_fps"])  # 0: uncapped
     unreal.RammsRobotCatalog.set_console_robot(cfg["robot_id"])
     unreal._curb_runner_session = {"cfg": cfg, "stage": "wait_pie", "samples": [], "imu": [], "steady": Steady(),
                                    "started_wall": time.time(), "start_placed": placed, "finished": False,

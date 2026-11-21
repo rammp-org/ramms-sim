@@ -158,6 +158,49 @@ class Events(unittest.TestCase):
         self.assertAlmostEqual(f.gap_to((800.0, 700.0, NEAR_Z + R), R), 0.0, places=3)
 
 
+class Surfaces(unittest.TestCase):
+    def test_plane_rotator_matches_rotation_axes(self):
+        for sid in ("W6", "X6P_G", "A30_X6", "A30N_G4X4", "G6", "T6"):
+            L = ct.Layout(ct.BY_ID[sid])
+            for name, plane in L.planes.items():
+                for yaw in (0.0, 17.0, -30.0):
+                    pitch, roll = m.plane_rotator(plane, yaw)
+                    x, y, z = m.rotation_axes(pitch, yaw, roll)
+                    nrm = (-plane.gradient[0], -plane.gradient[1], 1.0)
+                    k = math.sqrt(sum(v * v for v in nrm))
+                    for i in range(3):
+                        self.assertAlmostEqual(z[i], nrm[i] / k, places=9, msg="%s %s %s" % (sid, name, yaw))
+
+    def test_following_the_surfaces_is_level(self):
+        """A W6 climb whose chassis lies on the near road at the ask and on the twisted sidewalk at Done has no
+        attitude change the surfaces do not explain (the roll convention and the heading at each end)."""
+        L = ct.Layout(ct.BY_ID["W6"])
+        f = m.Frame(L, "up")
+        p0, r0 = m.plane_rotator(L.planes["near"], 0.0)
+        p1, r1 = m.plane_rotator(L.planes["top"], 4.0)
+        tr = make_trace()
+        for s in tr:
+            done = s["t"] >= T_DONE - 1.0
+            s["chassis"].update({"pitch": p1 if done else p0, "roll": r1 if done else r0, "yaw": 4.0 if done else 0.0})
+        sh = m.shared_figures(tr, WHEELS, f, T_ASK)
+        self.assertAlmostEqual(sh["attitude"]["final_roll_change_deg"], 0.0, places=2)
+        self.assertAlmostEqual(sh["attitude"]["final_pitch_change_deg"], 0.0, places=2)
+        self.assertGreater(abs(r1 - r0), 3.0)  # the test means something: the twist changes the roll
+
+    def test_dip_at_the_settle_sample_bridged(self):
+        tr = make_trace()
+        i = max(k for k, s in enumerate(tr) if s["t"] <= T_DONE + 0.05 + m.SETTLE_S)
+        def hook(name, t, a, z):
+            return z + 1.5 if name == "rear" and abs(t - tr[i]["t"]) < 1e-9 else z
+        f = m.shared_figures(make_trace(wheel_hook=hook), WHEELS, frame(), T_ASK)
+        self.assertTrue(f["across"])
+        self.check_t(f["events"]["down"]["rear"], T_ASK + (497.0 - X0) / V)
+
+    def check_t(self, got, want):
+        self.assertIsNotNone(got)
+        self.assertLessEqual(abs(got - want), 0.005)
+
+
 class Speeds(unittest.TestCase):
     def test_stop_counted(self):
         tr = []

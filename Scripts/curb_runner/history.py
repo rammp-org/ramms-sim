@@ -3,9 +3,9 @@
 crossings can be tracked and plotted over time, and compared with another robot's run the same way.
 
     python -I Scripts/curb_runner/history.py add RUN [RUN ...] [--history FILE] [--label TEXT]
-    python -I Scripts/curb_runner/history.py csv [--history FILE] [--out FILE.csv]
-    python -I Scripts/curb_runner/history.py plot [--history FILE ...] [--robot NAME] [--out FILE.html] [--all]
-    python -I Scripts/curb_runner/history.py list [--history FILE]
+    python -I Scripts/curb_runner/history.py csv --history FILE [--out FILE.csv]
+    python -I Scripts/curb_runner/history.py plot --history FILE [--history FILE ...] [--robot NAME] [--out FILE.html] [--all]
+    python -I Scripts/curb_runner/history.py list --history FILE
 
 Each RUN is a run_curb.py --out folder (results.json, or rep<k>/results.json, with the traces beside them); the runner
 records every run itself as it ends. A record (schema 3; Docs/curb-performance/README.md describes every field):
@@ -41,6 +41,8 @@ import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.normpath(os.path.join(HERE, "..", ".."))
+if HERE not in sys.path:
+    sys.path.insert(0, HERE)  # history_plot, robots (python -I leaves the script's folder off the path)
 DEFAULT_OUT = os.path.join(ROOT, "Saved", "CurbHistory")
 SCHEMA = 3
 RUN_SIDE_FILE = "history_run.json"
@@ -84,17 +86,21 @@ HISTORIES = {}
 
 
 def register(name, history_file, standard, public=True, repos=PUBLIC_REPOS, record_fn=None):
+    """A robot's history: its file, its standard-settings predicate, whether the file is public (its lines then must
+    pass Scripts/check_public_history.py's rules), the repositories its code state names, and its record builder."""
     HISTORIES[name] = {"file": history_file, "public": public, "standard": standard, "repos": repos, "record": record_fn}
 
 
 def register_profiles():
-    """Every robot profile with a history (robots/), registered."""
-    sys.path.insert(0, HERE)
+    """Every robot profile with a history (robots/), registered. A profile whose history is not public may name more
+    repositories (its `repos`: [(name, path from the project, extra git status arguments)]), the public ones first."""
     import robots
     for prof in robots.load_all().values():
         if prof.get("history_robot") and prof.get("history_file"):
+            public = bool(prof.get("history_public", True))
+            repos = PUBLIC_REPOS if public else PUBLIC_REPOS + tuple(tuple(r) for r in (prof.get("repos") or ()))
             register(prof["history_robot"], prof["history_file"], prof.get("standard") or (lambda row: False),
-                     public=bool(prof.get("history_public", True)))
+                     public=public, repos=repos)
 
 
 # --- code ---------------------------------------------------------------------------------------------------------
@@ -156,16 +162,42 @@ def rel_path(p):
     return rel.replace("\\", "/")
 
 
+def is_abs(s):
+    return os.path.isabs(s) or re.match(r"^[A-Za-z]:[\\/]", s) is not None or s.startswith(("/", "\\"))
+
+
 def public_argv(argv):
-    """argv with every path made project-relative (rel_path)."""
+    """argv with every path made project-relative (rel_path), an option's joined value (--out=PATH) too."""
     out = []
     for a in argv or []:
         s = str(a)
-        if os.path.isabs(s) or re.match(r"^[A-Za-z]:[\\/]", s) or s.startswith("/"):
+        if s.startswith("-") and "=" in s:
+            k, v = s.split("=", 1)
+            out.append(k + "=" + (rel_path(v) if is_abs(v) else v.replace("\\", "/")))
+        elif is_abs(s):
             out.append(rel_path(s))
         else:
             out.append(s.replace("\\", "/"))
     return out
+
+
+ABS_PATH = re.compile(r"(?<![A-Za-z0-9])(?:[A-Za-z]:[\\/]|\\\\|/(?:Users|home)/)[^\s'\"<>|,;]*")
+
+
+def public_text(text):
+    """Free text (a status, a reason, a label) with any absolute path in it made project-relative."""
+    if not isinstance(text, str):
+        return text
+    return ABS_PATH.sub(lambda m: rel_path(m.group(0)), text)
+
+
+def public_rules():
+    """Scripts/check_public_history.py's rules: what no line of a public history may carry."""
+    p = os.path.join(ROOT, "Scripts", "check_public_history.py")
+    ns = {"__name__": "check_public_history"}
+    with open(p, encoding="utf-8") as f:
+        exec(compile(f.read(), p, "exec"), ns)
+    return ns["RULES"]
 
 
 # --- reading a run --------------------------------------------------------------------------------------------------
@@ -179,17 +211,28 @@ def load_json(p):
 
 
 def run_rows(run_dir):
-    """(rep, rows, results path) for every results.json of a run: the top-level one alone when there is one, else
-    rep<k>/results.json."""
+    """(rep, rows, results path) for every results.json of a run: the top-level one, or rep<k>/results.json (a
+    --repeat run); a folder that holds both (one run, then another with --repeat) gives the newer."""
     top = os.path.join(run_dir, "results.json")
-    if os.path.exists(top):
-        return [(1, load_json(top) or [], top)]
-    out = []
+    reps = []
     for p in glob.glob(os.path.join(run_dir, "rep*", "results.json")):
         m = re.fullmatch(r"rep(\d+)", os.path.basename(os.path.dirname(p)))
         if m:
-            out.append((int(m.group(1)), load_json(p) or [], p))
-    return sorted(out, key=lambda x: x[0])
+            reps.append((int(m.group(1)), p))
+    if os.path.exists(top) and (not reps or os.path.getmtime(top) >= max(os.path.getmtime(p) for _, p in reps)):
+        if reps:
+            print("curb history: %s holds both results.json and rep*/: the newer, results.json, counts" % rel_path(run_dir))
+        return [(1, load_json(top) or [], top)]
+    if reps and os.path.exists(top):
+        print("curb history: %s holds both results.json and rep*/: the newer, rep*/, count" % rel_path(run_dir))
+    return sorted(((rep, load_json(p) or [], p) for rep, p in reps), key=lambda x: x[0])
+
+
+def run_id(run_dir):
+    """A run folder's identity, the same however its path is typed (records of a folder added again replace its
+    earlier ones; two folders with the same last name stay apart): a hash, not a path."""
+    import hashlib
+    return hashlib.sha1(os.path.normcase(os.path.realpath(run_dir)).encode("utf-8")).hexdigest()[:16]
 
 
 def num(x, nd=3):
@@ -230,13 +273,14 @@ def record(row, rep, results_path, run_dir, meta, code, label):
         "descent_start": row.get("descent_start"),
         "rep": rep,
         "ran_at": row.get("ran_at") or meta.get("started"),
-        "label": label,
-        "run": {"dir": rel_path(run_dir), "started": meta.get("started"), "argv": public_argv(meta.get("argv")),
-                "editors": (len(editors) if isinstance(editors, list) else editors) or None},
+        "label": public_text(label),
+        "run": {"id": run_id(run_dir), "dir": rel_path(run_dir), "started": meta.get("started"),
+                "argv": public_argv(meta.get("argv")), "editors": (len(editors) if isinstance(editors, list) else editors) or None},
         "code": code,
         "settings": s,
         "outcome": {"phase": o.get("phase"), "pass": o.get("pass"), "met": o.get("met"), "expect": o.get("expect"),
-                    "failed": sorted(set(o.get("failed") or [])) or None, "status": o.get("status"), "why": o.get("why") or None},
+                    "failed": sorted(set(o.get("failed") or [])) or None, "status": public_text(o.get("status")),
+                    "why": public_text(o.get("why")) or None},
         "shared": row.get("shared"),
         "rider": row.get("rider"),
         "controller": row.get("controller"),
@@ -349,7 +393,7 @@ def add_runs(run_dirs, history=None, label=None, quiet=False):
     the checkout now (kept as `at_record`)."""
     if not HISTORIES:
         register_profiles()
-    by_file = {}
+    by_file, public_by_file = {}, {}
     for run_dir in run_dirs:
         side = load_json(os.path.join(run_dir, RUN_SIDE_FILE)) or {}
         meta = dict(side.get("meta") or {})
@@ -366,16 +410,31 @@ def add_runs(run_dirs, history=None, label=None, quiet=False):
                 code = {"ran_on": side["ran_on"]} if side.get("ran_on") else {"at_record": code_state(repos)}
                 build = (h or {}).get("record") or record
                 rec = build(row, rep, path, run_dir, meta, code, label or meta.get("label"))
-                by_file.setdefault(target, {}).setdefault(rel_path(run_dir), []).append(rec)
+                by_file.setdefault(target, {}).setdefault(rec["run"].get("id") or rec["run"]["dir"], []).append(rec)
+                public_by_file[target] = (h or {}).get("public", True)
     n = 0
     for target, new in by_file.items():
+        if public_by_file.get(target):
+            # A public history takes no line its pre-commit hook would refuse.
+            rules = public_rules()
+            for recs in new.values():
+                for rec in recs:
+                    line = json.dumps(rec, separators=(",", ":"))
+                    hit = next((what for rx, what in rules if rx.search(line)), None)
+                    if hit:
+                        raise ValueError("a record for the public history %s carries %s: not written" % (rel_path(target), hit))
         with HistoryLock(target):
             have = read_history(target)
+
+            def key(r):
+                return r["run"].get("id") or r["run"]["dir"]
             old_label = {}
             for r in have:
                 if r.get("label"):
-                    old_label.setdefault(r["run"]["dir"], r["label"])
-            kept = [r for r in have if r["run"]["dir"] not in new]
+                    old_label.setdefault(key(r), r["label"])
+            # A record from before run ids (none) is replaced by the same folder's new ones.
+            new_dirs = {rec["run"]["dir"] for recs in new.values() for rec in recs}
+            kept = [r for r in have if key(r) not in new and (r["run"].get("id") or r["run"]["dir"] not in new_dirs)]
             for d, recs in new.items():
                 for rec in recs:
                     if not rec.get("label") and old_label.get(d):

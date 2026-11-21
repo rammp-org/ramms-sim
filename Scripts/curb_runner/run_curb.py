@@ -47,13 +47,27 @@ LIFT_RAD = 0.5 * 3.14159265 / 180.0  # a lift back within half a degree ...
 LIFT_CM = 0.5  # ... or half a centimetre (the translators)
 
 
-def op(words, timeout=180):
-    """Run runner_op.py in the editor with `words` (its own namespace each call: runpy) and return its reply."""
+OP_TRIES = 3  # a remote call the editor missed (busy starting PIE: discovery gives up) is tried again
+OP_RETRY_S = 2.0
+
+
+def op(words, timeout=180, tries=OP_TRIES):
+    """Run runner_op.py in the editor with `words` (its own namespace each call: runpy) and return its reply; a call
+    with no reply is tried again (tries in all)."""
     code = ("import unreal, runpy; unreal._curb_runner_op = %r; runpy.run_path(%r, run_name='__curb_runner__')" % (words, OP))
-    r = subprocess.run([sys.executable, "-I", EXEC, "--code", code], capture_output=True, text=True, timeout=timeout)
-    lines = [l.split(TAG + " ", 1)[1] for l in (r.stdout + r.stderr).splitlines() if (TAG + " ") in l]
+    for k in range(tries):
+        try:
+            r = subprocess.run([sys.executable, "-I", EXEC, "--code", code], capture_output=True, text=True, timeout=timeout)
+            lines = [l.split(TAG + " ", 1)[1] for l in (r.stdout + r.stderr).splitlines() if (TAG + " ") in l]
+            why = "" if lines else (r.stdout[-2000:] + r.stderr[-2000:])
+        except subprocess.TimeoutExpired:
+            lines, why = [], "timed out after %d s" % timeout
+        if lines:
+            break
+        if k < tries - 1:
+            time.sleep(OP_RETRY_S)
     if not lines:
-        raise RuntimeError("%s: no reply from the editor\n%s%s" % (words.split()[0], r.stdout[-2000:], r.stderr[-2000:]))
+        raise RuntimeError("%s: no reply from the editor\n%s" % (words.split()[0], why))
     d = json.loads(lines[-1])
     if not d.get("ok"):
         raise RuntimeError("%s: %s" % (words.split()[0], d.get("error")))
@@ -88,8 +102,13 @@ def row_of(prof, sid, direction, trace, expect, start, ran_at):
     end = trace.get("end") or {}
     layout = ct.Layout(ct.BY_ID[sid])
     frame = measures.Frame(layout, direction)
+    cfg = trace.get("cfg") or {}
+    wheels = cfg.get("wheels") or prof["wheels"]  # the order the samples were taken in
+    if trace.get("error") and not end:
+        # The session failed (PIE did not start, another robot, an adapter call raised): not a crossing.
+        return error_row(prof, sid, direction, expect, "the session: %s" % trace["error"])
     phase = end.get("phase") or ("REFUSED" if trace.get("refused") else "TIMEOUT")
-    shared = (measures.shared_figures(samples, prof["wheels"], frame, ask["t"]) if ask.get("t") is not None and ask.get("accepted")
+    shared = (measures.shared_figures(samples, wheels, frame, ask["t"]) if ask.get("t") is not None and ask.get("accepted")
               else None)
     rider = None
     if shared and trace.get("imu") and not trace.get("imu_dropped"):
@@ -102,16 +121,18 @@ def row_of(prof, sid, direction, trace, expect, start, ran_at):
     controller["lifts_back"] = lifts_back(ask.get("lifts"), end.get("lifts"))
     fmed, fmax, fp99 = frame_stats(samples)
     rate = trace.get("imu_rate_hz")
-    cfg = trace.get("cfg") or {}
+    setup = dict(cfg["setup"]) if isinstance(cfg.get("setup"), dict) else dict(prof.get("setup") or {})
+    if cfg.get("stick") is not None:
+        setup["stick"] = cfg["stick"]
     row = {
         "robot_id": prof["robot_id"], "history_robot": prof.get("history_robot"), "scenario": sid, "dir": direction,
         "start": "standing", "descent_start": (cfg.get("start") if direction == "down" else None), "ran_at": ran_at,
-        "settings": {"max_fps": cfg.get("max_fps"), "frame_ms": fmed, "frame_max_ms": fmax, "frame_p99_ms": fp99,
+        "settings": {"max_fps": trace.get("max_fps_set", cfg.get("max_fps")), "frame_ms": fmed, "frame_max_ms": fmax, "frame_p99_ms": fp99,
                      "physics_step_ms": round(1000.0 / rate, 3) if rate else None, "maps": "public",
                      "ask_sim_s": cfg.get("ask_sim_s"), "steady": bool((ask.get("steady") or {}).get("steady")),
                      "late_s": ask.get("late_s"), "cvars": None,
-                     "robot": {**(prof.get("setup") or {}), "start_offset_cm": cfg.get("start_offset_cm") if direction == "up" else None,
-                               "start": start}},
+                     "robot": {**setup, "start_offset_cm": cfg.get("start_offset_cm") if direction == "up" else None,
+                               "start": start, "start_past_cm": (trace.get("start_placed") or {}).get("past_cm")}},
         "outcome": {"phase": phase, "status": end.get("status"), "why": trace.get("refused") or (trace.get("error") or None),
                     "expect": expect},
         "shared": shared, "rider": rider, "controller": controller,
@@ -120,6 +141,14 @@ def row_of(prof, sid, direction, trace, expect, start, ran_at):
     sc = scoring.score(row, expect, frame.step_range, prof.get("checks"))
     row["outcome"].update(sc)
     return row
+
+
+def error_row(prof, sid, direction, expect, why):
+    """A crossing that did not run: never recorded in a history (its why starts "error:"), always counted as a
+    failure in the exit status, whatever was expected."""
+    return {"robot_id": prof["robot_id"], "history_robot": prof.get("history_robot"), "scenario": sid, "dir": direction,
+            "outcome": {"phase": "ERROR", "met": False, "pass": False, "why": "error: %s" % why, "expect": expect,
+                        "failed": ["not run"]}}
 
 
 def summary_line(r):
@@ -161,24 +190,49 @@ def run_one(prof, sid, direction, out_dir, max_fps):
            "stick": (prof.get("setup") or {}).get("stick", 1.0), "max_fps": max_fps, "post_s": POST_S,
            "timeout_sim_s": TIMEOUT_SIM_S, "timeout_wall_s": TIMEOUT_WALL_S, "trace_path": trace_path}
     ran_at = history.now_utc()
+    cfg["token"] = "%s %s %s %s" % (ran_at, sid, direction, os.getpid())  # the trace read must be this session's
+    for p in (trace_path, trace_path + ".tmp"):
+        if os.path.exists(p):
+            os.remove(p)
     try:
         op("end")
     except RuntimeError:
         pass
     time.sleep(3.0)
-    op("begin " + json.dumps(cfg))
-    deadline = time.monotonic() + TIMEOUT_WALL_S + 120.0
     st = {}
-    while time.monotonic() < deadline:
-        time.sleep(1.0)
-        st = op("status")
-        if st.get("finished") or st.get("stage") is None:
-            break
-    op("end")
+    try:
+        try:
+            op("begin " + json.dumps(cfg))
+        except RuntimeError as exc:
+            if "PIE was running" not in str(exc):
+                raise
+            time.sleep(5.0)  # the last PIE was still ending
+            op("begin " + json.dumps(cfg))
+        deadline = time.monotonic() + TIMEOUT_WALL_S + 120.0
+        misses = 0
+        while time.monotonic() < deadline:
+            time.sleep(1.0)
+            try:
+                st = op("status")
+                misses = 0
+            except RuntimeError:
+                misses += 1  # the editor busy: the session goes on in it
+                if misses >= 10:
+                    raise
+                continue
+            if st.get("finished") or st.get("stage") is None:
+                break
+    finally:
+        try:
+            op("end")
+        except RuntimeError as exc:
+            print("  (ending PIE: %s)" % str(exc).splitlines()[0])
     if not os.path.exists(trace_path):
         raise RuntimeError("no trace written (%s)" % (st.get("error") or st.get("stage")))
     with open(trace_path, encoding="utf-8") as f:
         trace = json.load(f)
+    if (trace.get("cfg") or {}).get("token") != cfg["token"]:
+        raise RuntimeError("the trace at %s is not this session's" % trace_path)
     if trace.get("error"):
         print("  (the session: %s)" % trace["error"])
     expect = prof["expect"](sid, direction)
@@ -224,6 +278,7 @@ def main():
     ap.add_argument("--history-label", default=None)
     ap.add_argument("--list", action="store_true", help="the robots there are, and exit")
     ap.add_argument("--rescore", default=None, metavar="DIR", help="make a run folder's rows again from its traces")
+    ap.add_argument("--overwrite", action="store_true", help="run into an --out folder that holds an earlier run")
     args = ap.parse_args()
     if args.rescore:
         rows = rescore(args.rescore)
@@ -248,16 +303,44 @@ def main():
         print("unknown scenarios: %s" % ", ".join(unknown))
         return 2
     dirs = [d for d in args.dirs.split(",") if d]
+    bad_dirs = [d for d in dirs if d not in ct.DIRECTIONS]
+    if bad_dirs or not dirs:
+        print("--dirs takes %s, not %s" % (",".join(ct.DIRECTIONS), args.dirs))
+        return 2
     max_fps = args.max_fps if args.max_fps is not None else prof.get("max_fps")
     stamp = datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S")
     out = os.path.abspath(args.out or os.path.join(history.DEFAULT_OUT, "runs", "%s-%s" % (stamp, prof["robot_id"])))
+    if history.run_rows(out) and not args.overwrite:
+        print("%s holds an earlier run's results: another --out, or --overwrite" % out)
+        return 2
+    for rep, _, path in history.run_rows(out):  # --overwrite: the earlier run's results go, not just some of them
+        os.remove(path)
     os.makedirs(out, exist_ok=True)
-    ran_on = history.code_state()
+    history.register_profiles()
+    ran_on = history.code_state((history.HISTORIES.get(prof.get("history_robot")) or {}).get("repos") or history.PUBLIC_REPOS)
     meta = {"argv": [os.path.relpath(__file__, ROOT).replace("\\", "/")] + sys.argv[1:], "started": history.now_utc(),
             "robot_id": prof["robot_id"], "editors": 1, "label": args.history_label}
     history.write_atomically(os.path.join(out, "run.json"), lambda f: f.write(json.dumps(meta, indent=1) + "\n"))
     history.write_run_side_file(out, ran_on, meta)
     all_rows, bad = [], 0
+    try:
+        run_all(args, prof, scenarios, dirs, max_fps, out, all_rows)
+    finally:
+        try:
+            op("end", tries=1)  # PIE, t.MaxFPS, ramms.Robot and the PlayerStart back, however the run ended
+        except Exception:  # noqa: BLE001
+            pass
+    bad = sum(1 for r in all_rows if r["outcome"].get("met") is False)
+    if not args.no_history:
+        history.add_runs([out], args.history, args.history_label)
+    print("results in %s" % out)
+    if not all_rows:
+        print("no crossing ran")
+        return 1
+    return 1 if bad else 0
+
+
+def run_all(args, prof, scenarios, dirs, max_fps, out, all_rows):
     for rep in range(1, args.repeat + 1):
         d = os.path.join(out, "rep%d" % rep) if args.repeat > 1 else out
         rows = []
@@ -270,19 +353,11 @@ def main():
                 try:
                     row = run_one(prof, sid, direction, d, max_fps)
                 except Exception as exc:  # one broken crossing must not lose the others
-                    row = {"robot_id": prof["robot_id"], "history_robot": prof.get("history_robot"), "scenario": sid,
-                           "dir": direction, "outcome": {"phase": None, "met": False, "why": "error: %s" % exc,
-                                                         "expect": prof["expect"](sid, direction), "failed": ["not run"]}}
+                    row = error_row(prof, sid, direction, prof["expect"](sid, direction), str(exc).splitlines()[0])
                 rows.append(row)
+                all_rows.append(row)
                 print("  " + summary_line(row), flush=True)
                 write_results(d, rows)
-        all_rows += rows
-        bad += sum(1 for r in rows if r["outcome"].get("met") is False)
-    if not args.no_history:
-        history.register_profiles()
-        history.add_runs([out], args.history, args.history_label)
-    print("results in %s" % out)
-    return 1 if bad else 0
 
 
 if __name__ == "__main__":

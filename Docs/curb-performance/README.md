@@ -46,7 +46,7 @@ From the map's PlayerStart itself, the front hubs are about 153 cm from the edge
 
 RAMMP Gen1's physics step is 2 ms (its MJCF). Its controller, like the runner, acts once per editor frame, so the frame rate is part of the setup. Its maps:
 - **pass**: S0 (6 in) and S4 (4 in), up and down;
-- **refusal expected**: S8 (taller than its 17 cm limit), and A15, A30, A30N and R_A40 (off square);
+- **refusal expected, climbing**: S8 (taller than its 17 cm limit), and A15, A30, A30N and R_A40 (off square); their descents are explore;
 - **explore**: the other maps, run and recorded but not scored.
 
 ## Against the real robot

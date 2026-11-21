@@ -5,8 +5,8 @@ order (every run one column, its repeats side by side, its median a line), marke
 for a robot whose runner scores fluidity), ringed = passed but not met or not fluid, a red cross = failed. A filter row
 picks the measure, the direction, the start and whether only runs at the standard settings show; an overview gives each
 run's share of crossings that met their expectation; a table lists the runs. Robots are series, so two robots' crossings
-share a chart when both ran the same one. The shared measures (measures.py, the same for every robot) come first;
-write(..., measures=...) adds a robot's own.
+share a chart when both ran the same one. The shared measures (measures.py, the same for every robot) are the page's;
+write(..., measures=...) gives it another list instead (a robot's own, with the shared ones where wanted).
 """
 
 import html
@@ -64,6 +64,23 @@ def describe_code(code):
     return out
 
 
+def flat_settings(settings, prefix=""):
+    """A record's settings as one level of name -> text (nested ones as name.field), for the page's tooltip: what is
+    unset (None, False, "") left out, a 0 kept."""
+    out = {}
+    for k, v in settings.items():
+        if k == "standard" and not prefix:
+            continue
+        name = prefix + k
+        if isinstance(v, dict):
+            out.update(flat_settings(v, name + "."))
+        elif v is None or v is False or v == "":
+            continue
+        else:
+            out[name] = v if isinstance(v, (int, float, str)) else json.dumps(v)
+    return out
+
+
 def slim(rec, measures):
     """What the page needs of a record."""
     o = rec.get("outcome") or {}
@@ -72,7 +89,7 @@ def slim(rec, measures):
         "robot": rec.get("robot"), "scenario": rec.get("scenario"), "dir": rec.get("dir"), "start": rec.get("start"),
         "from": rec.get("descent_start"), "rep": rec.get("rep"), "ran_at": rec.get("ran_at"), "run": rec["run"]["dir"],
         "label": rec.get("label"), "standard": bool((rec.get("settings") or {}).get("standard")),
-        "settings": {k: v for k, v in (rec.get("settings") or {}).items() if v not in (None, False, "") and k != "standard"},
+        "settings": flat_settings(rec.get("settings") or {}),
         "met": o.get("met"), "pass": o.get("pass"), "fluid": o.get("fluid"), "failed": o.get("failed"), "status": o.get("status"),
         "code": code_desc,
         "m": {path: get(rec, path) for path, _, _ in measures},
@@ -129,7 +146,8 @@ const $ = id => document.getElementById(id);
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 for (const [p, n] of MEASURES) { const o = document.createElement("option"); o.value = p; o.textContent = n; $("measure").appendChild(o); }
-try { const s = localStorage.getItem("curbhist.measure"); if (s) $("measure").value = s; } catch (e) {}
+const KEY = "curbhist.measure." + MEASURES[0][0];  // this page's own (another chart page has other measures)
+try { const s = localStorage.getItem(KEY); if (s && MEASURES.some(x => x[0] === s)) $("measure").value = s; } catch (e) {}
 $("theme").onclick = () => { const r = document.documentElement; const dark = matchMedia("(prefers-color-scheme: dark)").matches;
   const cur = r.dataset.theme || (dark ? "dark" : "light"); r.dataset.theme = cur === "dark" ? "light" : "dark"; draw(); };
 const tip = $("tip");
@@ -172,8 +190,8 @@ function tipFor(r, m, name) { const v = r.m[m];
     (Object.keys(r.settings).length ? `<br><span class="k">settings:</span> ${esc(Object.entries(r.settings).map(([k, v]) => k + " " + v).join(", "))}` : "") +
     (r.status ? `<br><span class="k">status:</span> ${esc(r.status)}` : ""); }
 function draw() {
-  const m = $("measure").value; try { localStorage.setItem("curbhist.measure", m); } catch (e) {}
-  const name = MEASURES.find(x => x[0] === m)[1];
+  const m = $("measure").value || MEASURES[0][0]; try { localStorage.setItem(KEY, m); } catch (e) {}
+  const name = (MEASURES.find(x => x[0] === m) || MEASURES[0])[1];
   const rows = DATA.filter(r => (!$("dir").value || r.dir === $("dir").value) && (!$("start").value || r.start === $("start").value) && (!$("std").checked || r.standard));
   legend();
   $("grid").innerHTML = ""; $("without").textContent = ""; $("runs").innerHTML = ""; $("overview").innerHTML = "";
@@ -230,12 +248,12 @@ function overview(rows, runs, col, runFirst) {
   const nRobots = Math.max(1, new Set(rows.map(r => r.robot)).size);
   const bw = Math.max(3, Math.min(18, (W - L - R) / runs.length / nRobots - 4));
   runs.forEach((run, i) => { const inRun = rows.filter(r => r.run === run); const robots = [...new Set(inRun.map(r => r.robot))];
-   robots.forEach((robot, j) => { const g = inRun.filter(r => r.robot === robot); const share = g.filter(r => r.met).length / g.length;
+   robots.forEach((robot, j) => { const g = inRun.filter(r => r.robot === robot); const sc = g.filter(r => r.met !== null && r.met !== undefined); const share = sc.length ? sc.filter(r => r.met).length / sc.length : 0;
     const slot = (W - L - R) / runs.length; const x = L + i * slot + (j + 0.5) * slot / robots.length; const top = y(share), base = y(0);
     const hgt = Math.max(0, base - top); const r = Math.min(4, bw / 2, hgt);
     el("path", {d:`M${x - bw / 2},${base}V${top + r}Q${x - bw / 2},${top} ${x - bw / 2 + r},${top}H${x + bw / 2 - r}Q${x + bw / 2},${top} ${x + bw / 2},${top + r}V${base}Z`, fill:css(robotOf(robot).v)}, svg);
     const hit = el("rect", {x:x - Math.max(bw, 12) / 2, y:T, width:Math.max(bw, 12), height:H - T - B, fill:"transparent"}, svg);
-    hit.addEventListener("mousemove", ev => showTip(ev, `<b>${esc(run)}</b> &middot; ${esc(robotOf(robot).name)}<br>${g.filter(r => r.met).length} of ${g.length} met (${Math.round(share * 100)}%)<br><span class="k">ran:</span> ${esc((g[0].ran_at || "").replace("T", " ").slice(0, 16))}`));
+    hit.addEventListener("mousemove", ev => showTip(ev, `<b>${esc(run)}</b> &middot; ${esc(robotOf(robot).name)}<br>${g.filter(r => r.met).length} of ${sc.length} scored met (${Math.round(share * 100)}%; ${g.length} run)<br><span class="k">ran:</span> ${esc((g[0].ran_at || "").replace("T", " ").slice(0, 16))}`));
     hit.addEventListener("mouseleave", hideTip);
    }); });
   dateLabels(svg, runs.map((run, i) => [L + (i + 0.5) * (W - L - R) / runs.length, (runFirst[run] || "").slice(5, 10)]), H, L, W - R);
@@ -245,7 +263,7 @@ function table(rows, runs, runFirst) {
   for (const run of runs) for (const robot of [...new Set(rows.filter(r => r.run === run).map(r => r.robot))]) {
     const g = rows.filter(r => r.run === run && r.robot === robot); const t = g.map(r => r.m[MEASURES[0][0]]).filter(v => v != null);
     h += `<tr><td>${esc((runFirst[run] || "").replace("T", " ").slice(0, 16))}</td><td>${esc(run)}</td><td>${esc(g[0].label || "")}</td><td>${esc(robotOf(g[0].robot).name)}</td>` +
-      `<td>${g.length}</td><td>${g.filter(r => r.met).length}</td><td>${g.filter(r => r.fluid).length}</td><td>${t.length ? median(t).toFixed(2) : "&ndash;"}</td>` +
+      `<td>${g.length}</td><td>${g.filter(r => r.met).length}</td><td>${g.some(r => r.fluid !== null && r.fluid !== undefined) ? g.filter(r => r.fluid).length : "&ndash;"}</td><td>${t.length ? median(t).toFixed(2) : "&ndash;"}</td>` +
       `<td>${esc(g[0].code.map(([k, v]) => k + " " + v).join(", "))}</td></tr>`; }
   $("runs").innerHTML = h + "</tbody></table>"; }
 for (const id of ["measure", "dir", "start", "std"]) $(id).addEventListener("change", draw);
