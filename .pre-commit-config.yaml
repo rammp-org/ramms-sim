@@ -8,3 +8,10 @@ repos:
           ^Plugins/
           )
         types_or: [c++, c]
+-   repo: local
+    hooks:
+    -   id: no-private-content
+        name: public Config, Content and Source name nothing under /RammsPrivateAssets/
+        entry: python Scripts/check_no_private_refs.py
+        language: python
+        files: ^(Config|Content|Source)/

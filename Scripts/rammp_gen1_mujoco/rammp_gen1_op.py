@@ -2,8 +2,10 @@
 
     unreal._ramms_rammp_gen1_op = "<op> [args]"; then run this file in the editor (run_rammp_gen1_checks.sh does both)
 
-  begin                      open Map_RammpGen1Curb_URL and start PIE
-  end                        stop PIE
+  begin [map]                open Map_RammpGen1Curb_URL (or the map given: a public curb map, /Game/Maps/Curb/...) and
+                             start PIE with RAMMP Gen1 (ramms.Robot rammp_gen1, which a map started through
+                             ARammsRobotGameMode spawns; its own map's game mode spawns it anyway)
+  end                        stop PIE (and clear ramms.Robot)
   state                      the chassis's position and attitude, every motor, the lift controls
   set <control id> <value>   a control-surface command (source Remote)
   trigger <control id>       a control-surface action (curb.negotiate, curb.abort)
@@ -83,14 +85,17 @@ if op[0] == "begin":
     if ues.get_game_world() is not None:
         les.editor_request_end_play()
         raise RuntimeError("PIE was running -- stopped it; run begin again")
-    if not les.load_level(MAP):
-        raise RuntimeError("could not load " + MAP)
+    level = op[1] if len(op) > 1 else MAP
+    if not les.load_level(level):
+        raise RuntimeError("could not load " + level)
+    unreal.RammsRobotCatalog.set_console_robot("rammp_gen1")
     les.editor_request_begin_play()
-    log("PIE requested on " + MAP)
+    log("PIE requested on " + level)
 elif op[0] == "end":
     stop_stick()
     if ues.get_game_world() is not None:
         les.editor_request_end_play()
+    unreal.RammsRobotCatalog.set_console_robot("")
     log("PIE ended")
 else:
     w, pawn, base, cs, chassis = pawn_and_parts()
