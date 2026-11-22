@@ -40,6 +40,8 @@ def standard(row):
     s = row.get("settings") or {}
     if s.get("cvars") or s.get("max_fps") != STANDARD_MAX_FPS:
         return False
+    if s.get("locked_frame_s"):
+        return False  # frame-locked stepping (urlab.LockedFrameSeconds): a series of its own until it is the standard
     frame = s.get("frame_ms")
     if frame is None or abs(frame - FRAME_MS) > 0.1 * FRAME_MS:
         return False

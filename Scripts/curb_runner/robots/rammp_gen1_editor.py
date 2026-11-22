@@ -1,6 +1,7 @@
 """RAMMP Gen1's adapter inside the editor (runner_op.py runs it): how the runner reads and drives the robot.
 
 An adapter module defines find(world, wheels) -> an object with:
+  sim_time()       the physics' own clock (s), which the session times everything by (below 0: not yet)
   chassis()        {"xyz": [cm], "pitch", "yaw", "roll"} of the chassis body, world
   seat()           {"pitch", "roll"} of the rider's seat, or None (the chassis stands in)
   wheel_hubs()     [[x, y, z] or None, ...] the wheels' hubs (cm, world) in the profile's wheel order
@@ -64,6 +65,11 @@ class Adapter(object):
             return None
         r = rot_of(self.seat_c)
         return {"pitch": r.pitch, "roll": r.roll}
+
+    def sim_time(self):
+        """The physics' own clock (s): the robot base's simulation time (the snapshot the controller reads); below 0
+        before the physics has published one."""
+        return self.base.get_simulation_time() if self.base else -1.0
 
     def wheel_hubs(self):
         out = []

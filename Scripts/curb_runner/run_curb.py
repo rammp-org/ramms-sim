@@ -54,7 +54,7 @@ OP_RETRY_S = 2.0
 def op(words, timeout=180, tries=OP_TRIES):
     """Run runner_op.py in the editor with `words` (its own namespace each call: runpy) and return its reply; a call
     with no reply is tried again (tries in all)."""
-    code = ("import unreal, runpy; unreal._curb_runner_op = %r; runpy.run_path(%r, run_name='__curb_runner__')" % (words, OP))
+    code = ("import unreal, runpy; unreal._curb_runner_op = %r; _r = runpy.run_path(%r, run_name='__curb_runner__')" % (words, OP))
     for k in range(tries):
         try:
             r = subprocess.run([sys.executable, "-I", EXEC, "--code", code], capture_output=True, text=True, timeout=timeout)
@@ -107,6 +107,11 @@ def row_of(prof, sid, direction, trace, expect, start, ran_at):
     if trace.get("error") and not end:
         # The session failed (PIE did not start, another robot, an adapter call raised): not a crossing.
         return error_row(prof, sid, direction, expect, "the session: %s" % trace["error"])
+    locked = trace.get("locked_frame_s_set") or 0.0
+    if locked > 0.0 and "locked_frame_s_end" in trace and trace["locked_frame_s_end"] != locked:
+        # URLab turned the lock off (a batch stalled) or something else changed it: the run is not a locked one.
+        return error_row(prof, sid, direction, expect, "the frame lock (urlab.LockedFrameSeconds %s) did not hold to "
+                         "the end (%s)" % (locked, trace.get("locked_frame_s_end")))
     phase = end.get("phase") or ("REFUSED" if trace.get("refused") else "TIMEOUT")
     shared = (measures.shared_figures(samples, wheels, frame, ask["t"]) if ask.get("t") is not None and ask.get("accepted")
               else None)
@@ -130,6 +135,7 @@ def row_of(prof, sid, direction, trace, expect, start, ran_at):
         "settings": {"max_fps": trace.get("max_fps_set", cfg.get("max_fps")), "frame_ms": fmed, "frame_max_ms": fmax, "frame_p99_ms": fp99,
                      "physics_step_ms": round(1000.0 / rate, 3) if rate else None, "maps": "public",
                      "ask_sim_s": cfg.get("ask_sim_s"), "steady": bool((ask.get("steady") or {}).get("steady")),
+                     "clock": trace.get("clock"), "locked_frame_s": trace.get("locked_frame_s_set") or None,
                      "late_s": ask.get("late_s"), "cvars": None,
                      "robot": {**setup, "start_offset_cm": cfg.get("start_offset_cm") if direction == "up" else None,
                                "start": start, "start_past_cm": (trace.get("start_placed") or {}).get("past_cm")}},
@@ -180,14 +186,15 @@ def write_results(d, rows):
     history.write_atomically(os.path.join(d, "summary.md"), lambda f: f.write("\n".join(lines) + "\n"))
 
 
-def run_one(prof, sid, direction, out_dir, max_fps):
+def run_one(prof, sid, direction, out_dir, max_fps, locked_frame_s=0.0):
     start = "top" if direction == "down" and prof.get("descent_start", "top") == "top" else "climb"
     trace_path = os.path.join(out_dir, "%s_%s.trace.json" % (sid, direction))
     cfg = {"robot_id": prof["robot_id"], "adapter": prof["editor"], "wheels": prof["wheels"], "rider_body": prof.get("rider_body"),
            "scenario": sid, "dir": direction, "start": start,
            "start_offset_cm": prof.get("start_offset_cm", 0.0) if start == "climb" else 0.0,
            "setup": prof.get("setup") or {}, "setup_at_s": SETUP_AT_S, "ask_sim_s": ASK_SIM_S,
-           "stick": (prof.get("setup") or {}).get("stick", 1.0), "max_fps": max_fps, "post_s": POST_S,
+           "stick": (prof.get("setup") or {}).get("stick", 1.0), "max_fps": max_fps, "locked_frame_s": locked_frame_s,
+           "post_s": POST_S,
            "timeout_sim_s": TIMEOUT_SIM_S, "timeout_wall_s": TIMEOUT_WALL_S, "trace_path": trace_path}
     ran_at = history.now_utc()
     cfg["token"] = "%s %s %s %s" % (ran_at, sid, direction, os.getpid())  # the trace read must be this session's
@@ -273,6 +280,8 @@ def main():
     ap.add_argument("--repeat", type=int, default=1)
     ap.add_argument("--out", default=None)
     ap.add_argument("--max-fps", type=float, default=None, help="the frame-rate cap (default: the robot's standard)")
+    ap.add_argument("--locked-frame-s", type=float, default=0.0, metavar="S",
+                    help="frame-locked stepping (urlab.LockedFrameSeconds): S of physics per frame, whatever the frame rate; 0 off")
     ap.add_argument("--history", default=None, help="record in this file instead of the robot's history")
     ap.add_argument("--no-history", action="store_true")
     ap.add_argument("--history-label", default=None)
@@ -351,7 +360,7 @@ def run_all(args, prof, scenarios, dirs, max_fps, out, all_rows):
                     continue
                 print("[%s %s %s%s]" % (prof["robot_id"], sid, direction, " rep %d" % rep if args.repeat > 1 else ""), flush=True)
                 try:
-                    row = run_one(prof, sid, direction, d, max_fps)
+                    row = run_one(prof, sid, direction, d, max_fps, args.locked_frame_s)
                 except Exception as exc:  # one broken crossing must not lose the others
                     row = error_row(prof, sid, direction, prof["expect"](sid, direction), str(exc).splitlines()[0])
                 rows.append(row)

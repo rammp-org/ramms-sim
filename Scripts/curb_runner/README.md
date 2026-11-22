@@ -33,6 +33,14 @@ Each crossing is one PIE session. Its timing runs inside the editor's own tick, 
 
 A session gives up when PIE has not started the robot its adapter knows within 5 s of simulated time, or when PIE started another robot. A crossing is aborted 90 s of simulated time after the robot appeared, or after 900 s of wall time.
 
+Every time is the physics' own clock (the adapter's `sim_time`, `settings.clock`), so a frame the physics did not advance is not a sample.
+
+## Frame-locked runs (`--locked-frame-s`)
+
+By default MuJoCo runs on its own, paced to the wall clock, and a controller reads whatever state it last published. How much physics happens between two of a controller's ticks then depends on the frame rate, and so do the figures. `--locked-frame-s S` sets URLab's `urlab.LockedFrameSeconds` for the session. MuJoCo then steps exactly `round(S / timestep)` steps per frame, between the frame's actor ticks, so every tick reads the state at the end of one whole batch and the figures no longer depend on the frame rate. The simulation then runs at `S` times the frame rate. `S` becomes the controllers' rate: 0.0625 is the same as RAMMP Gen1's standard 16 fps.
+
+A locked run is recorded with `settings.locked_frame_s` and is never `standard`: it is a series of its own. URLab turns the lock off and sets its variable back to 0 if a batch stops making progress; a run whose lock did not hold to the end is an error, never recorded.
+
 ## The shared measures (`measures.py`, `shared.version` 1)
 
 All figures are taken from the trace, against the map's terrain (`curb_terrain`).
