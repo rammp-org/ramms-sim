@@ -108,7 +108,7 @@ def row_of(prof, sid, direction, trace, expect, start, ran_at):
         # The session failed (PIE did not start, another robot, an adapter call raised): not a crossing.
         return error_row(prof, sid, direction, expect, "the session: %s" % trace["error"])
     locked = trace.get("locked_frame_s_set") or 0.0
-    if locked > 0.0 and "locked_frame_s_end" in trace and trace["locked_frame_s_end"] != locked:
+    if locked and "locked_frame_s_end" in trace and trace["locked_frame_s_end"] != locked:
         # URLab turned the lock off (a batch stalled) or something else changed it: the run is not a locked one.
         return error_row(prof, sid, direction, expect, "the frame lock (urlab.LockedFrameSeconds %s) did not hold to "
                          "the end (%s)" % (locked, trace.get("locked_frame_s_end")))
@@ -281,7 +281,8 @@ def main():
     ap.add_argument("--out", default=None)
     ap.add_argument("--max-fps", type=float, default=None, help="the frame-rate cap (default: the robot's standard)")
     ap.add_argument("--locked-frame-s", type=float, default=0.0, metavar="S",
-                    help="frame-locked stepping (urlab.LockedFrameSeconds): S of physics per frame, whatever the frame rate; 0 off")
+                    help="frame-locked stepping (urlab.LockedFrameSeconds): S of physics per frame, whatever the frame rate; "
+                         "0 off; below 0 matched to the frame (real time, but not frame-rate independent)")
     ap.add_argument("--history", default=None, help="record in this file instead of the robot's history")
     ap.add_argument("--no-history", action="store_true")
     ap.add_argument("--history-label", default=None)

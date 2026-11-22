@@ -39,6 +39,8 @@ Every time is the physics' own clock (the adapter's `sim_time`, `settings.clock`
 
 By default MuJoCo runs on its own, paced to the wall clock, and a controller reads whatever state it last published. How much physics happens between two of a controller's ticks then depends on the frame rate, and so do the figures. `--locked-frame-s S` sets URLab's `urlab.LockedFrameSeconds` for the session. MuJoCo then steps exactly `round(S / timestep)` steps per frame, between the frame's actor ticks, so every tick reads the state at the end of one whole batch and the figures no longer depend on the frame rate. The simulation then runs at `S` times the frame rate. `S` becomes the controllers' rate: 0.0625 is the same as RAMMP Gen1's standard 16 fps.
 
+A negative `S` is matched: each batch is the real time its frame took, cap reached or not (at most 1/20 s; a step's remainder is carried). It keeps real time but brings the frame rate back into the figures. In the editor, the Sim group's Frame lock control (Off / Matched / 1/16 s) sets the same variable, and its "Frame lock is" line says exactly what is set. A fixed period set elsewhere shows as the fixed choice, and picking that choice keeps it.
+
 A locked run is recorded with `settings.locked_frame_s` and is never `standard`: it is a series of its own. URLab turns the lock off and sets its variable back to 0 if a batch stops making progress; a run whose lock did not hold to the end is an error, never recorded.
 
 ## The shared measures (`measures.py`, `shared.version` 1)
