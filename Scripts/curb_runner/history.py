@@ -492,6 +492,17 @@ def code_label(rec):
     return (c.get("ran_on_note") or {}).get("note") or "?"
 
 
+def list_runs(records):
+    """(the run folder's name, its records) for each run in the records, in the order the runs ran. Runs are told
+    apart by their id (run_id), as add_runs does, not by the name: two folders outside the project with the same
+    last name are both recorded under it (rel_path), and are two runs. A record from before run ids goes by its
+    name."""
+    runs = {}
+    for r in records:
+        runs.setdefault(r["run"].get("id") or r["run"]["dir"], []).append(r)
+    return [(rs[0]["run"]["dir"], rs) for rs in sorted(runs.values(), key=lambda rs: min(x.get("ran_at") or "" for x in rs))]
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -524,10 +535,7 @@ def main():
         stem = "_".join(os.path.splitext(os.path.basename(h))[0] for h in args.history)
         history_plot.write(recs, args.out or os.path.join(DEFAULT_OUT, stem + ".html"), standard_only=not args.all)
     elif args.cmd == "list":
-        runs = {}
-        for r in read_history(args.history):
-            runs.setdefault(r["run"]["dir"], []).append(r)
-        for d, rs in sorted(runs.items(), key=lambda kv: min(x.get("ran_at") or "" for x in kv[1])):
+        for d, rs in list_runs(read_history(args.history)):
             met = sum(1 for x in rs if x["outcome"].get("met"))
             print("%s  %-60s %3d crossings, %3d met, %s%s" % (min(x.get("ran_at") or "" for x in rs)[:16], d, len(rs), met,
                                                         code_label(rs[0]), "  [%s]" % rs[0]["label"] if rs[0].get("label") else ""))

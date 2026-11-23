@@ -13,6 +13,7 @@ import unittest
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 import history as h  # noqa: E402
+import history_plot  # noqa: E402
 import measures as m  # noqa: E402
 import scoring  # noqa: E402
 
@@ -66,6 +67,26 @@ class Records(unittest.TestCase):
         # A run added again replaces its records.
         self.assertEqual(h.add_runs([d], quiet=True), 2)
         self.assertEqual(len(h.read_history(self.hist)), 2)
+
+    def test_same_folder_name_is_two_runs(self):
+        """Two run folders outside the project with the same last name are recorded under the same run.dir: the list
+        and the charts still keep them apart (by run.id), and show the folder's name."""
+        a = self.run_dir(os.path.join("before", "run1"), [row()])
+        b = self.run_dir(os.path.join("after", "run1"), [row(), row("S4")])
+        self.assertEqual(h.add_runs([a, b], quiet=True), 3)
+        recs = h.read_history(self.hist)
+        self.assertEqual({r["run"]["dir"] for r in recs}, {"run1"})
+        self.assertEqual(len({r["run"]["id"] for r in recs}), 2)
+        runs = h.list_runs(recs)
+        self.assertEqual([name for name, _ in runs], ["run1", "run1"])
+        self.assertEqual(sorted(len(rs) for _, rs in runs), [1, 2])
+        page = [history_plot.slim(r, history_plot.MEASURES) for r in recs]
+        self.assertEqual(len({p["run"] for p in page}), 2)
+        self.assertEqual({p["run_name"] for p in page}, {"run1"})
+        # A record from before run ids goes by its folder's name, in both.
+        old = dict(recs[0], run={"dir": "run0"})
+        self.assertEqual(history_plot.slim(old, history_plot.MEASURES)["run"], "run0")
+        self.assertEqual([name for name, _ in h.list_runs([old])], ["run0"])
 
     def test_unregistered_robot_left_out(self):
         d = self.run_dir("run2", [row(robot="nobody")])
@@ -122,6 +143,19 @@ class Scoring(unittest.TestCase):
         s = scoring.score(self.crossing(), "pass", [15.24, 15.24], robot_checks=lambda r: ["lifts back"])
         self.assertEqual(s["failed"], ["lifts back"])
         self.assertFalse(s["met"])
+
+
+class RiderWhy(unittest.TestCase):
+    def test_reason_for_missing_rider_figures(self):
+        import run_curb
+        why = run_curb.rider_why_of
+        self.assertIsNone(why({"imu": [{}]}, "rider", {"samples": 3}))  # it has them
+        self.assertIsNone(why({"imu_error": "no such body"}, None, None))  # a robot without a rider body
+        self.assertIn("no such body", why({"imu_error": "no such body", "imu": []}, "rider", None))
+        self.assertIn('"ok": false', why({"imu_error": {"ok": False}}, "rider", None))  # a reply without words
+        self.assertIn("lost 4", why({"imu": [{}], "imu_dropped": 4}, "rider", None))
+        self.assertIn("in the trace", why({"imu": []}, "rider", None))
+        self.assertIn("span", why({"imu": [{}]}, "rider", None))
 
 
 class ImuClock(unittest.TestCase):

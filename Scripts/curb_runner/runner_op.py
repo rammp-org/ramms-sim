@@ -214,7 +214,7 @@ def finish(s, why):
     # URLab sets the lock's variable back to 0 if a batch stalls: a run whose lock did not hold to the end says so.
     s["locked_frame_s_end"] = cvar_float(LOCK_CVAR)
     rec = {k: s.get(k) for k in ("cfg", "start_placed", "robot_active", "robot_source", "setup_done", "setup_t", "ask",
-                                 "refused", "end", "end_why", "imu_dropped", "imu_rate_hz", "frames", "error",
+                                 "refused", "end", "end_why", "imu_dropped", "imu_error", "imu_rate_hz", "frames", "error",
                                  "max_fps_set", "first_t", "clock", "locked_frame_s_set", "locked_frame_s_end",
                                  "plan_in_step_set")}
     rec["samples"] = s["samples"]

@@ -47,15 +47,22 @@ Two things can still differ. After Done (the hand-back, the `post_s` tail) the c
 
 A locked run is recorded with `settings.locked_frame_s` and is never `standard`: it is a series of its own. URLab turns the lock off and sets its variable back to 0 if a batch stops making progress; a run whose lock did not hold to the end is an error, never recorded.
 
-## The shared measures (`measures.py`, `shared.version` 1)
+## The shared measures (`measures.py`, `shared.version` 2)
 
 All figures are taken from the trace, against the map's terrain (`curb_terrain`).
+
+Version 2 differs from version 1 in two figures:
+- a wheel's "down" time is interpolated where its hub crosses the edge line too. Version 1 took the later sample's time there, up to a frame late, for a wheel that rolls onto the far surface;
+- a stop is counted on the size of the forward speed. Version 1 counted any backward motion, however fast, as stopped.
+
+A wheel that is set down past the edge, and a crossing that never rolled back, read the same in both. `run_curb.py --rescore DIR` makes a run folder's rows again, from its traces, with the measures as they are now.
 
 **Events:**
 - **`t_edge`**: the robot's leading wheel reaches the edge line. That is its hub plus its radius in its rolling plane, along the edge normal, interpolated between samples.
 - **`t0 = max(t_edge, t_begin)`**: the crossing's start. `t_begin` is when the controller began to carry out the crossing, after any planning, so planning and a stall at rest are never counted as crossing time.
 - **`t_last_down`**: the last counted wheel comes down for good on the surface the crossing ends on.
   - "Down" means its lowest point is within 1 cm of that surface, less the gap the wheel had at rest before the ask, with its hub past the edge.
+  - The time is interpolated between samples: where the gap closes to 1 cm, or where the hub crosses the edge line for a wheel that is already that close (one that rolls onto the surface).
   - Dips out of "down" shorter than 0.1 s (roller ripple, a bounce) are bridged.
   - A wheel held up at the ask, more than 2 cm over the start surface, is not counted. RAMMP Gen1's raised front omni wheels are an example.
   - Every counted wheel must be down past the edge by 1 s after the end: a wheel still settling as the controller reports Done counts when it gets there, so `t_last_down` can come after `t_done`. If one is not, the crossing did not get across and has no crossing times.
@@ -65,7 +72,7 @@ All figures are taken from the trace, against the map's terrain (`curb_terrain`)
 **Times:** `edge_to_last_down_s` (the headline), `edge_to_done_s`, `edge_to_rest_s`. `ask_to_edge_s` and `planning_after_edge_s` are reported on their own and are never part of a crossing time.
 
 **Other figures:**
-- the least forward speed (signed, over exact 0.3 s windows), stops, and the time stopped;
+- the least forward speed (signed, over exact 0.3 s windows), stops, and the time stopped. Stopped means slower than 2 cm/s in either direction, and a stop lasts at least 0.2 s. A roll-back faster than that is not a stop: it shows as a negative least speed;
 - the seat's and the chassis's most inclination and fastest tilt (over 0.3 s);
 - the seat's inclination at `t0` and its largest turn from that attitude up to Done (`seat_excursion_to_done_deg`): what the crossing itself did to the rider. The absolute figures also hold whatever attitude the seat started with, a sloped start's for one;
 - the seat against the chassis under it at the ask (`ask_seat_off_chassis_deg`): a seat that starts well off its base is a start to look at before its crossing is read;
@@ -73,6 +80,8 @@ All figures are taken from the trace, against the map's terrain (`curb_terrain`)
 - drift across the starting heading, and the change of heading;
 - how far past the edge each wheel came down, in radii;
 - the rider's acceleration (`rider`): every physics step's IMU sample of the rider's body, rotated to the world, gravity taken off, two first-order low-passes of 50 ms, then the peak and RMS of its fore/aft, vertical and total parts. The IMU's clock is the physics' own: a trace timed by the physics' clock (`settings.clock` `physics`) uses it as it is (`clock_offset_s` 0), and a world-clock trace is lined up with it by the median difference.
+
+A row whose robot has a rider body but no `rider` figures says why in `rider_why`: the IMU read failed (with the bridge's error, for example a rider body the physics does not know), the IMU lost samples, or it gave none. The runner prints it as the crossing ends. It is in `results.json` only, not in the history's record.
 
 A robot's controller also reports its own figures (`controller`). These are kept beside the shared ones, never in their place. They are not compared across robots.
 

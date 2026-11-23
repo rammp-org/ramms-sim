@@ -68,6 +68,52 @@ def make_trace(seed=1, t_end=26.0, ripple=0.3, wheel_hook=None, phase_begin=T_AS
     return out
 
 
+# The descent: S0's far edge is at x 750 on the path, the road beyond it at NEAR_Z (flat roads either side).
+FAR_EDGE_X = 750.0
+FAR_Z = NEAR_Z
+DOWN_X0 = 600.0  # the chassis's x at rest on the sidewalk
+DOWN_X_STOP = 830.0
+DOWN_T_STOP = T_ASK + (DOWN_X_STOP - DOWN_X0) / V  # 25.0 s
+DOWN_T_DONE = 26.0
+SET_FROM, SET_TO = 5.0, 20.0  # a wheel is set down onto the road over this stretch past the edge (cm)
+# The hub's distance past the edge where the wheel's lowest point is DOWN_GAP_CM over the road.
+DOWN_AT = SET_TO - m.DOWN_GAP_CM * (SET_TO - SET_FROM) / (TOP_Z - FAR_Z)
+
+
+def bottom_down(a, raised=False):
+    """A wheel's lowest point (z) on S0's descent with its hub `a` cm past the far edge: on the sidewalk until the hub
+    passes the edge, carried at that height to SET_FROM, set down at a steady rate onto the road by SET_TO. A raised
+    wheel rides 5 cm over either."""
+    if raised:
+        return (TOP_Z if a < 0.0 else FAR_Z) + 5.0
+    if a < SET_FROM:
+        return TOP_Z
+    if a < SET_TO:
+        return FAR_Z + (TOP_Z - FAR_Z) * (SET_TO - a) / (SET_TO - SET_FROM)
+    return FAR_Z
+
+
+def make_descent_trace(seed=1, t_end=28.0, ripple=0.3):
+    """make_trace's robot and frames, going down S0's far curb from rest on the sidewalk."""
+    rng = random.Random(seed)
+    out, t = [], 0.0
+    while t <= t_end:
+        x = DOWN_X0 if t <= T_ASK else min(DOWN_X_STOP, DOWN_X0 + V * (t - T_ASK))
+        wheels = []
+        for name, off, raised in (("front", 40.0, False), ("rear", -40.0, False), ("caster", 60.0, True)):
+            hx = x + off
+            a = hx - FAR_EDGE_X
+            z = bottom_down(a, raised) + R
+            if a >= SET_TO and not raised:
+                z += ripple * math.sin(37.0 * t + off)
+            wheels.append([hx, 700.0, z])
+        phase = "IDLE" if t < T_ASK + 0.05 else ("DONE" if t >= DOWN_T_DONE else "CROSS")
+        out.append({"t": t, "phase": phase, "chassis": {"xyz": [x, 700.0, -165.0], "pitch": 0.0, "yaw": 0.0, "roll": 0.0},
+                    "wheels": wheels})
+        t += rng.uniform(0.05, 0.07)
+    return out
+
+
 WHEELS = [{"name": "front", "radius_cm": R}, {"name": "rear", "radius_cm": R}, {"name": "caster", "radius_cm": R}]
 
 
@@ -104,6 +150,56 @@ class Events(unittest.TestCase):
         self.assertEqual(f["times"]["planning_after_edge_s"], 0.0)
         self.check(f["landing"]["min_r"], 0.7, 0.01)
         self.assertAlmostEqual(f["path"]["drift_cm"], 0.0, places=3)
+
+    def test_descent(self):
+        """The same figures on a descent: the frame's `down` side (the far edge, from the sidewalk onto the far road)."""
+        f = m.shared_figures(make_descent_trace(), WHEELS, frame("down"), T_ASK)
+        e, tm = f["events"], f["times"]
+        self.assertTrue(f["across"])
+        self.assertEqual(f["wheels"]["counted"], ["front", "rear"])
+        self.assertEqual(f["wheels"]["raised"], ["caster"])
+        # The caster leads: its hub 60 cm ahead reaches a radius short of the far edge at chassis x 680.
+        t_edge = T_ASK + (FAR_EDGE_X - 60.0 - R - DOWN_X0) / V
+        self.check(e["t_edge"], t_edge)
+        # A wheel is down with its hub DOWN_AT past the edge (the front 40 cm ahead of the chassis, the rear 40 behind).
+        t_front = T_ASK + (FAR_EDGE_X + DOWN_AT - 40.0 - DOWN_X0) / V
+        t_rear = T_ASK + (FAR_EDGE_X + DOWN_AT + 40.0 - DOWN_X0) / V
+        self.check(e["down"]["front"], t_front)
+        self.check(e["down"]["rear"], t_rear)
+        self.assertEqual(e["last_down_wheel"], "rear")
+        self.check(tm["edge_to_last_down_s"], t_rear - t_edge, 0.011)
+        self.check(e["t_done"], DOWN_T_DONE, 0.07)
+        self.check(e["t_rest"], DOWN_T_STOP, 0.07)
+        self.check(f["landing"]["min_r"], DOWN_AT / R, 0.01)
+        self.check(f["speed"]["v_min_cm_s"], V, 0.1)
+        self.assertEqual(f["speed"]["stops"], 0)
+        # Level on the sidewalk and level on the road: nothing the surfaces do not explain.
+        self.assertAlmostEqual(f["attitude"]["final_pitch_change_deg"], 0.0, places=6)
+        self.assertAlmostEqual(f["attitude"]["final_roll_change_deg"], 0.0, places=6)
+        self.assertAlmostEqual(f["path"]["drift_cm"], 0.0, places=3)
+
+    def test_descent_jitter_does_not_move_the_events(self):
+        a = [m.shared_figures(make_descent_trace(seed=s), WHEELS, frame("down"), T_ASK)["times"]["edge_to_last_down_s"]
+             for s in range(1, 8)]
+        self.assertLessEqual(max(a) - min(a), 0.011)
+
+    def rolled_up(self, seed):
+        """A climb whose counted wheels roll up over the corner: their lowest point is on the sidewalk from a radius
+        short of the edge, so each is within the gap before its hub is past the edge and comes down as the hub crosses
+        the edge line."""
+        def hook(name, t, a, z):
+            return TOP_Z + R if name != "caster" and -R <= a < 8.0 else z
+        return m.shared_figures(make_trace(seed=seed, wheel_hook=hook), WHEELS, frame(), T_ASK)
+
+    def test_rolled_on_wheel_is_down_as_its_hub_passes_the_edge(self):
+        """Interpolated to where the hub crosses the edge (chassis 410 for the front, 490 for the rear), not the
+        sample after it: the later sample's time reads up to a frame (70 ms here) late."""
+        for seed in range(1, 8):
+            f = self.rolled_up(seed)
+            self.assertTrue(f["across"])
+            self.check(f["events"]["down"]["front"], T_ASK + (410.0 - X0) / V)
+            self.check(f["events"]["down"]["rear"], T_ASK + (490.0 - X0) / V)
+            self.check(f["times"]["edge_to_last_down_s"], (490.0 - 380.0) / V, 0.011)
 
     def test_jitter_does_not_move_the_events(self):
         a = [m.shared_figures(make_trace(seed=s), WHEELS, frame(), T_ASK)["times"]["edge_to_last_down_s"] for s in range(1, 8)]
@@ -260,7 +356,24 @@ class Speeds(unittest.TestCase):
 
     def test_reverse_is_negative(self):
         tr = [{"t": i * 0.05, "chassis": {"xyz": [-V * i * 0.05, 0.0, 0.0], "yaw": 0.0}} for i in range(40)]
-        self.assertLess(m.speed_figures(tr)["v_min_cm_s"], -9.0)
+        f = m.speed_figures(tr)
+        self.assertLess(f["v_min_cm_s"], -9.0)
+        # Rolling back at 10 cm/s is moving, not stopped: only the least speed shows it.
+        self.assertEqual(f["stops"], 0)
+        self.assertEqual(f["stopped_s"], 0.0)
+
+    def test_roll_back_is_not_a_stop(self):
+        """Forward, back at 10 cm/s for 2.5 s, forward again: no stop, and only the two turns' moments near zero speed
+        as time stopped (each under STOP_MIN_S, so neither is a stop)."""
+        tr, t = [], 0.0
+        while t <= 10.0:
+            x = V * min(t, 3.0) - V * max(0.0, min(t, 5.5) - 3.0) + V * max(0.0, t - 5.5)
+            tr.append({"t": t, "chassis": {"xyz": [x, 0.0, 0.0], "yaw": 0.0}})
+            t += 0.0625
+        f = m.speed_figures(tr)
+        self.assertLess(f["v_min_cm_s"], -9.0)
+        self.assertEqual(f["stops"], 0)
+        self.assertLess(f["stopped_s"], 0.3)
 
 
 class Attitude(unittest.TestCase):
