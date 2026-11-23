@@ -187,6 +187,41 @@ class Surfaces(unittest.TestCase):
         self.assertAlmostEqual(sh["attitude"]["final_pitch_change_deg"], 0.0, places=2)
         self.assertGreater(abs(r1 - r0), 3.0)  # the test means something: the twist changes the roll
 
+    def test_seat_excursion_is_from_the_start_of_the_crossing(self):
+        """A seat 4 deg nose-down at the ask and 6 by the crossing's start (t0), turned to 8 for a second mid-crossing
+        and to 9 between the last wheel down and Done, reads 9 in the absolute figure to Done and 3 as the crossing's own
+        excursion (from t0's attitude, up to Done: not from the ask's, not only to the last wheel down, and not the 12 it
+        turns to after Done); a seat 4 deg off its chassis at the ask is flagged as that."""
+        tr = make_trace()
+        ev = m.shared_figures(tr, WHEELS, frame(), T_ASK)["events"]
+        t0, t_down, t_done = ev["t0"], ev["t_last_down"], ev["t_done"]
+
+        def pitch(t):
+            if t < t0 - 1.0:
+                return -4.0  # at the ask: not the crossing's start
+            if t0 + 1.0 <= t <= t0 + 2.0:
+                return -8.0  # mid-crossing
+            if t_down + 0.5 <= t <= t_down + 1.0:
+                return -9.0  # after the last wheel is down, before Done: counts
+            if t > t_done + 0.2:
+                return -12.0  # after Done: does not
+            return -6.0
+
+        for s in tr:
+            s["seat"] = {"pitch": pitch(s["t"]), "roll": 0.0}
+        sh = m.shared_figures(tr, WHEELS, frame(), T_ASK)["attitude"]
+        self.assertAlmostEqual(sh["ask_seat_incl_deg"], 4.0, places=2)
+        self.assertAlmostEqual(sh["ask_seat_off_chassis_deg"], 4.0, places=2)
+        self.assertAlmostEqual(sh["t0_seat_incl_deg"], 6.0, places=2)
+        self.assertAlmostEqual(sh["max_seat_incl_deg"], 8.0, places=2)
+        self.assertAlmostEqual(sh["max_seat_incl_to_done_deg"], 9.0, places=2)
+        self.assertAlmostEqual(sh["seat_excursion_to_done_deg"], 3.0, places=2)
+        for s in tr:
+            s["seat"] = {"pitch": 0.0, "roll": 0.0}
+        sh = m.shared_figures(tr, WHEELS, frame(), T_ASK)["attitude"]
+        self.assertAlmostEqual(sh["seat_excursion_to_done_deg"], 0.0, places=6)
+        self.assertAlmostEqual(sh["ask_seat_off_chassis_deg"], 0.0, places=6)
+
     def test_dip_at_the_settle_sample_bridged(self):
         tr = make_trace()
         i = max(k for k, s in enumerate(tr) if s["t"] <= T_DONE + 0.05 + m.SETTLE_S)

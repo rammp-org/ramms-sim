@@ -4,7 +4,8 @@
                    the frame rate, begin PIE and arm the crossing session (below); json: robot_id, adapter (the
                    editor-side adapter file), wheels, rider_body, scenario ("Flat" or a curb_terrain id), dir,
                    start ("climb" | "top"), start_offset_cm, setup, setup_at_s, ask_sim_s, stick, max_fps,
-                   locked_frame_s (urlab.LockedFrameSeconds for the session; 0 off), post_s, timeout_sim_s,
+                   locked_frame_s (urlab.LockedFrameSeconds for the session; 0 off; above 0, plans are waited for
+                   where they are asked, Ramms.Curb.PlanInStep), post_s, timeout_sim_s,
                    timeout_wall_s, trace_path
     status         the session's stage and what it has seen: {"stage", "sim", "phase", "status", "error", "finished"}
     end            end PIE, stop the session, release the stick, put back the PlayerStart, t.MaxFPS and ramms.Robot
@@ -46,6 +47,9 @@ STEADY_LEAD_S = 1.0
 TRACE_LEAD_S = 1.0
 ROBOT_WAIT_SIM_S = 5.0  # PIE without a robot the adapter knows this long: an error, not a wait
 LOCK_CVAR = "urlab.LockedFrameSeconds"  # frame-locked stepping (URLab): 0 off
+# With a fixed lock, a plan the robot's controller asks for is waited for where it is asked (RammsCore's curb planner;
+# a robot without one ignores it): taken on the same frame in every run, so a locked run repeats exactly.
+PLAN_CVAR = "Ramms.Curb.PlanInStep"
 TERMINAL = ("DONE", "FAULTED", "ABORTED")
 
 les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
@@ -211,7 +215,8 @@ def finish(s, why):
     s["locked_frame_s_end"] = cvar_float(LOCK_CVAR)
     rec = {k: s.get(k) for k in ("cfg", "start_placed", "robot_active", "robot_source", "setup_done", "setup_t", "ask",
                                  "refused", "end", "end_why", "imu_dropped", "imu_rate_hz", "frames", "error",
-                                 "max_fps_set", "first_t", "clock", "locked_frame_s_set", "locked_frame_s_end")}
+                                 "max_fps_set", "first_t", "clock", "locked_frame_s_set", "locked_frame_s_end",
+                                 "plan_in_step_set")}
     rec["samples"] = s["samples"]
     rec["imu"] = s["imu"]
     path = s["cfg"]["trace_path"]
@@ -306,7 +311,8 @@ def step(s):
         else:
             s["imu_next"] = imu_read(s, s["imu_next"])
         # imu_t: the physics' own clock (the IMU samples' sim_time), which starts later than the world's: the
-        # newest IMU sample read this frame, so the two clocks can be lined up (measures.imu_clock_offset).
+        # newest IMU sample read this frame, so a world-clock trace's two clocks can be lined up
+        # (measures.imu_clock_offset; a physics-clock trace needs none, run_curb.row_of).
         sample = {"t": round(t, 5), "wall": round(now_wall, 3), "imu_t": s.get("imu_last_t"), "phase": generic, "raw": raw,
                   "chassis": rnd_pose(chassis),
                   "wheels": [[round(x, 3) for x in h] if h else None for h in a.wheel_hubs()]}
@@ -397,14 +403,18 @@ def op_begin(cfg):
     placed = place_start(ct, cfg)
     if getattr(unreal, "_curb_runner_saved", None) is None:
         unreal._curb_runner_saved = {"t.MaxFPS": cvar_float("t.MaxFPS"), "robot": unreal.RammsRobotCatalog.get_console_robot(),
-                                     LOCK_CVAR: cvar_float(LOCK_CVAR)}
+                                     LOCK_CVAR: cvar_float(LOCK_CVAR), PLAN_CVAR: cvar_float(PLAN_CVAR)}
     if cfg.get("max_fps") is not None:
         console("t.MaxFPS %s" % cfg["max_fps"])  # 0: uncapped
     console("%s %s" % (LOCK_CVAR, float(cfg.get("locked_frame_s") or 0.0)))
+    # (Pinned either way, as the lock is: a 1 left behind by hand or by a run that was killed would hold an unlocked
+    # run's frames for its plans while its physics ran on.)
+    console("%s %d" % (PLAN_CVAR, 1 if float(cfg.get("locked_frame_s") or 0.0) > 0.0 else 0))
     unreal.RammsRobotCatalog.set_console_robot(cfg["robot_id"])
     unreal._curb_runner_session = {"cfg": cfg, "stage": "wait_pie", "samples": [], "imu": [], "steady": Steady(),
                                    "started_wall": time.time(), "start_placed": placed, "finished": False,
-                                   "max_fps_set": cvar_float("t.MaxFPS"), "locked_frame_s_set": cvar_float(LOCK_CVAR)}
+                                   "max_fps_set": cvar_float("t.MaxFPS"), "locked_frame_s_set": cvar_float(LOCK_CVAR),
+                                   "plan_in_step_set": cvar_float(PLAN_CVAR)}
     les.editor_request_begin_play()
     unreal._curb_runner_handle = unreal.register_slate_post_tick_callback(tick)
     return {"map": path, "start": placed}
@@ -444,6 +454,8 @@ def op_end():
             console("t.MaxFPS %s" % saved["t.MaxFPS"])
         if saved.get(LOCK_CVAR) is not None:
             console("%s %s" % (LOCK_CVAR, saved[LOCK_CVAR]))
+        if saved.get(PLAN_CVAR) is not None:
+            console("%s %d" % (PLAN_CVAR, int(saved[PLAN_CVAR])))
         unreal.RammsRobotCatalog.set_console_robot(saved.get("robot") or "")
         unreal._curb_runner_saved = None
     unreal._curb_runner_session = None

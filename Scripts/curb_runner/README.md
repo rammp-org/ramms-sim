@@ -41,6 +41,10 @@ By default MuJoCo runs on its own, paced to the wall clock, and a controller rea
 
 A negative `S` is matched: each batch is the real time its frame took, cap reached or not (at most 1/20 s; a step's remainder is carried). It keeps real time but brings the frame rate back into the figures. In the editor, the Sim group's Frame lock control (Off / Matched / 1/16 s) sets the same variable, and its "Frame lock is" line says exactly what is set. A fixed period set elsewhere shows as the fixed choice, and picking that choice keeps it.
 
+With a fixed lock the runner also sets `Ramms.Curb.PlanInStep 1` for the session (recorded as `settings.plan_in_step`; without one it sets it to 0). RammsCore's curb planner works in the background, and the crossing starts on whichever frame finds the plan done, which turns on the machine's load: the same crossing then differs by a frame from run to run. With the variable set, a plan is waited for where it is asked, the frame held meanwhile (the physics waits with it), so a locked crossing of one build repeats exactly up to Done, run to run and editor to editor. A robot whose controller does not use that planner ignores it.
+
+Two things can still differ. What the robot's drive mode does after Done (the hand-back, the `post_s` tail) follows the world's clock, not the physics', so its last digits can differ between runs and with the frame rate. And a plan search that is stopped on its work budget can end a few evaluations apart from run to run, which on a rare crossing changes the plan kept. A run that repeats exactly is still one sample: a crossing near a limit can fall the other way for a start a centimetre off. Judge a change on several starts, not on one repeated.
+
 A locked run is recorded with `settings.locked_frame_s` and is never `standard`: it is a series of its own. URLab turns the lock off and sets its variable back to 0 if a batch stops making progress; a run whose lock did not hold to the end is an error, never recorded.
 
 ## The shared measures (`measures.py`, `shared.version` 1)
@@ -63,10 +67,12 @@ All figures are taken from the trace, against the map's terrain (`curb_terrain`)
 **Other figures:**
 - the least forward speed (signed, over exact 0.3 s windows), stops, and the time stopped;
 - the seat's and the chassis's most inclination and fastest tilt (over 0.3 s);
+- the seat's inclination at `t0` and its largest turn from that attitude up to Done (`seat_excursion_to_done_deg`): what the crossing itself did to the rider. The absolute figures also hold whatever attitude the seat started with, a sloped start's for one;
+- the seat against the chassis under it at the ask (`ask_seat_off_chassis_deg`): a seat that starts well off its base is a start to look at before its crossing is read;
 - the attitude at Done, and its change from the ask less what the surfaces' slopes explain;
 - drift across the starting heading, and the change of heading;
 - how far past the edge each wheel came down, in radii;
-- the rider's acceleration (`rider`): every physics step's IMU sample of the rider's body, rotated to the world, gravity taken off, two first-order low-passes of 50 ms, then the peak and RMS of its fore/aft, vertical and total parts. The IMU's clock is the physics' own, and it is lined up with the trace's.
+- the rider's acceleration (`rider`): every physics step's IMU sample of the rider's body, rotated to the world, gravity taken off, two first-order low-passes of 50 ms, then the peak and RMS of its fore/aft, vertical and total parts. The IMU's clock is the physics' own: a trace timed by the physics' clock (`settings.clock` `physics`) uses it as it is (`clock_offset_s` 0), and a world-clock trace is lined up with it by the median difference.
 
 A robot's controller also reports its own figures (`controller`). These are kept beside the shared ones, never in their place. They are not compared across robots.
 
