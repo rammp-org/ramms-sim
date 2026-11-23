@@ -550,7 +550,18 @@ def shared_figures(samples, wheels, frame, t_ask, t_begin=None, source="trace"):
         tf, tt = plane_rotator(frame.plane_from, yaw_ask), plane_rotator(frame.plane_to, yaw_done)
         unexplained = (fd[1] - att_ask[0] - (tt[0] - tf[0]), fd[2] - att_ask[1] - (tt[1] - tf[1]))
     seat_ask = value_at(samples, t_ask, seat_attitude)
+    # What the crossing itself did to the rider: the seat's largest turn from its attitude at the crossing's start
+    # (a seat that starts on a slope's attitude and is held there reads that slope in the absolute figures). And the
+    # seat against the chassis under it at the ask: a seat that starts well off its base (its linkage sagged, a start
+    # that is not the robot's stance) is a start to look at before its crossing's figures are read.
+    seat_t0 = value_at(samples, t0, seat_attitude) if t0 is not None else None
+    excursion = max((math.hypot(seat_attitude(x)[0] - seat_t0[0], seat_attitude(x)[1] - seat_t0[1]) for x in b),
+                    default=None) if seat_t0 else None
     out["attitude"] = {
+        "t0_seat_incl_deg": rnd(incl(*seat_t0)) if seat_t0 else None,
+        "seat_excursion_to_done_deg": rnd(excursion),
+        "ask_seat_off_chassis_deg": rnd(math.hypot(seat_ask[0] - att_ask[0], seat_ask[1] - att_ask[1]))
+        if seat_ask and att_ask else None,
         "max_seat_incl_deg": rnd(max_incl(a, seat_attitude)) if a else None,
         "max_chassis_incl_deg": rnd(max_incl(a, chassis_attitude)) if a else None,
         "max_chassis_incl_to_done_deg": rnd(max_incl(b, chassis_attitude)) if b else None,
@@ -600,7 +611,9 @@ def quat_rotate(q, v):
 def imu_clock_offset(samples):
     """The world clock less the physics' (s): the median over the trace's samples of t - imu_t (the newest IMU sample
     read on that frame). The physics (MuJoCo) starts its clock some time after the world does, and its IMU samples
-    carry its own; None without imu_t."""
+    carry its own; None without imu_t. For a world-clock trace only: one timed by the physics' own clock
+    (`clock` "physics") has nothing to line up, and its imu_t is as far as the physics had stepped when the frame's
+    sample was taken."""
     d = sorted(s["t"] - s["imu_t"] for s in samples if isinstance(s.get("imu_t"), (int, float)))
     return d[len(d) // 2] if d else None
 

@@ -118,7 +118,10 @@ def row_of(prof, sid, direction, trace, expect, start, ran_at):
     rider = None
     if shared and trace.get("imu") and not trace.get("imu_dropped"):
         ev = shared["events"]
-        off = measures.imu_clock_offset(samples)
+        # A physics-clock trace's samples and the IMU's carry one clock: nothing to line up. (imu_t is the newest
+        # sample of a batch still being stepped as the session's callback ran, so its median turns on the wall clock.)
+        # Only a world-clock trace (no `clock`, or "world") needs the estimate.
+        off = 0.0 if trace.get("clock") == "physics" else measures.imu_clock_offset(samples)
         if off is not None:
             rider = measures.rider_figures(trace["imu"], ev.get("t0"), ev.get("t_last_down") or ev.get("t_end"), offset=off)
     controller = dict(end.get("stats") or {})
@@ -136,6 +139,7 @@ def row_of(prof, sid, direction, trace, expect, start, ran_at):
                      "physics_step_ms": round(1000.0 / rate, 3) if rate else None, "maps": "public",
                      "ask_sim_s": cfg.get("ask_sim_s"), "steady": bool((ask.get("steady") or {}).get("steady")),
                      "clock": trace.get("clock"), "locked_frame_s": trace.get("locked_frame_s_set") or None,
+                     "plan_in_step": bool(trace.get("plan_in_step_set")) or None,
                      "late_s": ask.get("late_s"), "cvars": None,
                      "robot": {**setup, "start_offset_cm": cfg.get("start_offset_cm") if direction == "up" else None,
                                "start": start, "start_past_cm": (trace.get("start_placed") or {}).get("past_cm")}},
