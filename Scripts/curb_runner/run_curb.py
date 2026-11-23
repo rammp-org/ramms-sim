@@ -124,6 +124,7 @@ def row_of(prof, sid, direction, trace, expect, start, ran_at):
         off = 0.0 if trace.get("clock") == "physics" else measures.imu_clock_offset(samples)
         if off is not None:
             rider = measures.rider_figures(trace["imu"], ev.get("t0"), ev.get("t_last_down") or ev.get("t_end"), offset=off)
+    rider_why = rider_why_of(trace, cfg.get("rider_body") or prof.get("rider_body"), rider) if shared else None
     controller = dict(end.get("stats") or {})
     controller["step_found"] = end.get("step_found")
     controller["lifts_back"] = lifts_back(ask.get("lifts"), end.get("lifts"))
@@ -145,12 +146,28 @@ def row_of(prof, sid, direction, trace, expect, start, ran_at):
                                "start": start, "start_past_cm": (trace.get("start_placed") or {}).get("past_cm")}},
         "outcome": {"phase": phase, "status": end.get("status"), "why": trace.get("refused") or (trace.get("error") or None),
                     "expect": expect},
-        "shared": shared, "rider": rider, "controller": controller,
+        "shared": shared, "rider": rider, "rider_why": rider_why, "controller": controller,
         "trace": None,
     }
     sc = scoring.score(row, expect, frame.step_range, prof.get("checks"))
     row["outcome"].update(sc)
     return row
+
+
+def rider_why_of(trace, rider_body, rider):
+    """Why a measured crossing of a robot with a rider body has no rider figures (None when it has them, or has no
+    rider body): without it a run whose IMU could not be read at all (a rider body the physics does not know, no IMU
+    track) looks the same as one that lost a sample."""
+    if rider is not None or not rider_body:
+        return None
+    err = trace.get("imu_error")  # the bridge's reply: words, or the whole reply when it gave none
+    if err:
+        return "the IMU read failed: %s" % (err if isinstance(err, str) else json.dumps(err, sort_keys=True))
+    if trace.get("imu_dropped"):
+        return "the IMU lost %d sample(s)" % trace["imu_dropped"]
+    if not trace.get("imu"):
+        return "no IMU samples in the trace"
+    return "no IMU samples in the crossing's span"
 
 
 def error_row(prof, sid, direction, expect, why):
@@ -249,6 +266,8 @@ def run_one(prof, sid, direction, out_dir, max_fps, locked_frame_s=0.0):
     expect = prof["expect"](sid, direction)
     row = row_of(prof, sid, direction, trace, expect, start, ran_at)
     row["trace"] = os.path.basename(trace_path)
+    if row.get("rider_why"):
+        print("  (no rider figures: %s)" % row["rider_why"])
     return row
 
 

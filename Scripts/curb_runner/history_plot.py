@@ -82,12 +82,16 @@ def flat_settings(settings, prefix=""):
 
 
 def slim(rec, measures):
-    """What the page needs of a record."""
+    """What the page needs of a record. `run` is what the page groups a run's crossings by: the run's id, since two
+    run folders outside the project with the same last name are recorded under the same `dir` and would be drawn as
+    one run (a record from before run ids goes by its dir); `run_name` is the folder's name, what the page shows."""
     o = rec.get("outcome") or {}
+    run = rec.get("run") or {}
     code_desc = describe_code(rec.get("code") or {})
     return {
         "robot": rec.get("robot"), "scenario": rec.get("scenario"), "dir": rec.get("dir"), "start": rec.get("start"),
-        "from": rec.get("descent_start"), "rep": rec.get("rep"), "ran_at": rec.get("ran_at"), "run": rec["run"]["dir"],
+        "from": rec.get("descent_start"), "rep": rec.get("rep"), "ran_at": rec.get("ran_at"),
+        "run": run.get("id") or run["dir"], "run_name": run["dir"],
         "label": rec.get("label"), "standard": bool((rec.get("settings") or {}).get("standard")),
         "settings": flat_settings(rec.get("settings") or {}),
         "met": o.get("met"), "pass": o.get("pass"), "fluid": o.get("fluid"), "failed": o.get("failed"), "status": o.get("status"),
@@ -185,7 +189,7 @@ function legend() { const robots = [...new Set(DATA.map(r => r.robot))];
 function tipFor(r, m, name) { const v = r.m[m];
   return `<b>${esc(r.scenario)} ${esc(r.dir)}, ${esc(r.start)}${r.from ? " (" + esc(r.from) + ")" : ""}</b> &middot; ${esc(robotOf(r.robot).name)}<br>` +
     `<span class="k">${esc(name)}:</span> ${v == null ? "&ndash;" : v}<br><span class="k">outcome:</span> ${outcome(r)}${r.failed ? " (" + esc(r.failed.join(", ")) + ")" : ""}<br>` +
-    `<span class="k">ran:</span> ${esc((r.ran_at || "").replace("T", " ").slice(0, 16))} &middot; rep ${r.rep}<br><span class="k">run:</span> ${esc(r.run)}${r.label ? " [" + esc(r.label) + "]" : ""}<br>` +
+    `<span class="k">ran:</span> ${esc((r.ran_at || "").replace("T", " ").slice(0, 16))} &middot; rep ${r.rep}<br><span class="k">run:</span> ${esc(r.run_name)}${r.label ? " [" + esc(r.label) + "]" : ""}<br>` +
     `<span class="k">code:</span> ${esc(r.code.map(([k, v]) => k + " " + v).join(", "))}` +
     (Object.keys(r.settings).length ? `<br><span class="k">settings:</span> ${esc(Object.entries(r.settings).map(([k, v]) => k + " " + v).join(", "))}` : "") +
     (r.status ? `<br><span class="k">status:</span> ${esc(r.status)}` : ""); }
@@ -253,7 +257,7 @@ function overview(rows, runs, col, runFirst) {
     const hgt = Math.max(0, base - top); const r = Math.min(4, bw / 2, hgt);
     el("path", {d:`M${x - bw / 2},${base}V${top + r}Q${x - bw / 2},${top} ${x - bw / 2 + r},${top}H${x + bw / 2 - r}Q${x + bw / 2},${top} ${x + bw / 2},${top + r}V${base}Z`, fill:css(robotOf(robot).v)}, svg);
     const hit = el("rect", {x:x - Math.max(bw, 12) / 2, y:T, width:Math.max(bw, 12), height:H - T - B, fill:"transparent"}, svg);
-    hit.addEventListener("mousemove", ev => showTip(ev, `<b>${esc(run)}</b> &middot; ${esc(robotOf(robot).name)}<br>${g.filter(r => r.met).length} of ${sc.length} scored met (${Math.round(share * 100)}%; ${g.length} run)<br><span class="k">ran:</span> ${esc((g[0].ran_at || "").replace("T", " ").slice(0, 16))}`));
+    hit.addEventListener("mousemove", ev => showTip(ev, `<b>${esc(g[0].run_name)}</b> &middot; ${esc(robotOf(robot).name)}<br>${g.filter(r => r.met).length} of ${sc.length} scored met (${Math.round(share * 100)}%; ${g.length} run)<br><span class="k">ran:</span> ${esc((g[0].ran_at || "").replace("T", " ").slice(0, 16))}`));
     hit.addEventListener("mouseleave", hideTip);
    }); });
   dateLabels(svg, runs.map((run, i) => [L + (i + 0.5) * (W - L - R) / runs.length, (runFirst[run] || "").slice(5, 10)]), H, L, W - R);
@@ -262,7 +266,7 @@ function table(rows, runs, runFirst) {
   let h = `<table><thead><tr><th>first crossing</th><th>run</th><th>label</th><th>robot</th><th>crossings</th><th>met</th><th>fluid</th><th>median ${esc(MEASURES[0][1])}</th><th>code</th></tr></thead><tbody>`;
   for (const run of runs) for (const robot of [...new Set(rows.filter(r => r.run === run).map(r => r.robot))]) {
     const g = rows.filter(r => r.run === run && r.robot === robot); const t = g.map(r => r.m[MEASURES[0][0]]).filter(v => v != null);
-    h += `<tr><td>${esc((runFirst[run] || "").replace("T", " ").slice(0, 16))}</td><td>${esc(run)}</td><td>${esc(g[0].label || "")}</td><td>${esc(robotOf(g[0].robot).name)}</td>` +
+    h += `<tr><td>${esc((runFirst[run] || "").replace("T", " ").slice(0, 16))}</td><td>${esc(g[0].run_name)}</td><td>${esc(g[0].label || "")}</td><td>${esc(robotOf(g[0].robot).name)}</td>` +
       `<td>${g.length}</td><td>${g.filter(r => r.met).length}</td><td>${g.some(r => r.fluid !== null && r.fluid !== undefined) ? g.filter(r => r.fluid).length : "&ndash;"}</td><td>${t.length ? median(t).toFixed(2) : "&ndash;"}</td>` +
       `<td>${esc(g[0].code.map(([k, v]) => k + " " + v).join(", "))}</td></tr>`; }
   $("runs").innerHTML = h + "</tbody></table>"; }

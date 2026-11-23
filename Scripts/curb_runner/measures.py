@@ -29,7 +29,9 @@ The crossing's events (seconds of simulated time):
                SETTLE_S after the crossing's end (a wheel still settling as the controller says Done is down when it
                gets there; what the robot does after that is not the crossing's), with its lowest point within DOWN_GAP_CM of that surface (less the gap it
                stood with at rest before the ask) and its hub past the edge; dips out of it shorter than BRIDGE_S are
-               bridged (a roller's ripple, a bounce). Interpolated where the gap crosses DOWN_GAP_CM.
+               bridged (a roller's ripple, a bounce). Interpolated where the gap crosses DOWN_GAP_CM, or where the
+               hub crosses the edge line when that is what brings it down (a wheel that rolls onto the surface); the
+               later of the two when both change between the same two samples.
   t_last_down  the latest t_down over the wheels the crossing counts: every wheel that stood on the start surface at
                the ask (a wheel held up, like a raised caster, is not counted). Every one of them must be down past
                the edge SETTLE_S after the end, or the crossing did not get across and has no crossing times.
@@ -39,11 +41,16 @@ The crossing's events (seconds of simulated time):
 
 The headline time is edge_to_last_down_s = t_last_down - t0; edge_to_done_s and edge_to_rest_s go on to Done and to
 rest. Only the standard library.
+
+shared.version 2 differs from 1 in two figures: t_down is interpolated where the hub crosses the edge line too (1 took
+the later sample's time there, up to a frame late), and a stop is counted on the size of the forward speed (1 counted
+any backward motion, however fast, as stopped). A wheel set down past the edge, and a crossing that never rolled
+back, read the same in both.
 """
 
 import math
 
-SHARED_VERSION = 1
+SHARED_VERSION = 2
 
 TERMINAL = ("DONE", "FAULTED", "ABORTED")
 INACTIVE = ("IDLE", "PLANNING")  # not yet carrying the crossing out: t_begin is the first sample after these
@@ -58,7 +65,7 @@ REST_MOVE_CM = 0.25
 REST_ATT_DEG = 0.1
 
 SPEED_WINDOW_S = 0.3  # speeds and tilt rates are changes over windows exactly this long
-STOPPED_CM_S = 2.0  # slower than this is stopped ...
+STOPPED_CM_S = 2.0  # slower than this, either way, is stopped ...
 STOP_MIN_S = 0.2  # ... and a stop lasts at least this long
 TILT_RATE_WINDOW_S = 0.3
 # A window end interpolated between two samples further apart than this (a gap in the trace) is not used.
@@ -340,11 +347,19 @@ def down_time(frame, samples, k, wheel, calib, i_end):
         break
     if i == 0:
         return samples[0]["t"]
+    # Sample i is down and sample i - 1 is not: the wheel came down between them, where the last of what was missing
+    # arrived -- its gap closing to DOWN_GAP_CM, its hub crossing the edge line (a wheel that rolls onto the surface is
+    # within the gap before its hub is past the edge), or both. Each is interpolated, as t_edge is: taking the later
+    # sample's time for the hub's crossing would read such a wheel up to a frame late, and jitter with the frames.
+    t_prev, t_i = samples[i - 1]["t"], samples[i]["t"]
     g_prev, a_prev = state(i - 1)
-    g_i, _ = state(i)
-    if g_prev is not None and a_prev is not None and a_prev >= 0.0 and g_prev > DOWN_GAP_CM:
-        return interp_time(samples[i - 1]["t"], g_prev, samples[i]["t"], g_i, DOWN_GAP_CM)
-    return samples[i]["t"]
+    g_i, a_i = state(i)
+    crossings = []
+    if a_prev is not None and a_prev < 0.0:
+        crossings.append(interp_time(t_prev, a_prev, t_i, a_i, 0.0))
+    if g_prev is not None and g_prev > DOWN_GAP_CM:
+        crossings.append(interp_time(t_prev, g_prev, t_i, g_i, DOWN_GAP_CM))
+    return max(crossings) if crossings else t_i  # neither: the hub was missing at i - 1
 
 
 def _out_time(samples, state, i_a, i_b):
@@ -426,8 +441,9 @@ def forward_speeds(samples):
 
 
 def speed_figures(samples, count_final_stop=True):
-    """{v_min, stops, stopped_s} over the samples: the least speed, and the stops (slower than STOPPED_CM_S for at
-    least STOP_MIN_S) and the time spent slower than STOPPED_CM_S, from the windowed speeds. count_final_stop False:
+    """{v_min, stops, stopped_s} over the samples: the least speed (signed: a roll-back reads negative), and the
+    stops (slower than STOPPED_CM_S, forwards or backwards, for at least STOP_MIN_S) and the time spent slower than
+    STOPPED_CM_S, from the windowed speeds. count_final_stop False:
     a stop still going at the end is the crossing's own end (a robot that stops before Done), not counted as a stop
     (its time still is)."""
     v = forward_speeds(samples)
@@ -435,7 +451,8 @@ def speed_figures(samples, count_final_stop=True):
         return {"v_min_cm_s": None, "stops": None, "stopped_s": None}
     stopped, stops, run, prev = 0.0, 0, None, v[0][0]
     for t, x in v:
-        if x < STOPPED_CM_S:
+        # The speed's size: a robot rolling back faster than the threshold is moving, not stopped (v_min shows it).
+        if abs(x) < STOPPED_CM_S:
             stopped += t - prev
             run = t if run is None else run
         else:
