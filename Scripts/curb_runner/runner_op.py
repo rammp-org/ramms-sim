@@ -3,13 +3,16 @@
     begin <json>   open the scenario's public curb map, place the robot's start, choose the robot (ramms.Robot), cap
                    the frame rate, begin PIE and arm the crossing session (below); json: robot_id, adapter (the
                    editor-side adapter file), wheels, rider_body, scenario ("Flat" or a curb_terrain id), dir,
-                   start ("climb" | "top"), start_offset_cm, setup, setup_at_s, ask_sim_s, stick, max_fps, post_s,
-                   timeout_sim_s, timeout_wall_s, trace_path
+                   start ("climb" | "top"), start_offset_cm, setup, setup_at_s, ask_sim_s, stick, max_fps,
+                   locked_frame_s (urlab.LockedFrameSeconds for the session; 0 off), post_s, timeout_sim_s,
+                   timeout_wall_s, trace_path
     status         the session's stage and what it has seen: {"stage", "sim", "phase", "status", "error", "finished"}
     end            end PIE, stop the session, release the stick, put back the PlayerStart, t.MaxFPS and ramms.Robot
     probe          the robot as the adapter reads it now (chassis, wheels and their gaps, phase, status)
 
-The session runs in the editor's own tick (a Slate post-tick callback), so nothing it times waits on a remote call:
+The session runs in the editor's own tick (a Slate post-tick callback), so nothing it times waits on a remote call, and
+by the physics' own clock (the adapter's sim_time: the robot base's simulation time, what the controller reads) -- with
+frame-locked stepping on (urlab.LockedFrameSeconds) the physics and the world's clock part company:
   - once the robot is there: its adapter's prepare(setup) at setup_at_s of simulated time;
   - from ask_sim_s - STEADY_LEAD_S: the steady gate (the chassis within STEADY_CM and STEADY_DEG over STEADY_WINDOW_S,
     no powered wheel faster than STEADY_RAD_S); the ask on the frame nearest ask_sim_s once steady (at most
@@ -42,6 +45,7 @@ STEADY_MAX_WAIT_S = 5.0
 STEADY_LEAD_S = 1.0
 TRACE_LEAD_S = 1.0
 ROBOT_WAIT_SIM_S = 5.0  # PIE without a robot the adapter knows this long: an error, not a wait
+LOCK_CVAR = "urlab.LockedFrameSeconds"  # frame-locked stepping (URLab): 0 off
 TERMINAL = ("DONE", "FAULTED", "ABORTED")
 
 les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
@@ -203,9 +207,11 @@ def finish(s, why):
     s["finished"] = True
     s["stage"] = "finished"
     s["end_why"] = why
+    # URLab sets the lock's variable back to 0 if a batch stalls: a run whose lock did not hold to the end says so.
+    s["locked_frame_s_end"] = cvar_float(LOCK_CVAR)
     rec = {k: s.get(k) for k in ("cfg", "start_placed", "robot_active", "robot_source", "setup_done", "setup_t", "ask",
                                  "refused", "end", "end_why", "imu_dropped", "imu_rate_hz", "frames", "error",
-                                 "max_fps_set", "first_t")}
+                                 "max_fps_set", "first_t", "clock", "locked_frame_s_set", "locked_frame_s_end")}
     rec["samples"] = s["samples"]
     rec["imu"] = s["imu"]
     path = s["cfg"]["trace_path"]
@@ -257,9 +263,23 @@ def step(s):
             return
         if s["robot_active"] != cfg["robot_id"]:
             raise RuntimeError("PIE started robot %r (%s), not %s" % (s["robot_active"], s["robot_source"], cfg["robot_id"]))
+    t = s["adapter"].sim_time() if hasattr(s["adapter"], "sim_time") else t
+    if t < 0.0:
+        return  # nothing published yet
+    if s.get("first_t") is None:
         s["first_t"] = round(t, 4)
+        s["clock"] = "physics" if hasattr(s["adapter"], "sim_time") else "world"
         s["actor_path"] = s["adapter"].pawn.get_path_name()
         s["stage"] = "setup"
+    if s.get("last_t") is not None and t <= s["last_t"]:
+        # The same physics state as the last frame (nothing stepped): nothing new to see or do -- but a physics that
+        # never steps again still times out.
+        if now_wall - s["started_wall"] > cfg["timeout_wall_s"]:
+            if s.get("ask") and not s.get("end"):
+                s["adapter"].abort()
+            s["end"] = s.get("end") or {"t": round(t, 4), "phase": "TIMEOUT", "status": s["adapter"].status()}
+            finish(s, "timeout")
+        return
     a = s["adapter"]
     frame_dt = t - s["last_t"] if s.get("last_t") is not None else None
     s["last_t"] = t
@@ -376,13 +396,15 @@ def op_begin(cfg):
         raise RuntimeError("could not load %s" % path)
     placed = place_start(ct, cfg)
     if getattr(unreal, "_curb_runner_saved", None) is None:
-        unreal._curb_runner_saved = {"t.MaxFPS": cvar_float("t.MaxFPS"), "robot": unreal.RammsRobotCatalog.get_console_robot()}
+        unreal._curb_runner_saved = {"t.MaxFPS": cvar_float("t.MaxFPS"), "robot": unreal.RammsRobotCatalog.get_console_robot(),
+                                     LOCK_CVAR: cvar_float(LOCK_CVAR)}
     if cfg.get("max_fps") is not None:
         console("t.MaxFPS %s" % cfg["max_fps"])  # 0: uncapped
+    console("%s %s" % (LOCK_CVAR, float(cfg.get("locked_frame_s") or 0.0)))
     unreal.RammsRobotCatalog.set_console_robot(cfg["robot_id"])
     unreal._curb_runner_session = {"cfg": cfg, "stage": "wait_pie", "samples": [], "imu": [], "steady": Steady(),
                                    "started_wall": time.time(), "start_placed": placed, "finished": False,
-                                   "max_fps_set": cvar_float("t.MaxFPS")}
+                                   "max_fps_set": cvar_float("t.MaxFPS"), "locked_frame_s_set": cvar_float(LOCK_CVAR)}
     les.editor_request_begin_play()
     unreal._curb_runner_handle = unreal.register_slate_post_tick_callback(tick)
     return {"map": path, "start": placed}
@@ -420,6 +442,8 @@ def op_end():
     if saved:
         if saved.get("t.MaxFPS") is not None:
             console("t.MaxFPS %s" % saved["t.MaxFPS"])
+        if saved.get(LOCK_CVAR) is not None:
+            console("%s %s" % (LOCK_CVAR, saved[LOCK_CVAR]))
         unreal.RammsRobotCatalog.set_console_robot(saved.get("robot") or "")
         unreal._curb_runner_saved = None
     unreal._curb_runner_session = None

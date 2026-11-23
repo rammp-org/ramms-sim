@@ -23,7 +23,7 @@ The `public-curb-history` pre-commit hook (`Scripts/check_public_history.py`) ke
 | identity | `schema`, `robot` (the history's robot name), `robot_id` (what `ramms.Robot` started), `scenario` (a `curb_terrain` id), `dir` (`up`, `down`), `start` (`standing`), `descent_start` (`top`: the descent started on the sidewalk), `rep`, `ran_at` (UTC), `label` |
 | `run` | `dir` (relative to the project), `started`, `argv` (with paths made relative), `editors` |
 | `code` | `ran_on`: for each public repository, its commit, branch and `dirty` (tracked files differ, up to 20 named), plus when the editor's plugin binaries were `built`. A record made later from a run folder without its `history_run.json` has `at_record` instead (the checkout at recording). |
-| `settings` | `standard` (the robot's standard settings, below), `max_fps` (the frame-rate cap), `frame_ms` / `frame_max_ms` / `frame_p99_ms` (the trace's median, worst and p99 frame), `physics_step_ms` (from the rider IMU's rate), `maps` (`public`), `ask_sim_s`, `steady` (at rest when asked), `late_s`, `cvars`, `robot` (its setup: for RAMMP Gen1 `style` 1 Blended, `stance`, `stick`, `start_offset_cm`, `start`) |
+| `settings` | `standard` (the robot's standard settings, below), `max_fps` (the frame-rate cap), `frame_ms` / `frame_max_ms` / `frame_p99_ms` (the trace's median, worst and p99 frame), `physics_step_ms` (from the rider IMU's rate), `maps` (`public`), `ask_sim_s`, `steady` (at rest when asked), `late_s`, `clock` (what the trace was timed by: `physics`), `locked_frame_s` (URLab's frame lock, null when off; see `Scripts/curb_runner/README.md`), `cvars`, `robot` (its setup: for RAMMP Gen1 `style` 1 Blended, `stance`, `stick`, `start_offset_cm`, `start`) |
 | `outcome` | `phase` (`DONE`, `FAULTED`, `ABORTED`, `REFUSED`, `TIMEOUT`), `pass`, `met` (null when not scored), `expect`, `failed` (the checks), `status`, `why` |
 | `shared` | `measures.py`'s figures, the same for every robot. `version`, `across`, and `wheels` (`counted`, `raised`). `events` (simulated s): `t_ask`, `t_begin`, `t_edge`, `t0`, `t_last_down`, `t_done`, `t_rest`, `t_end`, `last_down_wheel`, `down` per wheel. `times`: `edge_to_last_down_s`, `edge_to_done_s`, `edge_to_rest_s`, `edge_to_end_s`, `ask_to_edge_s`, `planning_after_edge_s`. `speed`: `v_min_cm_s`, `stops`, `stopped_s`, `mean_cm_s`, plus the same to Done. `attitude`: seat and chassis inclination, tilt rate, the attitude at Done and at rest, and its change beyond the surfaces. `path`: `drift_cm`, `yaw_change_deg`. `landing`: `min_r`. `resolution_s` |
 | `rider` | the rider's acceleration from the physics IMU (m/s², two 50 ms low-passes): `peak_` and `rms_` of `fore_aft`, `vertical` and `total`, `samples`, `clock_offset_s`. Null when the IMU lost samples. |
@@ -34,7 +34,7 @@ The measures' exact definitions are in `Scripts/curb_runner/measures.py` and `Sc
 ## RAMMP Gen1's standard settings
 
 A record has `settings.standard` true when all of these hold:
-- the runner's 16 fps cap, with the trace's median frame within 10% of 62.5 ms;
+- the runner's 16 fps cap, with the trace's median frame within 10% of 62.5 ms, and no frame lock;
 - the Blended style;
 - the outdoor stance: front arm −14° (front omni wheels up), elevators 9°;
 - the stick held at 1;
