@@ -6,6 +6,7 @@ crossings can be tracked and plotted over time, and compared with another robot'
     python -I Scripts/curb_runner/history.py csv --history FILE [--out FILE.csv]
     python -I Scripts/curb_runner/history.py plot --history FILE [--history FILE ...] [--robot NAME] [--out FILE.html] [--all]
     python -I Scripts/curb_runner/history.py list --history FILE
+    python -I Scripts/curb_runner/history.py add-level RUN [RUN ...] [--history FILE] [--label TEXT]
 
 Each RUN is a run_curb.py --out folder (results.json, or rep<k>/results.json, with the traces beside them); the runner
 records every run itself as it ends. A record (schema 3; Docs/curb-performance/README.md describes every field):
@@ -24,6 +25,12 @@ records every run itself as it ends. A record (schema 3; Docs/curb-performance/R
 Robots register their history here (register()): a robot's profile (robots/) gives its file and its standard. A file
 in a public repository keeps public provenance only: the public repositories' commits, paths relative to the project,
 nothing of an optional private plugin. Only the standard library.
+
+The level-assist course runs (run_level.py) are a group of their own, `level`, in a file of their own per robot (its
+profile's level history_file, registered by register_level_profiles() -- a robot kept privately registers its own
+there, and its file is never a public one): one record per run (LEVEL_SCHEMA; Docs/level-performance/README.md),
+keyed by course, dir, start, variant, pref, stick, hold, level (on / off) and the run's id, with the same run, code
+and settings provenance; an assist-on record carries its `pair` figures against the assist-off run of the same case.
 """
 
 import argparse
@@ -46,6 +53,10 @@ if HERE not in sys.path:
 DEFAULT_OUT = os.path.join(ROOT, "Saved", "CurbHistory")
 SCHEMA = 3
 RUN_SIDE_FILE = "history_run.json"
+RESULTS = "results.json"
+LEVEL_GROUP = "level"
+LEVEL_SCHEMA = 1
+LEVEL_RESULTS = "level_results.json"  # a level run folder's rows (a curb run's are results.json)
 
 
 def optional_submodules(root=ROOT):
@@ -83,6 +94,8 @@ BUILT = (("core", "Plugins/RammsCore/Binaries/Win64/UnrealEditor-RammsCore.dll")
 
 # name -> {"file", "public", "standard": fn(row) -> bool, "repos", "record": fn or None (the default record)}
 HISTORIES = {}
+# The level-assist course runs' histories: name -> {"file", "public", "standard", "repos"}
+LEVEL_HISTORIES = {}
 
 
 def register(name, history_file, standard, public=True, repos=PUBLIC_REPOS, record_fn=None):
@@ -101,6 +114,25 @@ def register_profiles():
             repos = PUBLIC_REPOS if public else PUBLIC_REPOS + tuple(tuple(r) for r in (prof.get("repos") or ()))
             register(prof["history_robot"], prof["history_file"], prof.get("standard") or (lambda row: False),
                      public=public, repos=repos)
+
+
+def register_level(name, history_file, standard, public=True, repos=PUBLIC_REPOS):
+    """A robot's level history: its file, its standard-settings predicate, whether the file is public (its lines then
+    must pass Scripts/check_public_history.py's rules), and the repositories its code state names."""
+    LEVEL_HISTORIES[name] = {"file": history_file, "public": public, "standard": standard, "repos": repos}
+
+
+def register_level_profiles():
+    """Every robot profile with a level history (its `level` history_file), registered: the hook a robot kept in a
+    private plugin registers its own file through, by being found (robots/__init__.py's discovery)."""
+    import robots
+    for prof in robots.load_all().values():
+        lv = prof.get("level") or {}
+        if prof.get("history_robot") and lv.get("history_file"):
+            public = bool(prof.get("history_public", True))
+            repos = PUBLIC_REPOS if public else PUBLIC_REPOS + tuple(tuple(r) for r in (prof.get("repos") or ()))
+            register_level(prof["history_robot"], lv["history_file"], lv.get("standard") or (lambda row: False),
+                           public=public, repos=repos)
 
 
 # --- code ---------------------------------------------------------------------------------------------------------
@@ -210,12 +242,13 @@ def load_json(p):
         return None
 
 
-def run_rows(run_dir):
+def run_rows(run_dir, name=RESULTS):
     """(rep, rows, results path) for every results.json of a run: the top-level one, or rep<k>/results.json (a
-    --repeat run); a folder that holds both (one run, then another with --repeat) gives the newer."""
-    top = os.path.join(run_dir, "results.json")
+    --repeat run); a folder that holds both (one run, then another with --repeat) gives the newer. name: the rows'
+    file (LEVEL_RESULTS for a level run)."""
+    top = os.path.join(run_dir, name)
     reps = []
-    for p in glob.glob(os.path.join(run_dir, "rep*", "results.json")):
+    for p in glob.glob(os.path.join(run_dir, "rep*", name)):
         m = re.fullmatch(r"rep(\d+)", os.path.basename(os.path.dirname(p)))
         if m:
             reps.append((int(m.group(1)), p))
@@ -447,6 +480,114 @@ def add_runs(run_dirs, history=None, label=None, quiet=False):
     return n
 
 
+# --- the level group ----------------------------------------------------------------------------------------------
+
+def not_a_level_run(row):
+    """Rows for runs that never ran (an editor that died, a session error)."""
+    if not isinstance(row, dict) or not row.get("course"):
+        return True
+    return str((row.get("outcome") or {}).get("why") or "").startswith("error:")
+
+
+def level_record(row, rep, run_dir, meta, code, label):
+    """A run_level.py row as a record (group `level`, LEVEL_SCHEMA)."""
+    meta = meta or {}
+    h = LEVEL_HISTORIES.get(row.get("history_robot")) or {}
+    s = dict(row.get("settings") or {})
+    try:
+        s["standard"] = bool(h.get("standard", lambda r: False)(row))
+    except Exception:  # noqa: BLE001  (a standard predicate that does not know this row)
+        s["standard"] = False
+    o = row.get("outcome") or {}
+    editors = meta.get("editors")
+    return {
+        "group": LEVEL_GROUP,
+        "schema": LEVEL_SCHEMA,
+        "robot": row.get("history_robot"),
+        "robot_id": row.get("robot_id"),
+        "course": row.get("course"),
+        "dir": row.get("dir"),
+        "start": row.get("start"),
+        "variant": row.get("variant"),
+        "level": row.get("level"),
+        "pref": row.get("pref"),
+        "stick": row.get("stick"),
+        "hold": bool((row.get("hold") or {}).get("on")),
+        "rep": rep,
+        "ran_at": row.get("ran_at") or meta.get("started"),
+        "label": public_text(label),
+        "run": {"id": run_id(run_dir), "dir": rel_path(run_dir), "started": meta.get("started"),
+                "argv": public_argv(meta.get("argv")), "editors": (len(editors) if isinstance(editors, list) else editors) or None},
+        "code": code,
+        "settings": s,
+        "outcome": {"end": o.get("end"), "met": o.get("met"), "expect": o.get("expect"),
+                    "failed": sorted(set(o.get("failed") or [])) or None, "not_measured": o.get("not_measured") or None,
+                    "checks": o.get("checks") or None, "why": public_text(o.get("why")) or None},
+        "figures": row.get("figures"),
+        "pair": row.get("pair"),
+        "rider": row.get("rider"),
+    }
+
+
+def level_key(r):
+    """What tells two level records of one run apart."""
+    return (r.get("course"), r.get("dir"), r.get("start"), r.get("variant"), tuple(r.get("pref") or ()), r.get("stick"),
+            bool(r.get("hold")), r.get("level"), r.get("rep"))
+
+
+def add_level_runs(run_dirs, history=None, label=None, quiet=False):
+    """Record every run of run_dirs (run_level.py --out folders: level_results.json, or rep<k>/level_results.json) in
+    its robot's level history (or `history`), replacing all of each folder's earlier records there; returns how many
+    were written. A public file takes no line its pre-commit hook would refuse."""
+    if not LEVEL_HISTORIES:
+        register_level_profiles()
+    by_file, public_by_file = {}, {}
+    for run_dir in run_dirs:
+        side = load_json(os.path.join(run_dir, RUN_SIDE_FILE)) or {}
+        meta = dict(side.get("meta") or {})
+        meta.update(load_json(os.path.join(run_dir, "run.json")) or {})
+        for rep, rows, path in run_rows(run_dir, LEVEL_RESULTS):
+            for row in rows:
+                if not_a_level_run(row):
+                    continue
+                h = LEVEL_HISTORIES.get(row.get("history_robot"))
+                if h is None and history is None:
+                    continue
+                target = history or h["file"]
+                code = {"ran_on": side["ran_on"]} if side.get("ran_on") else {"at_record": code_state((h or {}).get("repos") or PUBLIC_REPOS)}
+                rec = level_record(row, rep, run_dir, meta, code, label or meta.get("label"))
+                by_file.setdefault(target, {}).setdefault(rec["run"]["id"], []).append(rec)
+                public_by_file[target] = (h or {}).get("public", True)
+    n = 0
+    for target, new in by_file.items():
+        if public_by_file.get(target):
+            rules = public_rules()
+            for recs in new.values():
+                for rec in recs:
+                    line = json.dumps(rec, separators=(",", ":"))
+                    hit = next((what for rx, what in rules if rx.search(line)), None)
+                    if hit:
+                        raise ValueError("a record for the public history %s carries %s: not written" % (rel_path(target), hit))
+        with HistoryLock(target):
+            have = read_history(target)
+            old_label = {}
+            for r in have:
+                if r.get("label"):
+                    old_label.setdefault(r["run"]["id"], r["label"])
+            kept = [r for r in have if r["run"]["id"] not in new]
+            for rid, recs in new.items():
+                for rec in recs:
+                    if not rec.get("label") and old_label.get(rid):
+                        rec["label"] = old_label[rid]
+                kept += recs
+                n += len(recs)
+            kept.sort(key=lambda r: (r.get("ran_at") or "", r["run"]["dir"], r.get("rep") or 0, str(level_key(r))))
+            write_atomically(target, lambda f: [f.write(json.dumps(r, separators=(",", ":")) + "\n") for r in kept])
+        if not quiet:
+            print("level history: %d run(s) recorded in %s (%d in all)" % (sum(len(v) for v in new.values()), rel_path(target), len(kept)))
+    return n
+
+
 # --- export -------------------------------------------------------------------------------------------------------
 
 def flat(rec, prefix=""):
@@ -520,10 +661,17 @@ def main():
     p.add_argument("--all", action="store_true", help="every record, not only those at the standard settings")
     ls = sub.add_parser("list", help="the runs in a history")
     ls.add_argument("--history", required=True)
+    al = sub.add_parser("add-level", help="record a level run's course runs (run_level.py --out folders)")
+    al.add_argument("runs", nargs="+")
+    al.add_argument("--history", default=None, help="this file instead of each robot's own")
+    al.add_argument("--label", default=None)
     args = ap.parse_args()
     if args.cmd == "add":
         register_profiles()
         add_runs(args.runs, args.history, args.label)
+    elif args.cmd == "add-level":
+        register_level_profiles()
+        add_level_runs(args.runs, args.history, args.label)
     elif args.cmd == "csv":
         stem = os.path.splitext(os.path.basename(args.history))[0]
         to_csv(read_history(args.history), args.out or os.path.join(DEFAULT_OUT, stem + ".csv"))
@@ -537,7 +685,8 @@ def main():
     elif args.cmd == "list":
         for d, rs in list_runs(read_history(args.history)):
             met = sum(1 for x in rs if x["outcome"].get("met"))
-            print("%s  %-60s %3d crossings, %3d met, %s%s" % (min(x.get("ran_at") or "" for x in rs)[:16], d, len(rs), met,
+            what = "runs" if rs[0].get("group") == LEVEL_GROUP else "crossings"
+            print("%s  %-60s %3d %s, %3d met, %s%s" % (min(x.get("ran_at") or "" for x in rs)[:16], d, len(rs), what, met,
                                                         code_label(rs[0]), "  [%s]" % rs[0]["label"] if rs[0].get("label") else ""))
 
 

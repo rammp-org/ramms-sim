@@ -17,6 +17,15 @@ A profile is a module that defines PROFILE, a dict:
     expect(sid, dir) -> "pass" | "refuse:<regex>" | "explore": what a crossing should do
     standard(row)    -> bool: the row ran at the robot's standard settings
     checks(row)      -> [failed check names] (optional): the robot's own pass checks, beside the shared ones
+    level            (optional) the robot on the level-assist courses (run_level.py), a dict: stick (the stick's
+                     value for the standard speed), speed_cm_s (what that gives, for a run's timeout), locked_frame_s
+                     (its standard series' frame lock), setup (given to the adapter's prepare), support_wheels (the
+                     wheels it stands on) and drive_wheels (names from `wheels`), rider_offset_deg ((pitch, roll) of
+                     the seat on the chassis, or None: taken at each run's steady gate), alt_mode ((the mode it drives
+                     in, its other one) or None), hold (course.HOLD_DEFAULT overrides: k_yaw, k_xt, max_turn,
+                     turn_sign), courses (those it runs by default), criteria (level_measures.score's thresholds),
+                     expect(course, dir, start, variant) -> "pass" | "rates" | "past_reach" | "parked" | "explore",
+                     standard(row) -> bool, history_file (its level history; history_public says whether it is public)
 
 Discovery, in order (a later profile with the same robot_id replaces an earlier one):
   1. Scripts/curb_runner/robots/*.py (not *_editor.py);

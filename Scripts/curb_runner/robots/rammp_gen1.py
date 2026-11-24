@@ -61,6 +61,83 @@ def checks(row):
     return [] if c.get("lifts_back", True) else ["lifts back"]
 
 
+# --- level-assist courses (run_level.py; level_measures.score reads `criteria`) ---------------------------------------
+# What a run with the assist on must do, per the level plan's pass criteria (its section I): Gen1's values are public.
+LEVEL_CRITERIA = {
+    "steady_residual_deg": 0.5,  # the rider's error against the preference at the end of every constant segment
+    "rider_rms_deg": 1.0,  # over the driven span
+    "rider_peak_deg": 3.0,  # no seat mechanism: what the base leaves, the rider gets
+    "tilt_rate_deg_s": 4.0,  # over 0.3 s
+    "rejection_max": 0.3,  # the rider's error RMS on over off, on slopes of 3 deg or more
+    "stops": 0,
+    "speed_kept_slope": 0.8,  # mean speed on over off, on constant slopes ...
+    "speed_kept_overall": 0.6,  # ... and over the run
+    "at_reach_s": 0.0,
+    "margin_cm": 3.0,  # the centre of mass inside the bearing wheels' hull ...
+    "margin_under_off_cm": 1.0,  # ... and no more than this under the assist-off run's
+    "drive_share_under_off": 0.02,  # the drive wheels' least share of the load: not below the off run's (by more than this)
+    "float_s": 0.2,  # no drive wheel off the ground longer
+    "level_after_flat_deg": 0.5,  # 3 s after the last seam back onto the flat
+    "flat_rms_over_off_deg": 0.2,  # FLAT: on within this of off
+    "flat_leg_travel_rms_cm": 0.2,  # FLAT: no hunting
+    # Past the legs' reach (about 7 deg nose up at the outdoor stance): the tilt bounded by the ground less the reach.
+    "past_reach": {"reach_deg": 7.0, "tilt_over_deg": 0.5, "rate_deg_s": 3.5, "speed_floor": 0.25},
+    "parked": {"drift_cm": 1.0, "cmd_changes": 0, "toggle_rate_deg_s": 3.5, "mode_switch_deg": None},
+}
+LEVEL_COURSES = ["FLAT", "RAMP5", "CROSS2", "CROSS6", "BREAK6", "STEEPEN", "WARP", "CROWN", "FOLD", "COMBO", "TRANSITIONS"]
+LEVEL_LOCKED_FRAME_S = 0.0625  # the standard series is frame-locked: a levelling run has no planner to wait for
+LEVEL_STICK = 0.5  # about 60 of its 120 cm/s
+
+
+def level_expect(course_id, direction, start, variant):
+    """What an assist-on run should do (level_measures.score): its roll is capped at 6 deg and its nose-up reach is
+    about 7, so the 8 deg ramp is past its reach and the 12 deg one is only explored."""
+    if variant == "parked":
+        return "parked"
+    if variant in ("toggle", "pref_step", "mode"):
+        return "rates"
+    if course_id == "RAMP12":
+        return "explore"
+    if course_id == "RAMP8":
+        return "past_reach"
+    return "pass"
+
+
+def level_standard(row):
+    """A course run at the standard settings: frame-locked at 1/16 s, the standard setup and stick, the hold on,
+    steady at the gate, no console variables of its own."""
+    s = row.get("settings") or {}
+    if s.get("cvars") or s.get("locked_frame_s") != LEVEL_LOCKED_FRAME_S:
+        return False
+    robot = s.get("robot") or {}
+    if robot.get("style") != SETUP["style"] or robot.get("stance") != SETUP["stance"]:
+        return False
+    return bool(s.get("steady")) and row.get("stick") in (LEVEL_STICK, 0.0) and bool((row.get("hold") or {}).get("on"))
+
+
+LEVEL = {
+    "stick": LEVEL_STICK,
+    "speed_cm_s": 60.0,  # what that stick gives, for a run's timeout only
+    "locked_frame_s": LEVEL_LOCKED_FRAME_S,
+    "setup": {"style": SETUP["style"], "stance": SETUP["stance"]},
+    # The outdoor stance stands on the drive wheels and the rear omni wheels; the front ones are held up.
+    "support_wheels": ["drive_wheel_l", "drive_wheel_r", "rear_omni_l", "rear_omni_r"],
+    "drive_wheels": ["drive_wheel_l", "drive_wheel_r"],
+    "rider_offset_deg": None,  # the seat against the chassis, taken at each run's steady gate
+    "alt_mode": None,  # (the mode it drives in, its other one), for the variants that switch
+    # As tuned in the editor (FLAT from the yaw5 start, 2026-11-24). The differential drive takes nothing under its
+    # 0.05 stick dead zone and rescales the rest: with the plain gains the hold's small turns never reached the
+    # wheels and the robot wove +-20 cm / +-4 deg about its path. The dead zone is carried; the gains are low and the
+    # rate term small because the heading answers the stick late (the wheels' speed loops against the robot's yaw
+    # inertia): a yawed start is back within 1.5 deg in 5 s without a second swing.
+    "hold": {"k_yaw": 0.02, "k_xt": 0.002, "k_rate": 0.02, "deadzone": 0.05},
+    "courses": LEVEL_COURSES,
+    "criteria": LEVEL_CRITERIA,
+    "expect": level_expect,
+    "standard": level_standard,
+    "history_file": os.path.join(ROOT, "Docs", "level-performance", "gen1_level_history.jsonl"),
+}
+
 PROFILE = {
     "robot_id": "rammp_gen1",
     "aliases": ["Gen1", "RammpGen1"],
@@ -89,4 +166,5 @@ PROFILE = {
     "expect": expect,
     "standard": standard,
     "checks": checks,
+    "level": LEVEL,
 }
