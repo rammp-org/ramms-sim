@@ -12,6 +12,8 @@
   curb                       the curb crossing: phase, status, step and crossing height, the chassis
   stats                      the last crossing's measurements (times, stops, attitude, the rider's acceleration, margins)
   status                     curb.status: the panel's "Curb status" words and how much they need the rider
+  level                      the level assist (switch it with: set level.assist 1 / 0): its state and words, the
+                             base's tilt, the reach left, the speed scale, each lift's command and what is on top of it
   expect_status <words...>   curb.status begins with those words (e.g. "Faulted:", "Crossing up")
   release <control id>       release it
   pad <key> <value> [...]    gamepad keys at values (URammsInputTestLibrary: through Enhanced Input)
@@ -135,6 +137,19 @@ else:
         want = " ".join(op[1:])
         if op[0] == "expect_status" and not words.startswith(want):
             raise RuntimeError("curb.status is %r, not %r..." % (words, want))
+    elif op[0] == "level":
+        # level.state: 0 off, 1 levelling, 2 holding, 3 giving back, 4 standing by, 5 waiting, 6 faulted.
+        severity = int(round(cs.get_control_value("level.status")))
+        log("level assist %s | state %d | [%s] %s | tilt %.2f deg, reach left %.2f, speed scale %.2f" % (
+            "on" if cs.get_control_value("level.assist") > 0.5 else "off", int(round(cs.get_control_value("level.state"))),
+            ("info", "attention", "fault")[max(0, min(severity, 2))], cs.get_control_text("level.status"),
+            cs.get_control_value("level.tilt"), cs.get_control_value("level.reach"), cs.get_control_value("level.speed_scale")))
+        for motor in ("elevator_l", "elevator_r", "rear_lift", "front_arm"):
+            # (Its own command, which the lift controller and a crossing write; None while nothing has commanded it.)
+            own = base.get_motor_command(motor)
+            own = own[-1] if isinstance(own, tuple) else own
+            log("  %s: command %s, level offset %+.4f, at %+.4f" % (
+                motor, "none" if own is None else "%+.4f" % own, base.get_motor_command_offset(motor), base.get_motor_value(motor)))
     elif op[0] == "stats":
         s = pawn.get_component_by_class(unreal.RammsRammpGen1CurbController).get_stats()
         frame = ("frame %.1f cm over the edge (%s)" % (s.min_frame_clearance_cm, s.min_clearance_phase.name)

@@ -13,6 +13,11 @@ articulation gets the RAMMS wiring the chair pawn (BP_RammpGen1_Ramms) has, driv
   CurbController     URammsRammpGen1CurbController: the curb crossing (curb.negotiate / curb.abort / curb.phase),
                      configured from mujoco/rammp_gen1/curb_config_powered_front.json (export_curb_config.py)
   DriveModeSelector  the differential drive and the curb crossing as drive modes, differential first
+  LevelAssist        URammsLevelAssistComponent: the chassis (and so the rider: the seat is fixed to it) kept level on
+                     sloping ground, in pitch by the three axles' heights and in roll by the two elevators, which
+                     leaves the robot on three points; switched by level.assist, off at spawn. Its geometry is the curb
+                     controller's (the tables, the bodies, the lifts' speeds, the frame); what is authored here is how
+                     far and how fast it may correct (LEVEL_TUNING)
   On the seat body   the chair's seat, rails, arm mount and camera mounts and cameras (meshes, where BP_RammpGen1_Ramms
                      carries them), and RammsSeat: its seated occupant, with the chair's settings copied
   ArmIK, ArmTeleop   the Gen3 arm in the MJCF: URammsMjEndEffectorController (only the arm's joints; home = the MJCF's
@@ -47,6 +52,42 @@ ARTICULATION = "/Game/Robots/RammpGen1/URL/rammp_gen1_powered_front"
 PAWN_DIR, PAWN_NAME = "/Game/Robots/RammpGen1", "BP_RammpGen1PoweredFront_Ramms"
 DATA_DIR, TABLE_NAME = "/Game/Robots/Data", "DT_RammpGen1PoweredFront_Motors"
 INPUT_MAP = "/Game/Input/Ramms/DA_RammsInput_RammpGen1"
+
+# The level assist's tuning (FRammsLevelTuning; every member not named keeps its default). Worked out on a robot of
+# this shape and these rates in the plugin's kinematic dry run (RammsLevelGen1ShapeTests.cpp), to be confirmed in the
+# simulator:
+#   max_correction_deg        pitch 10: in the outdoor stance the frame's clearance stops a nose-up correction at about
+#                             8.5 deg (9 with the chassis let up 3 cm) and the rear lift's travel a nose-down one at
+#                             about 8 (11.5 with the chassis let up), so 10 binds only nose down with the chassis let
+#                             up. Roll 6: the owner's limit for standing on three points (the elevators 6.4 cm apart,
+#                             one rear omni wheel about 2.3 cm off the ground).
+#   max_correction_rate_...   8 deg/s: about what the elevators give alone. The rear lift is the slow one and does two
+#                             thirds of a pitch correction (the ride height is kept), so a pitch correction moves at
+#                             under 6 deg/s whatever this says; the drive is slowed where the ground turns faster.
+#   integral_max_deg          4: what the loaded elevators sag by, the sprung rear and its unloaded table are trimmed
+#                             out by the integral.
+#   ride_height_up_cm         3: the chassis may rise that far where it makes a correction fit (it buys nose-down
+#                             reach; lowering it buys none, the frame is what stops a nose-up one).
+#   min_belly_clearance_cm    4 under the frame's underside.
+#   level_reference_deg       (0, 0): on, the stance's own lean on the flat (about 1.4 deg nose up) is taken out too.
+LEVEL_TUNING = {
+    "level_reference_deg": unreal.Vector2D(0.0, 0.0),
+    "max_correction_deg": unreal.Vector2D(10.0, 6.0),
+    "max_correction_rate_deg_per_sec": 8.0,
+    "leg_rate_fraction": 0.8,
+    "feed_forward_gain": 1.0,
+    "proportional_gain": 0.3,
+    "integral_gain": 2.0,
+    "integral_max_deg": 4.0,
+    "ride_height_up_cm": 3.0,
+    "ride_height_down_cm": 0.0,
+    "min_belly_clearance_cm": 4.0,
+    "min_speed_scale": 0.25,
+    "max_tilt_deg": 5.0,
+    "tilt_rate_deg_per_sec": 3.0,
+    "tilt_accel_deg_per_sec2": 4.0,
+}
+LEVEL_MODES = ["differential"]
 
 DRIVE = ("drive_l", "drive_r")
 # Wheel speed loops (FRammsVelocityGains) and the drive wheels' brake, as the lift-drive robots'
@@ -217,6 +258,14 @@ curb = add_component(bp, unreal.RammsRammpGen1CurbController, "CurbController")
 setp(curb, config=curb_cfg, return_mode_id="differential")
 setp(add_component(bp, unreal.RammsDriveModeSelector, "DriveModeSelector"), initial_mode_id="differential")
 
+# The level assist, beside the curb controller that describes the robot to it.
+level = add_component(bp, unreal.RammsLevelAssistComponent, "LevelAssist")
+level_tuning = unreal.RammsLevelTuning()
+for key, value in LEVEL_TUNING.items():
+    level_tuning.set_editor_property(key, value)
+setp(level, tuning=level_tuning, enabled_mode_ids=LEVEL_MODES, enabled_at_start=False,
+     attitude_source=unreal.RammsLevelAttitudeSource.EXACT)
+
 add_component(bp, unreal.RammsRobotControlSurfaceComponent, "ControlSurface")
 setp(add_component(bp, unreal.RammsMjSimControlComponent, "SimControl"), initial_keyframe="home")
 setp(add_component(bp, unreal.RammsRobotCameraComponent, "CameraControl"), orbit_sensitivity=0.25, zoom_sensitivity=1.0,
@@ -229,6 +278,33 @@ cdo.set_editor_property("auto_possess_player", unreal.AutoReceiveInput.PLAYER0)
 unreal.BlueprintEditorLibrary.compile_blueprint(bp)
 if not EAL.save_loaded_asset(bp, False):
     raise RuntimeError("could not save %s" % pawn_path)
+
+
+def _same(a, b):
+    if isinstance(b, unreal.Vector2D):
+        return abs(a.x - b.x) < 1e-4 and abs(a.y - b.y) < 1e-4
+    return abs(a - b) < 1e-4
+
+
+# Read back from the saved Blueprint's own component: what a pawn will start with.
+_, level_saved = find_component(bp, "LevelAssist")
+if not level_saved:
+    raise RuntimeError("%s has no LevelAssist after the compile" % pawn_path)
+saved_tuning = level_saved.get_editor_property("tuning")
+wrong = [k for k, v in LEVEL_TUNING.items() if not _same(saved_tuning.get_editor_property(k), v)]
+if [str(m) for m in level_saved.get_editor_property("enabled_mode_ids")] != LEVEL_MODES:
+    wrong.append("enabled_mode_ids")
+if level_saved.get_editor_property("enabled_at_start"):
+    wrong.append("enabled_at_start")
+if level_saved.get_editor_property("attitude_source") != unreal.RammsLevelAttitudeSource.EXACT:
+    wrong.append("attitude_source")
+if wrong:
+    raise RuntimeError("the level assist's settings did not take: %s" % ", ".join(wrong))
+log("level assist: modes %s, off at spawn; correction up to %g deg pitch / %g deg roll at %g deg/s, integral %g deg, "
+    "ride height %g cm up / %g down, %g cm under the frame, speed scale down to %g" % (
+        LEVEL_MODES, saved_tuning.max_correction_deg.x, saved_tuning.max_correction_deg.y,
+        saved_tuning.max_correction_rate_deg_per_sec, saved_tuning.integral_max_deg, saved_tuning.ride_height_up_cm,
+        saved_tuning.ride_height_down_cm, saved_tuning.min_belly_clearance_cm, saved_tuning.min_speed_scale))
 log("curb controller: %d / %d / %d table points, rear lift up to %.1f cm" % tuple(
     [len(curb_cfg.get_editor_property(k).get_editor_property("angle_rad")) for k in ("drive_table", "front_table", "rear_table")]
     + [max(curb_fields["rear_table"]["height_cm"])]))
