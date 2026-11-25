@@ -63,6 +63,36 @@ def checks(row):
 
 # --- level-assist courses (run_level.py; level_measures.score reads `criteria`) ---------------------------------------
 # What a run with the assist on must do, per the level plan's pass criteria (its section I): Gen1's values are public.
+#
+# THREE POINTS. This robot's roll is made by its two elevators alone: with any roll corrected it stands on both drive
+# wheels and ONE rear omni wheel. Two of the checks below were written for a robot on four wheels and are held here to
+# what three points can do:
+#   margin_under_off_cm  was 1.0. Standing or at a crawl with roll corrected the bearing triangle is 2.2 to 3.2 cm
+#                        tighter than the four-wheel stance on the same cross slope (measured, 2026-11-24; never less
+#                        than 11 cm left, against the 3 cm of margin_cm), so "no more than 1 cm under the assist-off
+#                        run" failed 18 of 56 runs for the stance itself. 3.5: the triangle's cost and no more.
+#   at_reach_s           0.0 stays, and means the LEGS' reach: standing across exactly 6 deg the roll correction rests
+#                        on its 6 deg limit and the status says so, which is the robot doing as authored, not a run
+#                        out of reach. Courses whose cross fall is at that limit are not to be failed on it while the
+#                        robot stands or crawls (the score has no such exception yet: read CROSS6's at-reach time with
+#                        this in mind).
+# The level assist carries roll on this robot up to a walk: all of it while the stick asks 60 cm/s or less (the standard
+# stick, 0.5, asks 60), none of it once the stick asks 65 or more (Ramms.Level.ThreePointFullCmS / NoneCmS; all or none,
+# never a part). So:
+#   at the standard stick   the roll checks hold on a cross fall as on anything else (simulator, 2026-11-25: CROSS6 0.20
+#                           deg RMS, CROSS2 0.06, CROWN 0.10 to 0.14, WARP 0.28, at the assist-off robot's pace).
+#   at full stick           the rider's roll on a cross fall is the fall's own: steady_residual_deg, rider_rms_deg and
+#                           rejection_max cannot pass there by design, and say nothing against the assist. The score
+#                           does not yet tell that case apart; judge cross-fall segments driven at full stick by tilt
+#                           rate, stops, floats and the yaw measures, not by the rider's roll. (The drive is held to 60
+#                           cm/s for the 2 to 3 s the roll takes to walk out: the scale reads 0.5 there.)
+#   a roll under 0.75 deg   is not corrected at all (and let go again under 0.5): on three points even that lifts a rear
+#                           omni wheel. A robot straddling a crown rides up to 0.85 deg off, and steady_residual_deg can
+#                           fail there for the dead band alone.
+# In pitch a slope is levelled at any speed (the crest rule, which left part of a fast slope in the base, is off: it
+# cost every ramp at full stick more than it saved at a crest). The price is a crest: over a break of twice 6 deg at
+# full stick the levelled robot is thrown 9.4 deg where the robot switched off is thrown 8.0, and rider_peak_deg fails
+# there; at the standard stick the same crest is 3.3 deg.
 LEVEL_CRITERIA = {
     "steady_residual_deg": 0.5,  # the rider's error against the preference at the end of every constant segment
     "rider_rms_deg": 1.0,  # over the driven span
@@ -72,9 +102,9 @@ LEVEL_CRITERIA = {
     "stops": 0,
     "speed_kept_slope": 0.8,  # mean speed on over off, on constant slopes ...
     "speed_kept_overall": 0.6,  # ... and over the run
-    "at_reach_s": 0.0,
+    "at_reach_s": 0.0,  # the legs' reach; resting on the 6 deg roll limit standing across 6 deg is not this (see above)
     "margin_cm": 3.0,  # the centre of mass inside the bearing wheels' hull ...
-    "margin_under_off_cm": 1.0,  # ... and no more than this under the assist-off run's
+    "margin_under_off_cm": 3.5,  # ... and no more than this under the assist-off run's (three points: see above)
     "drive_share_under_off": 0.02,  # the drive wheels' least share of the load: not below the off run's (by more than this)
     "float_s": 0.2,  # no drive wheel off the ground longer
     "level_after_flat_deg": 0.5,  # 3 s after the last seam back onto the flat

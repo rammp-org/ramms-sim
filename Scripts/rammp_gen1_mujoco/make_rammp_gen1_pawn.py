@@ -56,20 +56,44 @@ INPUT_MAP = "/Game/Input/Ramms/DA_RammsInput_RammpGen1"
 # The level assist's tuning (FRammsLevelTuning; every member not named keeps its default). Worked out on a robot of
 # this shape and these rates in the plugin's kinematic dry run (RammsLevelGen1ShapeTests.cpp), to be confirmed in the
 # simulator:
-#   max_correction_deg        pitch 10: in the outdoor stance the frame's clearance stops a nose-up correction at about
-#                             8.5 deg (9 with the chassis let up 3 cm) and the rear lift's travel a nose-down one at
-#                             about 8 (11.5 with the chassis let up), so 10 binds only nose down with the chassis let
-#                             up. Roll 6: the owner's limit for standing on three points (the elevators 6.4 cm apart,
-#                             one rear omni wheel about 2.3 cm off the ground).
+#   max_correction_deg        pitch 10, counted from the stance (the plugin adds the stance's own lean to it): in the
+#                             simulator the frame's clearance stops a nose-up correction at 8.4 deg of rising ground
+#                             and nothing stops a nose-down one short of 12 with the chassis let up, so 10 binds only
+#                             nose down. (Counted from the chassis' frame, as it was, it bound at 7.5 deg of rising
+#                             ground, before the frame did.) Roll 6: the owner's limit for standing on three points
+#                             (the elevators' commands 11.7 deg apart at 6 deg; one rear omni wheel off the ground with
+#                             ANY roll corrected, the drive wheels then loaded about 2 to 1). On three points the robot
+#                             swings about its heavier drive wheel when braked, the further the faster it was going:
+#                             across 6 deg with the roll on, 0 to 3 deg from up to 57 cm/s (half stick), 4 to 5.5 from
+#                             63 to 88, 10 from 100, 15 and more from full stick; a lower limit is no better. So the
+#                             plugin carries roll up to a walk: all of it while the stick asks 60 cm/s or less, none of
+#                             it once the stick asks 65 or more, the drive held to 60 for the 2 to 3 s the roll takes
+#                             to walk out (console: Ramms.Level.ThreePointRule and its companions). With the roll out
+#                             a stop swings under 1 deg; the robot then turns 4.3 to 4.7 deg where it stands as the
+#                             roll comes back, as it does when the assist is switched on standing across 6 deg (the
+#                             braked drive wheels roll with the elevators' arms as the elevators part). The
+#                             translators moved 2.4 cm apiece against that as the elevators parted took the standing
+#                             turn from 4.4 deg to 0.25 in the simulator; the plugin does not do that yet.
 #   max_correction_rate_...   8 deg/s: about what the elevators give alone. The rear lift is the slow one and does two
 #                             thirds of a pitch correction (the ride height is kept), so a pitch correction moves at
 #                             under 6 deg/s whatever this says; the drive is slowed where the ground turns faster.
+#                             A crest is left to that: levelled all the way up 6 deg at full stick the robot is thrown
+#                             9.4 deg over a crest of twice that, where the robot switched off is thrown 8.0. The rule
+#                             that held the correction back for it (console: Ramms.Level.CrestRule) is off: it cannot
+#                             tell a slope that ends in a crest from a ramp that ends on a landing, and in the
+#                             simulator it left a 1:12 ramp at full stick 5 deg off (1.6 without) and an 8 deg ramp
+#                             7.7 (5.2), slower on both, to bring that one crest to 5.6.
 #   integral_max_deg          4: what the loaded elevators sag by, the sprung rear and its unloaded table are trimmed
 #                             out by the integral.
 #   ride_height_up_cm         3: the chassis may rise that far where it makes a correction fit (it buys nose-down
 #                             reach; lowering it buys none, the frame is what stops a nose-up one).
-#   min_belly_clearance_cm    4 under the frame's underside.
-#   level_reference_deg       (0, 0): on, the stance's own lean on the flat (about 1.4 deg nose up) is taken out too.
+#   min_belly_clearance_cm    4 under the frame's underside, reckoned from where the lifts' joints stand under the
+#                             load when the assist is switched on (the loaded elevators sit 1.3 to 2.3 deg short of
+#                             their commands; reckoned from the commands the simulator had 3.3 to 3.7 cm). Over a
+#                             fold in the ground it can still be less for a moment: the law takes the ground for a
+#                             plane under the wheels.
+#   level_reference_deg       (0, 0): on, the stance's own lean on the flat is taken out too (1.73 deg nose up in the
+#                             simulator; the kinematic tables, which have no springs and no sag, say 1.35).
 LEVEL_TUNING = {
     "level_reference_deg": unreal.Vector2D(0.0, 0.0),
     "max_correction_deg": unreal.Vector2D(10.0, 6.0),
