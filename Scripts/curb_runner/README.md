@@ -109,11 +109,73 @@ A robot is two files:
 
 The runner finds profiles here, in any checked-out plugin's `Scripts/curb_runner_robots/`, and in the folders listed in `$RAMMS_CURB_ROBOTS`. The profile's `robot_id` is what `ramms.Robot` is set to: a robot definition's id, or a pawn class path for a robot with no definition (`/Game/MyRobot/BP_MyRobot.BP_MyRobot_C`).
 
+## Level-assist courses (`run_level.py`)
+
+The same runner drives a robot over the level-assist course maps (`Content/Maps/Level`, see `Scripts/level_maps/README.md`) with the level assist on and off. It measures whether the rider stays level, or at the tilt they prefer, on slopes, cross slopes and combined ground, and what happens at each transition.
+
+```
+python -I Scripts/curb_runner/run_level.py --list
+python -I Scripts/curb_runner/run_level.py --robot rammp_gen1 --courses TRANSITIONS --dirs fwd
+python -I Scripts/curb_runner/run_level.py --robot rammp_gen1 --courses RAMP5,CROSS6 --pref "0,0" --pref "3,-2" --variants drive,toggle
+python -I Scripts/curb_runner/run_level.py --rescore DIR          # its rows again from its traces
+python -I Scripts/curb_runner/level_report.py DIR                 # its report again
+```
+
+Results go to `--out` (by default `Saved/CurbHistory/level-runs/<time>-<robot>`):
+- `level_results.json`, one row per run, and `level_summary.md`;
+- each run's `<case>.trace.json`;
+- `level_report.html`: one page with a figure per case and the tables. Each figure is also saved alone under `figures/`.
+
+**A case** is a course, a direction (`fwd` or `rev`), a start, a variant, a preference, a stick value and the hold on or off. It is run once with the assist off and once with it on, so the two cover the same ground. The preference (`--pref "pitch,roll"`) is set in both, and the assist-off run is scored against it too.
+
+**A run** is one PIE session, timed by the physics' clock (`course.py`):
+1. The robot's standard setup at 1 s.
+2. The steady gate from 3 s. Once the robot is at rest the run's zero is taken (the seat against the chassis), and the events timed before the start fire: the preference, and the assist for an on run.
+3. "Go" 6 s later. The stick is held from here in whatever drive mode is active.
+4. The end: the robot's reference point passes the end line, 120 cm before the lane's end. A run that leaves the lane ends there and says so.
+5. 4 s at rest, then the trace is written.
+
+**Variants** (`--variants`):
+- `drive`: straight through.
+- `toggle`: the assist switched on halfway along the first slope and off halfway along the last.
+- `pref_step`: the preference stepped on the way and back.
+- `stop_go`: a 3 s stop halfway along every slope.
+- `mode`: a stop, a switch to the robot's other drive mode and back, then on.
+- `parked`: no driving. The assist is on for 30 s where the robot stands, then off. Use it with a start on a slope: `--courses PARK --starts pad_grade,pad_cross --variants parked`. Its figures: how far the reference point moved in all (every switch on the way included), how far it crept while held, when the rider was settled, and when the commands went quiet (they are given 3 s after the rider is settled before a change counts as hunting).
+
+**The hold.** A small heading and cross-track loop sets `drive.turn` so that both runs of a case cover the same ground. It hides nothing: the turn it held, the heading error and the cross-track error are in every sample, and the figures report the steering effort. `--hold off` runs without it and shows the yaw and the drift the robot has by itself. `--hold both` runs each case both ways. The gains and the sign of `drive.turn` are the robot profile's (`level` `hold`). Run `FLAT` with `--starts yaw5` first: the heading error must shrink, and it must not come back the other way.
+
+Two things a real drive needed that a toy does not (`course.steer`):
+- `deadzone`: the drive's own stick dead zone. A differential drive that takes nothing under 0.05 of stick and rescales the rest never sees the hold's small turns, and the robot weaves inside that band for the whole run. The hold carries its turn over the dead zone, so `drive.turn` in a trace is never between 0 and the dead zone, and the steering effort (`steer_abs_mean`) reads at least the dead zone.
+- `k_rate`: damping on the heading's own rate, smoothed over 0.25 s. A heading that answers the stick late (wheel speed loops against the robot's yaw inertia) weaves slowly without it. Keep it small: a large one rings, the stick swinging to its limit about once a second. Check a new robot's gains on a cross slope with the assist on as well as on the flat: the heading can answer the stick several times more strongly there.
+
+`--hold-gains k_yaw=0.02,k_rate=0.02` sets gains for one run, over the profile's, for tuning. At full stick a turn costs speed (the drive scales both wheels to keep the curvature), so a hold that works hard shows as speed lost: read `speed kept` beside the steering effort.
+
+**Ending a long run.** Put a file named `STOP` in the run's `--out` folder. The session in PIE finishes, the cases left are not started, and the runner ends as usual (PIE ended, the editor's settings put back). Do not kill the runner or its editor instead. Remove the file to run into that folder again.
+
+**Frame lock.** The standard series is frame-locked (the robot profile's `locked_frame_s`, 0.0625 s). `--locked-frame-s 0` runs unlocked.
+
+**The figures** (`level_measures.py`, `figures.version` 1) are described in `Docs/level-performance/README.md`. In short:
+- per segment: the rider's and the chassis's error against the preference (mean, RMS, and the residual over the last 1.5 s) and their difference from the ground's own attitude;
+- per transition (each seam and each event): the peak error, the time outside 1°, the fastest tilt over 0.3 s and the time to settle within 0.5°. The stop at the end of the run (the stick let go at speed) is a transition of its own: reported, not scored, and left out of the "level 3 s after the flat" check;
+- over the run: the speed, stops nobody asked for, the least `level.reach` and speed scale, yaw and lateral drift, the steering effort, the drive wheels' share of the load, the longest a drive wheel was off the ground, the standing margin, and the legs' travel;
+- for a pair: the rejection ratio (error RMS on over off) and the speed kept.
+
+**Scoring.** A robot's profile gives its criteria as data (`level` `criteria`) and what each case should do (`level` `expect`): `pass`, `rates` (a run that switches something on the way: only the tilt rates are scored), `past_reach`, `parked` or `explore`. An assist-off run is a baseline and is never scored. A check whose value could not be measured is listed as not measured and fails nothing. The rejection ratio is scored where a course has a slope of 3° or more; the flat checks (the on run no worse than the off run, no hunting of the legs) only where the whole course is flat; a course of gentle slopes gets neither.
+
+**History.** Each run is recorded in the robot's level history (`level` `history_file`; RAMMP Gen1's is `Docs/level-performance/gen1_level_history.jsonl`) unless you pass `--no-history`.
+
+**Your robot** needs a `level` entry in its profile (`robots/__init__.py` lists its keys) and these adapter methods (`robots/rammp_gen1_editor.py` documents them): `drive`, `release_drive`, `set_control`, `level`, `mode`, `set_mode`, `commands`, `ground`. Only `drive` and `release_drive` are required. A robot without a level assist still runs the courses as a baseline.
+
 ## Tests
 
 ```
 python -I Scripts/curb_runner/tests/test_measures.py
 python -I Scripts/curb_runner/tests/test_history.py
+python -I Scripts/curb_runner/tests/test_level_measures.py
+python -I Scripts/curb_runner/tests/test_course_session.py
+python -I Scripts/curb_runner/tests/test_svg_plot.py
+python -I Scripts/level_maps/tests/test_level_terrain.py
 ```
 
-These use synthetic traces with known answers. They need no editor, and they write nothing outside a temporary folder.
+These use synthetic traces with known answers. They need no editor, and they write nothing outside a temporary folder. `test_course_session.py` runs the course session itself against a stand-in `unreal` module and a made-up robot, then makes the rows, the history and the report from the traces it wrote.
